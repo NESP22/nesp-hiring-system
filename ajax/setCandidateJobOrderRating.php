@@ -27,6 +27,8 @@
  * $Id: setCandidateJobOrderRating.php 1479 2007-01-17 00:22:21Z will $
  */
 
+include_once(__DIR__ . '/bootstrap.php');
+
 include_once(LEGACY_ROOT . '/lib/Pipelines.php');
 
 

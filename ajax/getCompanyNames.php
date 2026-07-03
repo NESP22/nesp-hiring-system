@@ -27,6 +27,8 @@
  * $Id: getCompanyNames.php 2367 2007-04-23 23:24:05Z will $
  */
 
+include_once(__DIR__ . '/bootstrap.php');
+
 include_once(LEGACY_ROOT . '/lib/Companies.php');
 include_once(LEGACY_ROOT . '/lib/Search.php');
 

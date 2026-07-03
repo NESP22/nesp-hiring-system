@@ -27,6 +27,8 @@
  * $Id: getDataGridPager.php 3078 2007-09-21 20:25:28Z will $
  */
 
+include_once(__DIR__ . '/bootstrap.php');
+
 include_once(LEGACY_ROOT . '/lib/CATSUtility.php');
 include_once(LEGACY_ROOT . '/lib/TemplateUtility.php');
 include_once(LEGACY_ROOT . '/lib/DataGrid.php');

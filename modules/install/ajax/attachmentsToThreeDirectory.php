@@ -27,6 +27,8 @@
  * $Id: attachmentsToThreeDirectory.php 2336 2007-04-14 22:01:51Z will $
  */
 
+include_once(dirname(__DIR__, 3) . '/ajax/bootstrap.php');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST')
 {
     header('Content-Type: text/html; charset=UTF-8');
@@ -45,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST')
     die();
 }
 
-include_once('./config.php');
+include_once(LEGACY_ROOT . '/config.php');
 include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
 
 $interface = new SecureAJAXInterface();

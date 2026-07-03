@@ -27,6 +27,8 @@
  * $Id: backup.php 3402 2007-11-02 22:03:43Z brian $
  */
 
+include_once(dirname(__DIR__, 3) . '/ajax/bootstrap.php');
+
 @ini_set('memory_limit', '512M');
 
 include_once(LEGACY_ROOT . '/lib/Attachments.php');

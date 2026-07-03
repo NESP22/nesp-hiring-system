@@ -27,6 +27,8 @@
  * $Id: getCompanyContacts.php 1892 2007-02-20 06:44:04Z will $
  */
 
+include_once(__DIR__ . '/bootstrap.php');
+
 include_once(LEGACY_ROOT . '/lib/Companies.php');
 
 

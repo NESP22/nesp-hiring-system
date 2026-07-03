@@ -27,7 +27,9 @@
  * $Id: ui.php 3807 2007-12-05 01:47:41Z will $
  */
 
-include_once('./config.php');
+include_once(dirname(__DIR__, 3) . '/ajax/bootstrap.php');
+
+include_once(LEGACY_ROOT . '/config.php');
 include_once(LEGACY_ROOT . '/lib/InstallationTests.php');
 include_once(LEGACY_ROOT . '/lib/CATSUtility.php');
 

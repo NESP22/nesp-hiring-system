@@ -27,6 +27,8 @@
  * $Id: processMassImportItem.php 2359 2007-04-21 22:49:17Z will $
  */
 
+include_once(dirname(__DIR__, 3) . '/ajax/bootstrap.php');
+
 
 include_once(LEGACY_ROOT . '/lib/Attachments.php');
 

@@ -1,7 +1,9 @@
 <?php
-    include_once('./lib/EmailTemplates.php');
-    include_once('./lib/DateUtility.php');
-    include_once('./lib/Candidates.php');
+    include_once(__DIR__ . '/bootstrap.php');
+
+    include_once(LEGACY_ROOT . '/lib/EmailTemplates.php');
+    include_once(LEGACY_ROOT . '/lib/DateUtility.php');
+    include_once(LEGACY_ROOT . '/lib/Candidates.php');
     
     $interface = new SecureAJAXInterface();
 

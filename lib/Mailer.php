@@ -40,7 +40,7 @@
  use PHPMailer\PHPMailer\Exception;
 
  // Load Composer's autoloader
- require './vendor/autoload.php';
+ require LEGACY_ROOT . '/vendor/autoload.php';
 
 // FIXME: Remove this dependency! Bad bad bad!
 include_once(LEGACY_ROOT . '/lib/Pipelines.php');

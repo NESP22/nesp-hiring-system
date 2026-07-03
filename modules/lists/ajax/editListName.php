@@ -27,6 +27,8 @@
  * $Id: editListName.php 3198 2007-10-14 23:36:43Z will $
  */
 
+include_once(dirname(__DIR__, 3) . '/ajax/bootstrap.php');
+
 
 include_once(LEGACY_ROOT . '/lib/StringUtility.php');
 include_once(LEGACY_ROOT . '/lib/ActivityEntries.php');

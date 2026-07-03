@@ -27,6 +27,8 @@
  * $Id: setColumnWidth.php 2373 2007-04-24 21:57:28Z will $
  */
 
+include_once(__DIR__ . '/bootstrap.php');
+
 $interface = new SecureAJAXInterface();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST')

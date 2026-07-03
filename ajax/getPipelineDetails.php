@@ -27,6 +27,8 @@
  * $Id: getPipelineDetails.php 2976 2007-08-30 18:18:48Z andrew $
  */
 
+include_once(__DIR__ . '/bootstrap.php');
+
 include_once(LEGACY_ROOT . '/lib/Pipelines.php');
 
 

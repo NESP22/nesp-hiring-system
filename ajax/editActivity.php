@@ -27,6 +27,8 @@
  * $Id: editActivity.php 2883 2007-08-14 15:25:26Z brian $
  */
 
+include_once(__DIR__ . '/bootstrap.php');
+
 
 include_once(LEGACY_ROOT . '/lib/ActivityEntries.php');
 

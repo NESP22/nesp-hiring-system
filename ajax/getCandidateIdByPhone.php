@@ -27,6 +27,8 @@
 * $Id: getCandidateIdByPhone.php 3078 2007-09-21 20:25:28Z will $
 */
 
+include_once(__DIR__ . '/bootstrap.php');
+
 $interface = new SecureAJAXInterface();
 
 include (LEGACY_ROOT . '/lib/Candidates.php');

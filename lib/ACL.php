@@ -7,7 +7,7 @@
  * @copyright (C) OpenCats
  */
 
-include_once("./config.php");
+include_once(LEGACY_ROOT . '/config.php');
 
 class ACL
 {
