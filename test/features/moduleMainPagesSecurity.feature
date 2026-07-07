@@ -5,7 +5,7 @@ Feature: Access Level to objects check - main pages
   
   ######## DASHBOARD(HOME) #######
 
-  @javascript @dashboard
+  @dashboard
   Scenario Outline: Dashboard module visibility
     Given I am logged in with <accessLevel> access level
     And I am on "/index.php?m=home"
@@ -32,7 +32,7 @@ Feature: Access Level to objects check - main pages
      
   ####### ACTIVITIES #######
     
-  @javascript @activities
+  @activities
   Scenario Outline: Activities module visibility
     Given I am logged in with <accessLevel> access level
     And I am on "/index.php?m=activity"
@@ -64,7 +64,7 @@ Feature: Access Level to objects check - main pages
      
   ####### JOB ORDERS #######
     
-  @javascript @joborders
+  @joborders
   Scenario Outline: Job Orders module visibility
     Given I am logged in with <accessLevel> access level
     And I am on "/index.php?m=joborders"
@@ -98,7 +98,7 @@ Feature: Access Level to objects check - main pages
      
   ####### CANDIDATES #######
      
-  @javascript @candidates
+  @candidates
   Scenario Outline: Candidates module visibility
     Given I am logged in with <accessLevel> access level
     And I am on "/index.php?m=candidates"
@@ -134,7 +134,7 @@ Feature: Access Level to objects check - main pages
 
     ####### COMPANIES #######
     
-    @javascript @companies
+    @companies
     Scenario Outline: Companies module visibility
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=companies"
@@ -167,7 +167,7 @@ Feature: Access Level to objects check - main pages
      
    ####### CONTACTS #######
      
-   @javascript @contacts
+   @contacts
    Scenario Outline: Contacts module visibility
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=contacts"
@@ -201,7 +201,7 @@ Feature: Access Level to objects check - main pages
      
      ####### LISTS #######
      
-    @javascript @lists
+    @lists
     Scenario Outline: Lists module visibility
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=lists"
@@ -227,7 +227,7 @@ Feature: Access Level to objects check - main pages
      
        ####### REPORTS #######
   
-  @javascript @reports
+  @reports
     Scenario Outline: Reports module visibility
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=reports"
@@ -257,7 +257,7 @@ Feature: Access Level to objects check - main pages
      
 ####### SETTINGS #######  
 
-@javascript @settings
+@settings
     Scenario Outline: Settings module visibility
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=settings"

@@ -50,7 +50,7 @@ Feature: Access Level to objects check - sub pages (show, ...)
   
   ####### CANDIDATES #######
   
-   @javascript @candidates
+   @candidates
    Scenario Outline: Candidate Show page visibility
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=candidates"
@@ -93,7 +93,7 @@ Feature: Access Level to objects check - sub pages (show, ...)
      
     ####### COMPANIES #######
 
-    @javascript @companies
+    @companies
     Scenario Outline: Company Show page visibility for disabled level
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=home"
@@ -119,7 +119,7 @@ Feature: Access Level to objects check - sub pages (show, ...)
      | accessLevel | addCompany  | searchCompany  | quickSearch | actionMenu | addAttachment | viewHistory | editCompany   | deleteCompany   | addJobOrder | addContact | editJobOrder | editContact | deleteAttachment | sendEmail |
      | DISABLED    | not see     | not see        | not         | not        | not see       | not see     | not see       | not see         | not see     | not see    | not          | not         | not              | not       |
    
-    @javascript @companies
+    @companies
     Scenario Outline: Company Show page visibility
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=home&a=quickSearch&quickSearchFor=google"
@@ -153,7 +153,7 @@ Feature: Access Level to objects check - sub pages (show, ...)
      
   ####### CONTACTS #######
   
-  @javascript @contacts
+  @contacts
     Scenario Outline: Contacts Show page visibility
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=contacts"
@@ -187,7 +187,7 @@ Feature: Access Level to objects check - sub pages (show, ...)
      
    ####### LISTS #######
        
-   @javascript @lists
+   @lists
    Scenario Outline: Lists Show page visibility
      Given I am logged in with <accessLevel> access level
      And I am on "/index.php?m=lists"
