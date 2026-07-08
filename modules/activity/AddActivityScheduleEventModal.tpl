@@ -1,12 +1,8 @@
 <?php /* $Id: AddActivityScheduleEventModal.tpl $ */ ?>
-<?php if ($this->isJobOrdersMode && $this->onlyScheduleEvent): ?>
-    <?php TemplateUtility::printModalHeader('Job Orders', array('modules/candidates/activityvalidator.js', 'js/activity.js'), 'Job Orders: Schedule Event'); ?>
-<?php elseif ($this->isJobOrdersMode): ?>
-    <?php TemplateUtility::printModalHeader('Job Orders', array('modules/candidates/activityvalidator.js', 'js/activity.js'), 'Job Orders: Log Activity'); ?>
-<?php elseif ($this->onlyScheduleEvent): ?>
-    <?php TemplateUtility::printModalHeader('Candidates', array('modules/candidates/activityvalidator.js', 'js/activity.js'), 'Candidates: Schedule Event'); ?>
+<?php if ($this->onlyScheduleEvent): ?>
+    <?php TemplateUtility::printModalHeader($this->activityModalTitle, array($this->activityValidatorPath, 'js/activity.js'), $this->activityModalTitle . ': Schedule Event'); ?>
 <?php else: ?>
-    <?php TemplateUtility::printModalHeader('Candidates', array('modules/candidates/activityvalidator.js', 'js/activity.js'), 'Candidates: Log Activity'); ?>
+    <?php TemplateUtility::printModalHeader($this->activityModalTitle, array($this->activityValidatorPath, 'js/activity.js'), $this->activityModalTitle . ': Log Activity'); ?>
 <?php endif; ?>
 
 <?php if (!$this->isFinishedMode): ?>
@@ -15,11 +11,11 @@
     window.CATSUserDateFormat = '<?php echo($_SESSION['CATS']->isDateDMY() ? 'DD-MM-YY' : 'MM-DD-YY'); ?>';
 </script>
 
-    <form name="logActivityForm" id="logActivityForm" action="<?php echo(CATSUtility::getIndexName()); ?>?m=<?php if ($this->isJobOrdersMode): ?>joborders<?php else: ?>candidates<?php endif; ?>&amp;a=addActivity<?php if ($this->onlyScheduleEvent): ?>&amp;onlyScheduleEvent=true<?php endif; ?>" method="post" onsubmit="return checkActivityForm(document.logActivityForm);" autocomplete="off">
+    <form name="logActivityForm" id="logActivityForm" action="<?php echo(CATSUtility::getIndexName()); ?>?m=<?php echo($this->activityParentModule); ?>&amp;a=<?php echo($this->activitySubmitAction); ?><?php if ($this->onlyScheduleEvent): ?>&amp;onlyScheduleEvent=true<?php endif; ?>" method="post" onsubmit="return checkActivityForm(document.logActivityForm);" autocomplete="off">
         <input type="hidden" name="postback" id="postback" value="postback" />
-        <input type="hidden" id="candidateID" name="candidateID" value="<?php echo($this->candidateID); ?>" />
-<?php if ($this->isJobOrdersMode): ?>
-        <input type="hidden" id="regardingID" name="regardingID" value="<?php echo($this->selectedJobOrderID); ?>" />
+        <input type="hidden" id="<?php echo($this->activityParentIDName); ?>" name="<?php echo($this->activityParentIDName); ?>" value="<?php echo($this->activityParentID); ?>" />
+<?php if ($this->activityRegardingIDHidden): ?>
+        <input type="hidden" id="regardingID" name="regardingID" value="<?php echo($this->regardingID); ?>" />
 <?php endif; ?>
 
         <table class="editTable" width="560">
@@ -63,16 +59,16 @@
                     <label id="regardingIDLabel" for="regardingID">Regarding:</label>
                 </td>
                 <td class="tdData">
-<?php if ($this->isJobOrdersMode): ?>
-                    <span><?php $this->_($this->pipelineData['title']); ?></span>
+<?php if ($this->activityRegardingIDHidden): ?>
+                    <span><?php $this->_($this->activityRegardingTitle); ?></span>
 <?php else: ?>
                     <select id="regardingID" name="regardingID" class="inputbox" style="width: 150px;">
                         <option value="-1">General</option>
-                        <?php foreach ($this->pipelineRS as $rowNumber => $pipelinesData): ?>
-                            <?php if ($this->selectedJobOrderID == $pipelinesData['jobOrderID']): ?>
-                                <option selected="selected" value="<?php $this->_($pipelinesData['jobOrderID']) ?>"><?php $this->_($pipelinesData['title']) ?></option>
+                        <?php foreach ($this->jobOrdersRS as $jobOrderData): ?>
+                            <?php if ($this->regardingID == $jobOrderData['jobOrderID']): ?>
+                                <option selected="selected" value="<?php $this->_($jobOrderData['jobOrderID']) ?>"><?php $this->_($jobOrderData['activityLabel']) ?></option>
                             <?php else: ?>
-                                <option value="<?php $this->_($pipelinesData['jobOrderID']) ?>"><?php $this->_($pipelinesData['title']) ?> (<?php $this->_($pipelinesData['companyName']) ?>)</option>
+                                <option value="<?php $this->_($jobOrderData['jobOrderID']) ?>"><?php $this->_($jobOrderData['activityLabel']) ?></option>
                             <?php endif; ?>
                         <?php endforeach; ?>
                     </select>
@@ -158,13 +154,14 @@
                                 <td valign="top">
                                     <div style="margin-bottom: 4px;">
                                         <label id="titleLabel" for="title">Title&nbsp;*</label><br />
-                                        <input type="text" class="inputbox" name="title" id="title" style="width: 180px;" />
+                                        <input type="text" class="inputbox" name="title" id="title" style="width: <?php echo($this->activityTitleWidth); ?>px" />
                                     </div>
 
+<?php if ($this->activityShowEventDuration): ?>
                                     <div style="margin-bottom: 4px;">
                                         <label id="durationLabel" for="duration">Length:</label>
                                         <br />
-                                        <select id="duration" name="duration" class="inputbox" style="width: 180px;">
+                                        <select id="duration" name="duration" class="inputbox" style="width: <?php echo($this->activityTitleWidth); ?>px;">
                                             <option value="15">15 minutes</option>
                                             <option value="30">30 minutes</option>
                                             <option value="45">45 minutes</option>
@@ -176,19 +173,20 @@
                                             <option value="300">More than 4 hours</option>
                                         </select>
                                     </div>
-                                    
+<?php endif; ?>
+
                                     <div style="margin-bottom: 4px;">
                                         <label id="descriptionLabel" for="description">Description</label><br />
-                                        <textarea name="description" id="description" cols="20" class="inputbox" style="width: 180px; height:60px;"></textarea>
+                                        <textarea name="description" id="description" cols="20" class="inputbox" style="width: <?php echo($this->activityDescriptionWidth); ?>px;<?php if ($this->activityDescriptionHeight > 0): ?> height:<?php echo($this->activityDescriptionHeight); ?>px;<?php endif; ?>"></textarea>
                                     </div>
 
                                     <div <?php if (!$this->allowEventReminders): ?>style="display:none;"<?php endif; ?>>
                                         <input type="checkbox" name="reminderToggle" onclick="if (this.checked) document.getElementById('reminderArea').style.display = ''; else document.getElementById('reminderArea').style.display = '';">&nbsp;<label>Set Reminder</label><br />
                                     </div>
-                                    
+
                                     <div style="display:none;" id="reminderArea">
                                         <div>
-                                            <label>E-Mail To:</label><br />
+                                            <label><?php echo($this->activityReminderEmailLabel); ?></label><br />
                                             <input type="text" id="sendEmail" name="sendEmail" class="inputbox" style="width: 150px" value="<?php $this->_($this->userEmail); ?>" />
                                         </div>
                                         <div>
@@ -212,11 +210,7 @@
 
         </table>
         <input type="submit" class="button" name="submit" id="submit" value="Save" />&nbsp;
-<?php if ($this->isJobOrdersMode): ?>
-        <input type="button" class="button" name="close" value="Cancel" onclick="parentGoToURL(<?php echo Template::escapeJsAttr(CATSUtility::getIndexName() . '?m=joborders&a=show&jobOrderID=' . $this->selectedJobOrderID); ?>);" />
-<?php else: ?>
-        <input type="button" class="button" name="close" value="Cancel" onclick="parentGoToURL(<?php echo Template::escapeJsAttr(CATSUtility::getIndexName() . '?m=candidates&a=show&candidateID=' . $this->candidateID); ?>);" />
-<?php endif; ?>
+        <input type="button" class="button" name="close" value="Cancel" onclick="parentGoToURL(<?php echo Template::escapeJsAttr($this->activityCancelURL); ?>);" />
     </form>
 
     <script type="text/javascript">
@@ -233,13 +227,19 @@
             document.getElementById('activityMeridiem').value = (now.getHours() >= 12 ? 'PM' : 'AM');
             document.logActivityForm.activityNote.focus();
         }
+<?php if ($this->onlyScheduleEvent && $this->activityFocusEventTitle): ?>
+        else
+        {
+            document.getElementById('title').focus();
+        }
+<?php endif; ?>
     </script>
 
 <?php else: ?>
     <?php if (!$this->changesMade): ?>
         <p>No changes have been made.</p>
     <?php else: ?>
-         <?php if (!$this->onlyScheduleEvent): ?>
+        <?php if (!$this->onlyScheduleEvent): ?>
             <?php if ($this->activityAdded): ?>
                 <?php if (!empty($this->activityDescription)): ?>
                     <p>An activity entry of type <span class="bold"><?php $this->_($this->activityType); ?></span> has been added with the following note: &quot;<?php $this->_($this->activityDescription); ?>&quot;.</p>
@@ -255,11 +255,7 @@
     <?php echo($this->eventHTML); ?>
 
     <form>
-<?php if ($this->isJobOrdersMode): ?>
-        <input type="button" name="close" class="button" value="Close" onclick="parentGoToURL(<?php echo Template::escapeJsAttr(CATSUtility::getIndexName() . '?m=joborders&a=show&jobOrderID=' . $this->regardingID); ?>);" />
-<?php else: ?>
-        <input type="button" name="close" class="button" value="Close" onclick="parentGoToURL(<?php echo Template::escapeJsAttr(CATSUtility::getIndexName() . '?m=candidates&a=show&candidateID=' . $this->candidateID); ?>);" />
-<?php endif; ?>
+        <input type="button" name="close" class="button" value="Close" onclick="parentGoToURL(<?php echo Template::escapeJsAttr($this->activityCloseURL); ?>);" />
     </form>
 <?php endif; ?>
 
