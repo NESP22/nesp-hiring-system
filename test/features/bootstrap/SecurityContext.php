@@ -12,7 +12,6 @@ use Behat\MinkExtension\Context\MinkContext;
 use Behat\Mink\Exception\ExpectationException;
 use Behat\Mink\Exception\ElementHtmlException;
 
-define('SITE_ID', 1);
 define('ADMIN_ID', 1);
 /**
  * Defines application features from the security context.
@@ -113,7 +112,9 @@ class SecurityContext extends MinkContext implements Context, SnippetAcceptingCo
                 $password = "tester";
                 break;
             case 'MULTI_ADMIN':
-                $username = "testerMultiSA";
+                /* Legacy multi-site administration was removed. Keep the
+                 * existing security matrix label mapped to site-admin access. */
+                $username = "testerSA";
                 $password = "tester";
                 break;
             case 'ROOT':
