@@ -1,0 +1,93 @@
+name: nesp-hiring
+
+services:
+  opencats:
+    container_name: nesp_hiring_web
+    image: prooph/nginx:www
+    restart: unless-stopped
+    depends_on:
+      - php
+    ports:
+      # Localhost-only. Cloudflare Tunnel or a host reverse proxy should be
+      # the public entry point; the OpenCATS container is not exposed directly.
+      - "127.0.0.1:${OPENCATS_HTTP_PORT:-8080}:80"
+    volumes_from:
+      - opencatsdata:ro
+    networks:
+      - frontend
+
+  php:
+    container_name: nesp_hiring_php
+    build:
+      context: ..
+      dockerfile: docker/php/Dockerfile
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.4.1}
+    restart: unless-stopped
+    working_dir: /var/www/public
+    depends_on:
+      opencatsdb:
+        condition: service_healthy
+    volumes_from:
+      - opencatsdata
+    volumes:
+      - ./php/production.ini:/usr/local/etc/php/conf.d/zz-nesp-production.ini:ro
+    networks:
+      - frontend
+      - backend
+
+  opencatsdata:
+    container_name: nesp_hiring_data
+    image: busybox:1.36
+    volumes:
+      # OpenCATS writes its generated config, temp files, uploads and
+      # attachments inside the application tree. Back up this directory.
+      - ..:/var/www/public
+    command: "true"
+
+  opencatsdb:
+    container_name: nesp_hiring_mariadb
+    image: ${MARIADB_IMAGE:-mariadb:10.11}
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in docker/.env.production}
+      MARIADB_DATABASE: ${DB_NAME:-cats}
+      MARIADB_USER: ${DB_USER:-opencats}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in docker/.env.production}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mariadb-admin ping -h localhost -u root -p"$$MARIADB_ROOT_PASSWORD" --silent
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    volumes:
+      - opencats_db:/var/lib/mysql
+    networks:
+      - backend
+
+  cloudflared:
+    container_name: nesp_hiring_cloudflared
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles:
+      - cloudflare
+    depends_on:
+      - opencats
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - ${CLOUDFLARE_TUNNEL_TOKEN:-SET_WHEN_READY}
+    networks:
+      - frontend
+
+volumes:
+  opencats_db:
+
+networks:
+  frontend:
+  backend:
+    internal: true

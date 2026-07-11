@@ -4,6 +4,9 @@ INSTALL_BLOCK
 .settings/*
 docker/data/*
 docker/persist/*
+docker/.env.production
+docker/backups/*
+!docker/backups/.gitkeep
 vendor/*
 attachments/*
 temp/*
