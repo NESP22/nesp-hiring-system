@@ -1,0 +1,70 @@
+name: NESP Production Configuration Check
+
+on:
+  pull_request:
+    paths:
+      - 'docker/docker-compose.production.yml'
+      - 'docker/.env.production.example'
+      - 'docker/php/production.ini'
+      - '.github/workflows/nesp-production-config.yml'
+      - 'docs/nesp/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-production-compose:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare non-secret validation environment
+        run: cp docker/.env.production.example docker/.env.production
+
+      - name: Render Docker Compose configuration
+        run: |
+          docker compose \
+            --env-file docker/.env.production \
+            -f docker/docker-compose.production.yml \
+            config --format json > /tmp/nesp-compose.json
+
+      - name: Enforce NESP production safety rules
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path('/tmp/nesp-compose.json').read_text())
+          services = config.get('services', {})
+
+          errors = []
+
+          if 'phpmyadmin' in services:
+              errors.append('phpMyAdmin must not be present in the production stack.')
+
+          database = services.get('opencatsdb', {})
+          if database.get('ports'):
+              errors.append('MariaDB must not publish any host ports.')
+
+          web = services.get('opencats', {})
+          ports = web.get('ports') or []
+          if not ports:
+              errors.append('The OpenCATS origin must have a localhost-only port for private setup.')
+          else:
+              for port in ports:
+                  host_ip = port.get('host_ip') if isinstance(port, dict) else None
+                  if host_ip != '127.0.0.1':
+                      errors.append(f'OpenCATS origin is not localhost-only: {port!r}')
+
+          networks = config.get('networks', {})
+          if not networks.get('backend', {}).get('internal', False):
+              errors.append('The database backend network must be internal.')
+
+          if errors:
+              raise SystemExit('\n'.join(f'ERROR: {error}' for error in errors))
+
+          print('NESP production Docker configuration passed safety checks.')
+          PY
