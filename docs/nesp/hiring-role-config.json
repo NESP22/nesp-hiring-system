@@ -1,0 +1,162 @@
+{
+  "version": 2,
+  "status": "draft_for_human_approval",
+  "company": {
+    "name": "New England Sports Photo",
+    "short_name": "NESP",
+    "base_location": "Methuen, Massachusetts",
+    "service_area": [
+      "Massachusetts",
+      "New Hampshire",
+      "Rhode Island",
+      "Connecticut"
+    ]
+  },
+  "roles": [
+    {
+      "id": "freelance_photographer",
+      "title": "Freelance Sports & School Photographer",
+      "employment_type": "independent_contractor_proposed",
+      "publication_status": "blocked_pending_classification_review",
+      "classification_review_required": true,
+      "safe_initial_alternative": "seasonal_or_per_diem_w2_photographer",
+      "compensation": {
+        "type": "hourly_proposed",
+        "amount": 27,
+        "currency": "USD",
+        "approval_required": true
+      },
+      "required_review_fields": [
+        "location",
+        "travel_radius",
+        "weekday_availability",
+        "weekend_availability",
+        "reliable_transportation",
+        "relevant_photography_experience",
+        "equipment_list",
+        "portfolio",
+        "working_with_children_and_groups"
+      ],
+      "scorecard": {
+        "reliability_and_communication": 25,
+        "relevant_image_quality": 25,
+        "workflow_and_direction": 20,
+        "equipment_readiness": 15,
+        "travel_and_availability": 15
+      }
+    },
+    {
+      "id": "on_site_table_team",
+      "title": "On-Site Photo Day Table Team Member",
+      "employment_type": "w2_seasonal",
+      "publication_status": "draft_pending_business_approval",
+      "compensation": {
+        "type": "hourly_proposed",
+        "amount": 20,
+        "currency": "USD",
+        "approval_required": true
+      },
+      "required_review_fields": [
+        "location",
+        "travel_radius",
+        "weekday_availability",
+        "weekend_availability",
+        "reliable_transportation",
+        "customer_service_experience",
+        "detail_and_organization_example",
+        "tablet_or_checkin_comfort"
+      ],
+      "scorecard": {
+        "reliability_and_punctuality": 30,
+        "communication": 20,
+        "attention_to_detail": 20,
+        "organization_under_pressure": 15,
+        "travel_and_availability": 15
+      }
+    },
+    {
+      "id": "photography_assistant",
+      "title": "Photography Assistant / Poser",
+      "employment_type": "w2_seasonal",
+      "publication_status": "draft_pending_business_approval",
+      "compensation": {
+        "type": "hourly_proposed",
+        "amount": 22,
+        "currency": "USD",
+        "approval_required": true
+      },
+      "required_review_fields": [
+        "location",
+        "travel_radius",
+        "weekday_availability",
+        "weekend_availability",
+        "reliable_transportation",
+        "experience_with_children_or_groups",
+        "comfort_giving_directions",
+        "physical_activity_acknowledgement"
+      ],
+      "scorecard": {
+        "reliability_and_punctuality": 30,
+        "direction_and_confidence": 20,
+        "working_with_children_and_groups": 20,
+        "visual_attention_to_detail": 15,
+        "travel_and_availability": 15
+      }
+    },
+    {
+      "id": "staff_photographer_w2",
+      "title": "Staff Photographer — School & Sports Photography",
+      "employment_type": "w2",
+      "publication_status": "draft_pending_business_approval",
+      "compensation": {
+        "type": "hourly_range_proposed",
+        "minimum": 22,
+        "maximum": 27,
+        "currency": "USD",
+        "approval_required": true
+      },
+      "required_review_fields": [
+        "location",
+        "travel_radius",
+        "school_day_availability",
+        "evening_availability",
+        "weekend_availability",
+        "reliable_transportation",
+        "relevant_photography_experience",
+        "camera_and_lighting_experience",
+        "portfolio",
+        "working_with_children_and_groups"
+      ],
+      "scorecard": {
+        "reliability_and_punctuality": 25,
+        "technical_photography_skills": 25,
+        "consistency_and_workflow": 20,
+        "direction_and_communication": 15,
+        "travel_and_availability": 15
+      }
+    }
+  ],
+  "ai_policy": {
+    "decision_authority": "human_only",
+    "allowed": [
+      "extract_job_related_facts",
+      "summarize_relevant_experience",
+      "identify_missing_answers",
+      "compare_documented_availability",
+      "suggest_interview_questions",
+      "draft_messages_for_human_approval"
+    ],
+    "prohibited": [
+      "automatic_rejection",
+      "automatic_interview_selection",
+      "automatic_hiring",
+      "protected_characteristic_inference",
+      "protected_characteristic_scoring",
+      "name_scoring",
+      "photo_scoring",
+      "address_scoring_beyond_documented_travel_requirements",
+      "graduation_year_scoring",
+      "unsupervised_message_sending"
+    ]
+  }
+}
