@@ -47,9 +47,12 @@ RUN composer install \
 
 COPY docker/render/apache-vhost.conf.template /etc/apache2/sites-available/000-default.conf.template
 COPY docker/render/entrypoint.sh /usr/local/bin/nesp-render-entrypoint
+COPY docker/render/backup.sh /usr/local/bin/nesp-render-backup
 COPY docker/php/production.ini /usr/local/etc/php/conf.d/zz-nesp-production.ini
 
-RUN chmod 0755 /usr/local/bin/nesp-render-entrypoint
+RUN chmod 0755 \
+      /usr/local/bin/nesp-render-entrypoint \
+      /usr/local/bin/nesp-render-backup
 
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/nesp-render-entrypoint"]
