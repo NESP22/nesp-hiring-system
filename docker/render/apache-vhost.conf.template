@@ -1,0 +1,25 @@
+<VirtualHost *:__PORT__>
+    ServerName localhost
+    DocumentRoot /var/www/html
+
+    <Directory /var/www/html>
+        Options FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    <FilesMatch "^\.(env|git)">
+        Require all denied
+    </FilesMatch>
+
+    <Location "/render-health.txt">
+        Require all granted
+    </Location>
+
+    ErrorLog /proc/self/fd/2
+    CustomLog /proc/self/fd/1 combined
+
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set X-Frame-Options "SAMEORIGIN"
+</VirtualHost>
