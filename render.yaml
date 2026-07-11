@@ -1,0 +1,77 @@
+previews:
+  generation: off
+
+services:
+  - type: pserv
+    name: nesp-hiring-db
+    runtime: image
+    plan: starter
+    region: virginia
+    image:
+      url: docker.io/library/mariadb:10.11
+    envVars:
+      - key: PORT
+        value: 3306
+      - key: MARIADB_DATABASE
+        value: cats
+      - key: MARIADB_USER
+        value: opencats
+      - key: MARIADB_PASSWORD
+        generateValue: true
+      - key: MARIADB_ROOT_PASSWORD
+        generateValue: true
+      - key: MARIADB_AUTO_UPGRADE
+        value: 1
+    disk:
+      name: nesp-hiring-db-data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+
+  - type: web
+    name: nesp-hiring-web
+    runtime: docker
+    plan: starter
+    region: virginia
+    branch: master
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./docker/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /render-health.txt
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_TIMEZONE
+        value: America/New_York
+      - key: DB_NAME
+        value: cats
+      - key: DB_USER
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          envVarKey: MARIADB_USER
+      - key: DB_PASSWORD
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          envVarKey: MARIADB_PASSWORD
+      - key: DB_HOST
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          property: host
+      - key: DB_PORT
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          property: port
+      - key: INSTALL_ACCESS_USER
+        value: nesp-admin
+      - key: INSTALL_ACCESS_PASSWORD
+        sync: false
+      - key: OPENCATS_MAIL_ENABLED
+        value: 0
+    disk:
+      name: nesp-hiring-files
+      mountPath: /var/data
+      sizeGB: 10
