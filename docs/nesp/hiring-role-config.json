@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "status": "draft_for_human_approval",
   "company": {
     "name": "New England Sports Photo",
@@ -17,6 +17,9 @@
       "id": "freelance_photographer",
       "title": "Freelance Sports & School Photographer",
       "employment_type": "independent_contractor_proposed",
+      "publication_status": "blocked_pending_classification_review",
+      "classification_review_required": true,
+      "safe_initial_alternative": "seasonal_or_per_diem_w2_photographer",
       "compensation": {
         "type": "hourly_proposed",
         "amount": 27,
@@ -46,6 +49,7 @@
       "id": "on_site_table_team",
       "title": "On-Site Photo Day Table Team Member",
       "employment_type": "w2_seasonal",
+      "publication_status": "draft_pending_business_approval",
       "compensation": {
         "type": "hourly_proposed",
         "amount": 20,
@@ -74,6 +78,7 @@
       "id": "photography_assistant",
       "title": "Photography Assistant / Poser",
       "employment_type": "w2_seasonal",
+      "publication_status": "draft_pending_business_approval",
       "compensation": {
         "type": "hourly_proposed",
         "amount": 22,
@@ -102,6 +107,7 @@
       "id": "staff_photographer_w2",
       "title": "Staff Photographer — School & Sports Photography",
       "employment_type": "w2",
+      "publication_status": "draft_pending_business_approval",
       "compensation": {
         "type": "hourly_range_proposed",
         "minimum": 22,
