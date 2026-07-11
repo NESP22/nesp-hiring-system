@@ -8,6 +8,8 @@ on:
       - 'docker/php/production.ini'
       - '.github/workflows/render-deployment-check.yml'
       - 'docs/nesp/job-ads/**'
+      - 'docs/nesp/hiring-role-config.json'
+      - 'docs/nesp/RENDER_DEPLOYMENT.md'
   workflow_dispatch:
 
 permissions:
@@ -30,7 +32,33 @@ jobs:
       - name: Check shell scripts
         run: |
           sh -n docker/render/entrypoint.sh
+          sh -n docker/render/backup.sh
           shellcheck -s sh docker/render/entrypoint.sh
+          shellcheck -s sh docker/render/backup.sh
+
+      - name: Validate structured hiring configuration
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path('docs/nesp/hiring-role-config.json').read_text())
+          role_ids = {role['id'] for role in config.get('roles', [])}
+          expected = {
+              'freelance_photographer',
+              'on_site_table_team',
+              'photography_assistant',
+              'staff_photographer_w2',
+          }
+          if role_ids != expected:
+              raise SystemExit(f'Unexpected role set: {sorted(role_ids)}')
+          if config.get('ai_policy', {}).get('decision_authority') != 'human_only':
+              raise SystemExit('Hiring decision authority must remain human-only.')
+          for role in config['roles']:
+              if not role.get('compensation', {}).get('approval_required'):
+                  raise SystemExit(f"Compensation must remain approval-gated: {role['id']}")
+          print('NESP hiring role configuration is valid and approval-gated.')
+          PY
 
       - name: Validate Render Blueprint safety rules
         run: |
@@ -151,7 +179,7 @@ jobs:
           test "$authenticated_status" = "200"
           grep -qi 'OpenCATS' /tmp/root-authenticated.html
 
-      - name: Verify persistent paths and safe config
+      - name: Verify persistent paths, safe config, and logical backup
         run: |
           docker exec nesp-hiring-test-web sh -c '
             test -L /var/www/html/config.php
@@ -163,6 +191,10 @@ jobs:
             grep -F "define('\''DATABASE_HOST'\'', '\''nesp-hiring-test-db'\'');" /var/data/config.php
             grep -F "define('\''MAIL_MAILER'\'', 0);" /var/data/config.php
             touch /var/data/state/persistence-marker
+            RETENTION_DAYS=1 nesp-render-backup
+            test "$(find /var/data/backups -name database.sql.gz -type f | wc -l)" -eq 1
+            test "$(find /var/data/backups -name opencats-files.tar.gz -type f | wc -l)" -eq 1
+            gzip -t "$(find /var/data/backups -name database.sql.gz -type f | head -n 1)"
           '
 
           docker rm -f nesp-hiring-test-web
@@ -185,6 +217,7 @@ jobs:
           timeout 120s bash -c \
             'until curl -fsS http://127.0.0.1:18080/render-health.txt | grep -q ok; do sleep 3; done'
           docker exec nesp-hiring-test-web test -f /var/data/state/persistence-marker
+          docker exec nesp-hiring-test-web sh -c 'find /var/data/backups -name database.sql.gz -type f | grep -q .'
 
       - name: Container diagnostics
         if: failure()
