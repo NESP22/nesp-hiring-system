@@ -37,7 +37,6 @@ services:
     dockerfilePath: ./docker/render/Dockerfile
     dockerContext: .
     healthCheckPath: /render-health.txt
-    maxShutdownDelaySeconds: 60
     envVars:
       - key: APP_ENV
         value: production
