@@ -45,10 +45,11 @@ jobs:
           config = json.loads(Path('docs/nesp/hiring-role-config.json').read_text())
           role_ids = {role['id'] for role in config.get('roles', [])}
           expected = {
-              'freelance_photographer',
-              'on_site_table_team',
-              'photography_assistant',
-              'staff_photographer_w2',
+              'freelance_contract_youth_sports_photographer',
+              'on_site_picture_day_table_staff',
+              'part_time_customer_service_representative',
+              'photography_assistant_poser',
+              'w2_seasonal_youth_sports_photographer',
           }
           if role_ids != expected:
               raise SystemExit(f'Unexpected role set: {sorted(role_ids)}')

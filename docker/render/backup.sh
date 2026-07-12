@@ -16,15 +16,22 @@ mkdir -p "$TARGET"
 chmod 0700 "$BACKUP_ROOT" "$TARGET"
 
 echo "Creating MariaDB logical dump..."
-MARIADB_PWD="$DB_PASSWORD" mariadb-dump \
-  --host="$DB_HOST" \
-  --port="${DB_PORT:-3306}" \
-  --user="$DB_USER" \
-  --single-transaction \
-  --routines \
-  --events \
-  --triggers \
-  "$DB_NAME" | gzip -9 > "$TARGET/database.sql.gz"
+dump_file="$TARGET/database.sql"
+if MYSQL_PWD="$DB_PASSWORD" mariadb-dump \
+    --host="$DB_HOST" \
+    --port="${DB_PORT:-3306}" \
+    --user="$DB_USER" \
+    --single-transaction \
+    --routines \
+    --events \
+    --triggers \
+    "$DB_NAME" > "$dump_file"; then
+  gzip -9 "$dump_file"
+else
+  rm -f "$dump_file" "$TARGET/database.sql.gz"
+  echo "MariaDB logical dump failed." >&2
+  exit 1
+fi
 
 echo "Archiving persistent OpenCATS files..."
 set --
