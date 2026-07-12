@@ -46,6 +46,7 @@ ln -s "$DATA_ROOT/config.php" "$APP_ROOT/config.php"
 # installer creates the target.
 rm -f "$APP_ROOT/INSTALL_BLOCK"
 ln -s "$DATA_ROOT/INSTALL_BLOCK" "$APP_ROOT/INSTALL_BLOCK"
+chown -h www-data:www-data "$APP_ROOT/INSTALL_BLOCK"
 
 # Use Render's private-service values in the persistent OpenCATS config.
 # The installer can still validate and rewrite this file during first setup.
