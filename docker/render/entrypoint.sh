@@ -41,12 +41,18 @@ fi
 rm -f "$APP_ROOT/config.php"
 ln -s "$DATA_ROOT/config.php" "$APP_ROOT/config.php"
 
-# Keep the installer lock on persistent storage. A dangling symlink is
-# intentional before installation; file_exists() remains false until the
-# installer creates the target.
+# Keep the installer lock on persistent storage. Before installation, a dangling
+# symlink lets the installer create the persistent target. After installation,
+# use a real app-root file because protected symlink rules can make file_exists()
+# return false for Apache in sticky directories.
 rm -f "$APP_ROOT/INSTALL_BLOCK"
-ln -s "$DATA_ROOT/INSTALL_BLOCK" "$APP_ROOT/INSTALL_BLOCK"
-chown -h www-data:www-data "$APP_ROOT/INSTALL_BLOCK"
+if [ -f "$DATA_ROOT/INSTALL_BLOCK" ]; then
+  cp "$DATA_ROOT/INSTALL_BLOCK" "$APP_ROOT/INSTALL_BLOCK"
+  chown www-data:www-data "$APP_ROOT/INSTALL_BLOCK"
+else
+  ln -s "$DATA_ROOT/INSTALL_BLOCK" "$APP_ROOT/INSTALL_BLOCK"
+  chown -h www-data:www-data "$APP_ROOT/INSTALL_BLOCK"
+fi
 
 # Use Render's private-service values in the persistent OpenCATS config.
 # The installer can still validate and rewrite this file during first setup.
