@@ -1,8 +1,12 @@
+<?php
+$isNESPCareers = trim((string) $this->siteName) === 'New England Sports Photo';
+?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html>
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=<?php echo(HTML_ENCODING); ?>" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title><?php $this->_($this->siteName); ?> - Careers</title>
             <script type="text/javascript" src="<?php echo '../' . TemplateUtility::getVersionedAssetURL('js/careerPortalApply.js'); ?>"></script>
         <?php global $careerPage; if (isset($careerPage) && $careerPage == true): ?>
@@ -15,13 +19,29 @@
             <script type="text/javascript" src="<?php echo TemplateUtility::getVersionedAssetURL('js/calendarDateInput.js'); ?>"></script>
 			<script type="text/javascript" src="<?php echo TemplateUtility::getVersionedAssetURL('js/careersPage.js'); ?>"></script>
         <?php endif; ?>
+        <?php if ($isNESPCareers): ?>
+            <link rel="stylesheet" type="text/css" href="<?php echo(isset($careerPage) && $careerPage == true ? '../' : '') . TemplateUtility::getVersionedAssetURL('modules/careers/nespCareers.css'); ?>" />
+        <?php endif; ?>
         <style type="text/css" media="all">
             <?php echo($this->template['CSS']); ?>
 			#poweredCATS { clear: both; margin: 30px auto; clear: both; width: 140px; height: 40px; border: none;}
 			#poweredCATS img { border: none; }
         </style>
     </head>
-    <body>
+    <body<?php if ($isNESPCareers): ?> class="nesp-careers-page"<?php endif; ?>>
+    <?php if ($isNESPCareers): ?>
+    <div id="nespCareers">
+        <header class="nesp-header">
+            <div class="nesp-logo-text" aria-label="New England Sports Photo text logo">NESP</div>
+            <div class="nesp-brand">
+                <p class="nesp-kicker">Family-owned since 1975</p>
+                <h1>New England Sports Photo</h1>
+                <p class="nesp-careers-label">Careers</p>
+                <p>Youth sports photography across New England</p>
+                <p class="nesp-location">Methuen, Massachusetts</p>
+            </div>
+        </header>
+    <?php endif; ?>
     <!-- TOP -->
     <?php echo($this->template['Header']); ?>
 
@@ -30,6 +50,12 @@
 
     <!-- FOOTER -->
     <?php echo($this->template['Footer']); ?>
+    <?php if ($isNESPCareers): ?>
+        <footer class="nesp-footer">
+            <strong>Local review only.</strong> These draft job postings are prepared for NESP review and are not published externally.
+        </footer>
+    </div>
+    <?php endif; ?>
     <div style="font-size:9px;">
         <br /><br /><br /><br />
     </div>

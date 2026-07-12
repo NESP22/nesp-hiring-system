@@ -1,0 +1,377 @@
+html {
+    box-sizing: border-box;
+}
+
+*, *::before, *::after {
+    box-sizing: inherit;
+}
+
+body.nesp-careers-page,
+body.nesp-careers-page html {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background: #f4f7f9;
+    color: #14213d;
+    font: 16px/1.5 Arial, Helvetica, sans-serif;
+}
+
+body.nesp-careers-page a {
+    color: #0b5cad;
+}
+
+body.nesp-careers-page img {
+    max-width: 100%;
+    border: 0;
+}
+
+#nespCareers {
+    min-height: 100vh;
+}
+
+.nesp-header {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    padding: 28px clamp(18px, 4vw, 48px);
+    color: #ffffff;
+    background: #12355b;
+    border-bottom: 6px solid #d62828;
+}
+
+.nesp-logo-text {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 96px;
+    height: 96px;
+    border: 2px solid rgba(255, 255, 255, .8);
+    border-radius: 8px;
+    color: #ffffff;
+    background: rgba(255, 255, 255, .12);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.nesp-brand h1 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 34px;
+    line-height: 1.1;
+    letter-spacing: 0;
+}
+
+.nesp-brand p {
+    margin: 6px 0 0;
+    color: #e8f2f7;
+}
+
+.nesp-kicker {
+    margin: 0 0 8px;
+    color: #d62828;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.nesp-header .nesp-kicker {
+    color: #ffcb77;
+}
+
+.nesp-careers-label {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    color: #12355b !important;
+    background: #ffcb77;
+    font-weight: 700;
+}
+
+.nesp-location {
+    font-weight: 700;
+}
+
+.nesp-nav {
+    display: flex;
+    justify-content: flex-end;
+    padding: 14px clamp(18px, 4vw, 48px);
+    background: #ffffff;
+    border-bottom: 1px solid #dce5ec;
+}
+
+.nesp-main {
+    width: min(1120px, calc(100% - 32px));
+    margin: 28px auto 40px;
+}
+
+.nesp-intro,
+.nesp-section-heading,
+.nesp-form-panel,
+.nesp-action-panel,
+.nesp-detail-body {
+    padding: 24px;
+    border: 1px solid #dce5ec;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 2px 10px rgba(18, 53, 91, .06);
+}
+
+.nesp-section-heading {
+    margin-bottom: 18px;
+}
+
+.nesp-section-heading h2,
+.nesp-intro h2 {
+    margin: 0 0 8px;
+    color: #12355b;
+    font-size: 28px;
+    line-height: 1.2;
+    letter-spacing: 0;
+}
+
+.nesp-section-heading p,
+.nesp-intro p {
+    max-width: 760px;
+}
+
+.nesp-button,
+.nesp-job-card-button,
+input.submitButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 6px;
+    color: #ffffff !important;
+    background: #d62828;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.nesp-button:hover,
+.nesp-job-card-button:hover,
+input.submitButton:hover {
+    background: #a61f1f;
+}
+
+.nesp-button-secondary {
+    color: #12355b !important;
+    background: #e8f2f7;
+}
+
+.nesp-button-secondary:hover {
+    background: #cfe3ee;
+}
+
+.nesp-link {
+    display: inline-block;
+    margin-bottom: 16px;
+    font-weight: 700;
+}
+
+.nesp-job-grid {
+    display: grid;
+    gap: 14px;
+}
+
+.nesp-job-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 18px;
+    align-items: center;
+    padding: 20px;
+    border: 1px solid #dce5ec;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 2px 10px rgba(18, 53, 91, .06);
+}
+
+.nesp-job-card h3 {
+    margin: 0 0 12px;
+    color: #12355b;
+    font-size: 22px;
+    line-height: 1.25;
+}
+
+.nesp-job-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0;
+}
+
+.nesp-job-card-meta span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    color: #263845;
+    background: #f4f7f9;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.nesp-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 18px;
+    align-items: start;
+}
+
+.nesp-facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0 0 24px;
+}
+
+.nesp-facts div {
+    padding: 14px;
+    border-radius: 6px;
+    background: #f4f7f9;
+}
+
+.nesp-facts dt {
+    color: #52616b;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.nesp-facts dd {
+    margin: 4px 0 0;
+    font-weight: 700;
+}
+
+.nesp-description {
+    white-space: pre-wrap;
+}
+
+.nesp-description strong:first-child,
+.nesp-description p:first-child strong {
+    color: #a61f1f;
+}
+
+.nesp-action-panel {
+    position: sticky;
+    top: 16px;
+    display: grid;
+    gap: 12px;
+}
+
+.nesp-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.nesp-form-panel h3 {
+    margin: 0 0 12px;
+    color: #12355b;
+}
+
+.nesp-form-panel label {
+    display: block;
+    margin: 12px 0 4px;
+    font-weight: 700;
+}
+
+.nesp-form-panel input.inputBoxName,
+.nesp-form-panel input.inputBoxNormal,
+.nesp-form-panel input.inputBoxFile,
+.nesp-form-panel select.inputBoxNormal,
+.nesp-form-panel textarea.inputBoxArea {
+    width: 100% !important;
+    max-width: 100%;
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px solid #b9c7d3;
+    border-radius: 6px;
+    background: #ffffff;
+    font: inherit;
+}
+
+.nesp-form-panel textarea.inputBoxArea,
+#resumeContents {
+    min-height: 130px;
+}
+
+.nesp-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 18px;
+}
+
+.nesp-footer {
+    margin-top: 40px;
+    padding: 20px clamp(18px, 4vw, 48px);
+    color: #334;
+    text-align: center;
+    background: #ffffff;
+    border-top: 1px solid #dce5ec;
+}
+
+@media (max-width: 760px) {
+    .nesp-header {
+        align-items: flex-start;
+        padding: 22px 18px;
+    }
+
+    .nesp-logo-text {
+        width: 68px;
+        height: 68px;
+        font-size: 20px;
+    }
+
+    .nesp-brand h1 {
+        font-size: 26px;
+    }
+
+    .nesp-nav {
+        justify-content: stretch;
+        padding: 12px 18px;
+    }
+
+    .nesp-nav .nesp-button {
+        width: 100%;
+    }
+
+    .nesp-main {
+        width: calc(100% - 24px);
+        margin-top: 18px;
+    }
+
+    .nesp-section-heading h2,
+    .nesp-intro h2 {
+        font-size: 23px;
+    }
+
+    .nesp-job-card,
+    .nesp-detail-grid,
+    .nesp-form-grid,
+    .nesp-facts {
+        grid-template-columns: 1fr;
+    }
+
+    .nesp-job-card-button,
+    .nesp-form-actions .nesp-button,
+    input.submitButton {
+        width: 100%;
+    }
+
+    .nesp-action-panel {
+        position: static;
+    }
+}

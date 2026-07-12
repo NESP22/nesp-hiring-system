@@ -1511,6 +1511,51 @@ class CareersUI extends UserInterface
     // FIXME: More of this needs to be done in the template. The UI shouldn't generate HTML.
     private function getResultsTable($rs, $settings, $unformatted = false, $parameters = '')
     {
+        $parameters = trim((string) $parameters);
+        if (!$unformatted && ($parameters == 'cards' || $parameters == 'card'))
+        {
+            $html  = '<div class="nesp-job-grid">' . "\n";
+            foreach ($rs as $index => $line)
+            {
+                $jobUrl = CATSUtility::getIndexName()
+                    . '?m=careers'
+                    . (isset($_GET['templateName']) ? '&amp;templateName=' . urlencode($_GET['templateName']) : '')
+                    . '&amp;p=showJob&amp;ID=' . $line['jobOrderID'];
+                $title = htmlspecialchars((string) $line['title'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+                $location = htmlspecialchars($this->getLocationString(
+                    $line['city'],
+                    $line['state'],
+                    $line['country']
+                ), ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+                $salary = htmlspecialchars((string) $line['salary'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+                $type = htmlspecialchars((string) JobOrders::typeCodeToString($line['type']), ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+
+                $html .= '<article class="nesp-job-card">' . "\n";
+                $html .= '<div>' . "\n";
+                $html .= '<h3><a href="' . $jobUrl . '">' . $title . '</a></h3>' . "\n";
+                $html .= '<p class="nesp-job-card-meta">';
+                if ($salary != '')
+                {
+                    $html .= '<span>Pay: ' . $salary . '</span>';
+                }
+                if ($location != '')
+                {
+                    $html .= '<span>Location: ' . $location . '</span>';
+                }
+                if ($type != '')
+                {
+                    $html .= '<span>Type: ' . $type . '</span>';
+                }
+                $html .= '</p>' . "\n";
+                $html .= '</div>' . "\n";
+                $html .= '<a class="nesp-job-card-button" href="' . $jobUrl . '">View Position</a>' . "\n";
+                $html .= '</article>' . "\n";
+            }
+            $html .= '</div>';
+
+            return $html;
+        }
+
         if ($unformatted)
         {
             $html  = '<table class="sortable">' . "\n";

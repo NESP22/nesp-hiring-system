@@ -421,6 +421,7 @@ class JobOrders
                 joborder.title AS title,
                 joborder.description AS description,
                 joborder.type AS type,
+                joborder.salary AS salary,
                 joborder.is_hot AS isHot,
                 joborder.openings AS openings,
                 joborder.openings_available AS openingsAvailable,

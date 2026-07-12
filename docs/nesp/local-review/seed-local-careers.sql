@@ -8,6 +8,11 @@ DELETE FROM candidate_joborder WHERE joborder_id BETWEEN 41001 AND 41005;
 DELETE FROM activity WHERE data_item_type = 400 AND data_item_id BETWEEN 41001 AND 41005;
 DELETE FROM attachment WHERE data_item_type = 400 AND data_item_id BETWEEN 41001 AND 41005;
 DELETE FROM joborder WHERE joborder_id BETWEEN 41001 AND 41005;
+DELETE FROM career_portal_template_site WHERE career_portal_name = 'NESP Local Review';
+
+UPDATE site
+SET name = 'New England Sports Photo'
+WHERE site_id = 1;
 
 DELETE FROM settings
 WHERE settings_type = 4
@@ -28,9 +33,131 @@ INSERT INTO settings (setting, value, settings_type) VALUES
   ('candidateRegistration', '0', 4),
   ('showDepartment', '0', 4),
   ('showCompany', '0', 4),
-  ('activeBoard', 'CATS 2.0', 4),
+  ('activeBoard', 'NESP Local Review', 4),
   ('allowXMLSubmit', '0', 4),
   ('useCATSTemplate', '', 4);
+
+INSERT INTO career_portal_template_site (career_portal_name, setting, value) VALUES
+  ('NESP Local Review', 'Header', '<nav class="nesp-nav" aria-label="Careers navigation">
+    <a class="nesp-button nesp-button-secondary" href="index.php?m=careers&p=showAll">Back to Available Positions</a>
+  </nav>'),
+  ('NESP Local Review', 'Footer', ''),
+  ('NESP Local Review', 'Content - Main', '<main id="careerContent" class="nesp-main">
+  <registeredCandidate>
+  <section class="nesp-intro">
+    <p class="nesp-kicker">Seasonal and part-time roles</p>
+    <h2>Join the NESP picture day team</h2>
+    <p>We support youth sports leagues, schools, families, and coordinators across Massachusetts, Rhode Island, New Hampshire, and Connecticut.</p>
+    <a class="nesp-button" href="index.php?m=careers&p=showAll">View Available Positions</a>
+  </section>
+</main>'),
+  ('NESP Local Review', 'Content - Search Results', '<main id="careerContent" class="nesp-main">
+  <registeredCandidate>
+  <section class="nesp-section-heading">
+    <p class="nesp-kicker">Available positions</p>
+    <h2>Current NESP openings: <numberOfSearchResults></h2>
+    <p>Review the local draft postings below. Use View Position to open details and the local application preview.</p>
+  </section>
+  <searchResultsTable cards >
+</main>'),
+  ('NESP Local Review', 'Content - Job Details', '<main id="careerContent" class="nesp-main nesp-job-detail">
+  <registeredCandidate>
+  <a class="nesp-link" href="index.php?m=careers&p=showAll">Back to Available Positions</a>
+  <section class="nesp-section-heading">
+    <p class="nesp-kicker">Position details</p>
+    <h2><title></h2>
+  </section>
+  <div class="nesp-detail-grid">
+    <section class="nesp-detail-body">
+      <dl class="nesp-facts">
+        <div><dt>Location</dt><dd><location></dd></div>
+        <div><dt>Openings</dt><dd><openings></dd></div>
+        <div><dt>Pay</dt><dd><salary></dd></div>
+      </dl>
+      <div class="nesp-description"><description></div>
+    </section>
+    <aside class="nesp-action-panel">
+      <p>Ready to review the local application form?</p>
+      <a-applyToJob class="nesp-button">Apply Now</a>
+      <a class="nesp-button nesp-button-secondary" href="index.php?m=careers&p=showAll">Back to Available Positions</a>
+    </aside>
+  </div>
+</main>'),
+  ('NESP Local Review', 'Content - Apply for Position', '<main id="careerContent" class="nesp-main nesp-application">
+  <a class="nesp-link" href="index.php?m=careers&p=showJob&ID=<jobid>">Back to Position Details</a>
+  <section class="nesp-section-heading">
+    <p class="nesp-kicker">Application preview</p>
+    <h2>Applying to: <title></h2>
+    <p>This local form is for review only. Do not enter real applicant data.</p>
+  </section>
+  <catsform>
+  <div class="nesp-form-grid">
+    <section class="nesp-form-panel">
+      <h3>Resume or work history</h3>
+      <p class="instructions">Optional for local review. Do not upload real applicant files.</p>
+      <input-resumeUpload>
+    </section>
+    <section class="nesp-form-panel">
+      <h3>About you</h3>
+      <label id="firstNameLabel" for="firstName">First Name *</label>
+      <input-firstName>
+      <label id="lastNameLabel" for="lastName">Last Name *</label>
+      <input-lastName>
+      <label id="emailLabel" for="email">Email Address *</label>
+      <input-email>
+      <label id="emailConfirmLabel" for="emailconfirm">Confirm Email *</label>
+      <input-emailconfirm>
+    </section>
+    <section class="nesp-form-panel">
+      <h3>Contact details</h3>
+      <label id="homePhoneLabel" for="homePhone">Home Phone</label>
+      <input-phone-home>
+      <label id="mobilePhoneLabel" for="mobilePhone">Mobile Phone</label>
+      <input-phone-cell>
+      <label id="workPhoneLabel" for="workPhone">Work Phone</label>
+      <input-phone>
+      <label id="bestTimeLabel" for="bestTime">Best time to call *</label>
+      <input-best-time-to-call>
+      <label id="mailingAddressLabel" for="mailingAddress">Mailing Address</label>
+      <input-address>
+      <label id="cityProvinceLabel" for="cityProvince">City/Province *</label>
+      <input-city>
+      <label id="stateCountryLabel" for="stateCountry">State/Country *</label>
+      <input-state>
+      <input-country>
+      <label id="zipPostalLabel" for="zipPostal">Zip/Postal Code *</label>
+      <input-zip>
+    </section>
+    <section class="nesp-form-panel">
+      <h3>Additional information</h3>
+      <label id="keySkillsLabel" for="keySkills">Relevant skills or availability *</label>
+      <input-keySkills>
+      <label id="captchaLabel" for="captcha">Captcha *</label>
+      <input-captcha req>
+      <div class="nesp-form-actions">
+        <submit value="Apply Now">
+        <a class="nesp-button nesp-button-secondary" href="index.php?m=careers&p=showAll">Back to Available Positions</a>
+      </div>
+    </section>
+  </div>
+  </form>
+</main>'),
+  ('NESP Local Review', 'Content - Questionnaire', '<main id="careerContent" class="nesp-main">
+  <section class="nesp-form-panel">
+    <questionnaire>
+    <div class="nesp-form-actions"><submit value="Continue"></div>
+  </section>
+</main>'),
+  ('NESP Local Review', 'Content - Thanks for your Submission', '<main id="careerContent" class="nesp-main">
+  <section class="nesp-section-heading">
+    <h2>Application Submitted For: <title></h2>
+    <p>This confirmation page should not appear during local review because test applications must not be submitted.</p>
+    <a class="nesp-button" href="index.php?m=careers&p=showAll">Back to Available Positions</a>
+  </section>
+</main>'),
+  ('NESP Local Review', 'Content - Candidate Registration', ''),
+  ('NESP Local Review', 'Content - Candidate Profile', ''),
+  ('NESP Local Review', 'CSS', '/* NESP visual styles are loaded from modules/careers/nespCareers.css. */');
 
 INSERT INTO joborder (
   joborder_id,
@@ -383,4 +510,3 @@ Draft only. Do not publish until Craig approves the final posting. Employment cl
   );
 
 COMMIT;
-
