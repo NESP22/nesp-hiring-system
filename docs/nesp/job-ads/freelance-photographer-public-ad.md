@@ -1,94 +1,52 @@
-# Freelance Photographer Ad — Public Posting Version
+# Freelance/Contract Youth Sports Photographer - Public Posting Version
+
+This draft is not approved for publication. It remains blocked pending final independent-contractor classification review.
 
 ## Title
 
-Freelance Sports & School Photographer — Seasonal Assignments
+Freelance/Contract Youth Sports Photographer - Fall Assignments
 
 ## Short Summary
 
-New England Sports Photo is looking for dependable freelance photographers for youth sports and school picture-day assignments across New England. Great fit for photographers who want recurring seasonal work with an established local company, organized schedules, and production support.
+New England Sports Photo is looking for experienced freelance photographers for youth sports picture-day assignments across Massachusetts, Rhode Island, New Hampshire, and Connecticut. Pay is $22-$27/hour based on experience, pending final classification approval.
 
 ## Full Posting
 
-**Freelance Sports & School Photographer**  
-**New England Sports Photo — Seasonal Assignments Across New England**  
-**Independent-contractor assignments | Weekday, evening, and weekend opportunities**  
-**Proposed assignment rate: approximately $27/hour for qualified lead work, pending final approval and assignment requirements**
+**Freelance/Contract Youth Sports Photographer**  
+**Pay: $22-$27 per hour, based on experience, pending final payroll/legal classification confirmation**  
+**Locations: Massachusetts, Rhode Island, New Hampshire, and Connecticut**  
+**Primary season: September through November**
 
-New England Sports Photo is expanding our freelance photographer network for school and youth-sports picture days throughout Massachusetts, New Hampshire, Rhode Island, and Connecticut.
+New England Sports Photo is building a network of experienced freelance photographers for youth sports picture-day assignments across New England.
 
-NESP is a local, family-run photography company serving New England communities since 1975. We photograph athletes, teams, students, coaches, schools, and leagues, with an organized photo-day system and in-house production support.
+This role is for photographers who already operate with professional camera equipment and want recurring seasonal assignments with an established local company. NESP manages the client relationship, schedule, products, production, and customer service. You bring reliable professional equipment, follow the assignment workflow, and deliver consistent images.
 
-This is a good opportunity for photographers who want recurring seasonal assignments without having to handle every part of the business themselves. NESP manages the client relationship, photo-day schedule, production, products, printing, and customer service. You focus on showing up prepared, following the photo-day workflow, and creating consistent, professional images.
+Most fall assignments run September through November. Weekday assignments are usually after approximately 4:00 PM, and weekend assignments are generally early morning through noon.
 
-## What You’ll Photograph
+Paid time begins when you leave home and continues through completion of the assignment. Return travel is paid when the drive home exceeds one hour.
 
-- Individual athletes
-- Team photos
-- School portraits
-- Coaches and staff
-- League and school picture-day setups
-- Occasional banners, composites, or specialty photo-day needs depending on experience
+## Equipment Required
 
-## What You’ll Do
+Contract photographers must provide their own professional DSLR or mirrorless camera system, appropriate lenses, external flash or lighting equipment, memory cards, batteries, chargers, and backup equipment.
 
-- Arrive on time and prepared for assigned jobs
-- Photograph individuals and groups using NESP’s established workflow
-- Follow assignment-specific posing, lighting, naming, and file-handling standards
-- Work professionally with children, parents, coaches, school staff, and NESP team members
-- Keep photo lines moving while maintaining image quality
-- Communicate quickly if traffic, weather, equipment, or schedule issues arise
-- Protect image files and transfer completed work according to NESP procedures
+## What We Are Looking For
 
-## What We’re Looking For
-
-- Professional reliability and communication
-- Experience with portrait, sports, school, event, studio, or volume photography
-- Confidence directing children and groups efficiently
-- Understanding of exposure, focus, basic lighting, and image consistency
-- Reliable transportation and willingness to travel to assigned locations
-- Availability for selected weekdays, school-day hours, evenings, and/or weekends
-- Ability to carry and set up photography equipment
-- Portfolio or sample images showing relevant work
-- Professional DSLR or mirrorless camera system preferred; final equipment expectations depend on the assignment
-
-## Why Freelance With NESP
-
-- Recurring seasonal assignments
-- Organized clients and schedules
-- Local family-run company with decades of experience
-- In-house support for products, printing, and fulfillment
-- Opportunity to earn more responsibility based on quality and reliability
-- Work with schools, leagues, families, and community organizations
+- Experience with youth sports, portrait, school, event, studio, or volume photography.
+- Strong portfolio or sample images showing relevant work.
+- Professional reliability and communication.
+- Comfort directing children and teams.
+- Understanding of exposure, focus, flash, and image consistency.
+- Reliable transportation to assigned photo locations.
+- Availability on selected weekday evenings and weekend mornings during the fall season.
+- Ability to complete required background-check steps for field work.
 
 ## To Apply
 
-Please submit:
-
-- Résumé or photography work history
-- City/state and travel radius
-- Weekday, evening, and weekend availability
-- Equipment list
-- Portfolio link or 5–10 relevant image samples
-- Brief note about your experience photographing children, teams, events, schools, or sports
-
-## Application Questions
-
-1. What city and state are you based in?
-2. How far are you willing to travel for assignments?
-3. Which weekdays, school-day hours, evenings, and weekends are you available?
-4. Describe your photography experience.
-5. What camera bodies, lenses, flashes, lighting, and backup equipment do you own or use?
-6. Are you comfortable photographing and directing children and groups?
-7. Do you have reliable transportation?
-8. Provide a portfolio link or upload 5–10 relevant examples.
-9. Have you worked under another company’s workflow, naming, posing, or file-delivery standards?
-10. Tell us about a time you solved an equipment, weather, or schedule problem during a job.
+Apply with your work history, city/state, travel radius, fall availability, equipment list, backup-equipment plan, and a portfolio link or 5-10 relevant sample images.
 
 ## Internal Notes Before Posting
 
-- Confirm contractor classification before publishing.
-- Confirm final assignment rate, minimum call time, mileage/travel policy, and payment timing.
+- Do not publish until contractor classification is approved for the actual work arrangement and state.
 - Do not promise guaranteed hours.
 - Do not publish until the application link is ready.
 - Do not use AI as the final hiring or assignment decision-maker.

@@ -1,22 +1,22 @@
 # NESP Applicant Portal Copy and Flow
 
-This document defines the first version of the public application experience. It is not live and should not be published until the privacy, classification, compensation, and workflow gates are approved.
+This document defines the first version of the public application experience. It is not live and should not be published until the privacy, classification, compensation, payroll, and workflow gates are approved.
 
 ## Landing Page
 
 ### Join the New England Sports Photo Team
 
-New England Sports Photo is a local, family-run sports and school photography company serving New England communities since 1975.
+New England Sports Photo is a local, family-run youth sports photography company serving New England communities since 1975.
 
-We hire dependable people for school picture days, youth-sports photo days, customer support, production, and seasonal operations. Some roles require professional photography experience. Others include training and are a strong fit for people with customer service, youth sports, school, childcare, event, hospitality, or organizational experience.
+We hire dependable people for youth sports picture days, field support, table/check-in work, and seasonal Methuen operations support. Some roles require professional photography experience. Others include training and are a strong fit for people with customer service, youth sports, school, childcare, event, hospitality, office, or organizational experience.
 
-Current opportunities may include:
+Current draft opportunities may include:
 
-- Freelance Sports & School Photographer
-- W-2 Staff Photographer
-- Photography Assistant / Poser
-- On-Site Photo Day Table Team Member
-- Customer Service Representative
+- W-2 Seasonal Youth Sports Photographer
+- Freelance/Contract Youth Sports Photographer
+- Photography Assistant/Poser
+- On-Site Picture Day Table Staff
+- Methuen Operations Support
 
 Choose the role or roles that interest you. The application will show the questions required for each selection.
 
@@ -30,11 +30,11 @@ Choose the role or roles that interest you. The application will show the questi
 - Role or roles of interest
 - Resume or work-history upload
 - Earliest start date
-- General weekday availability
-- General evening availability
-- General weekend availability
-- Reliable transportation response
-- Travel radius
+- Weekday availability after approximately 4:00 PM
+- Weekend morning availability
+- General weekday daytime availability for Methuen operations support
+- Reliable transportation response for field roles
+- Travel radius for field roles
 - Referral source
 - Optional additional information
 
@@ -42,30 +42,48 @@ Do not ask applicants for age, date of birth, photograph, marital status, family
 
 ## Role Routing
 
-### Photographer roles
+### W-2 seasonal youth sports photographer
 
 Display:
 
 - Relevant photography experience
 - Camera and lighting experience
-- Equipment list, when relevant
 - Portfolio link or image upload
-- Comfort directing children and groups
-- School-day, evening, and weekend availability
-- Travel radius
+- Comfort using company-provided equipment and required settings
+- Comfort directing children and teams
+- Weekday after 4:00 PM and weekend morning availability
+- Travel radius and reliable transportation
+- Background-check acknowledgement for field work
 - Technical/problem-solving example
 
-### Assistant / poser role
+### Freelance/contract youth sports photographer
 
 Display:
 
-- Experience with children, schools, sports, camps, dance, theater, events, or coaching
+- Relevant photography experience
+- Camera, lens, external flash, and lighting equipment list
+- Backup-equipment plan
+- Portfolio link or image upload
+- Comfort following another company's workflow
+- Comfort directing children and teams
+- Weekday after 4:00 PM and weekend morning availability
+- Travel radius and reliable transportation
+- Background-check acknowledgement for field work
+
+### Photography assistant/poser
+
+Display:
+
+- Experience with children, teams, schools, camps, dance, theater, events, or coaching
 - Comfort giving clear directions
 - Ability to stand and remain active
 - Visual-detail example
 - Nervous-child scenario
+- Weekday after 4:00 PM and weekend morning availability
+- Travel radius and reliable transportation
+- Background-check acknowledgement for field work
 
-### Table / check-in role
+### On-site picture day table staff
 
 Display:
 
@@ -74,17 +92,21 @@ Display:
 - Organization-under-pressure example
 - Detail-correction example
 - Communication scenario
+- Weekday after 4:00 PM and weekend morning availability
+- Travel radius and reliable transportation
+- Background-check acknowledgement for field work
 
-### Customer service role
+### Methuen Operations Support
 
 Display:
 
-- Relevant office/customer-service experience
-- Email/ticketing/order-system experience
-- Organization method
-- Upset-customer example
-- Required written work sample
-- Hybrid Methuen availability
+- Methuen office availability
+- Weekday daytime or afternoon availability
+- Occasional evening/weekend availability during peak season
+- Office, operations, data-entry, production, school, sports, or customer-service experience
+- Computer comfort
+- Organization/detail example
+- Confidentiality acknowledgement
 
 ## Applicant Acknowledgements
 
@@ -100,17 +122,21 @@ Use plain-language acknowledgements similar to the following, subject to final H
 
 ### Human review and AI assistance
 
-> NESP may use software to organize application materials, summarize job-related experience, identify missing answers, and suggest interview questions. NESP does not authorize software to make the final interview or hiring decision. A person reviews employment decisions.
+> NESP may use software to organize application materials, summarize job-related experience, identify missing answers, and suggest interview questions. NESP does not authorize software to make the final interview, assignment, or hiring decision. A person reviews employment decisions.
 
 ### Accommodation
 
 > NESP provides reasonable assistance during the application process when requested. Applicants may contact NESP to request an alternative application method or interview accommodation.
 
+### Background checks for field roles
+
+> Field roles require completion of NESP's approved background-check process before work begins. Do not send sensitive personal documents through ordinary email or text.
+
 ### Independent-contractor role notice
 
-Show only for the proposed freelance role and only after classification review:
+Show only for the proposed freelance/contract role and only after classification review:
 
-> This application is for potential independent assignments. Assignment availability is not guaranteed. Final terms, responsibilities, equipment requirements, compensation, and classification will be provided in writing before an assignment is accepted.
+> This application is for potential independent assignments. Assignment availability is not guaranteed. Final terms, responsibilities, equipment requirements, compensation, travel policy, background-check process, and classification will be provided in writing before an assignment is accepted.
 
 ## Confirmation Page
 
@@ -120,7 +146,7 @@ Thank you for applying to New England Sports Photo.
 
 Your application has been received. Our hiring team will review the information you submitted. We may contact you for missing information, a work sample, a phone screen, or an interview.
 
-Submitting an application does not guarantee an interview or assignment. Please do not send sensitive personal information such as Social Security numbers, banking details, identification documents, or medical information during the initial application process.
+Submitting an application does not guarantee an interview or assignment. Please do not send sensitive personal information such as Social Security numbers, banking details, identification documents, background-check documents, or medical information during the initial application process.
 
 ## Internal Status Flow
 
@@ -148,3 +174,4 @@ Submitting an application does not guarantee an interview or assignment. Please 
 - Do not email attachments containing resumes unless explicitly approved.
 - Do not send automated rejections based only on an AI recommendation.
 - Do not accept real applicants until backups and restore testing pass.
+- Keep all applicant communications draft-only until human approval.

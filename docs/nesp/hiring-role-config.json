@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "status": "draft_for_human_approval",
   "company": {
     "name": "New England Sports Photo",
@@ -7,35 +7,86 @@
     "base_location": "Methuen, Massachusetts",
     "service_area": [
       "Massachusetts",
-      "New Hampshire",
       "Rhode Island",
+      "New Hampshire",
       "Connecticut"
-    ]
+    ],
+    "primary_fall_season": "September through November"
+  },
+  "global_rules": {
+    "publication_status": "draft_only_do_not_publish",
+    "decision_authority": "human_only",
+    "applicant_communications": "draft_only_human_approval_required",
+    "field_role_availability_expectation": "Weekdays after approximately 4:00 PM and weekends generally early morning through noon",
+    "field_role_travel_pay": "Paid time begins when the worker leaves home and continues through completion of the assignment. Return travel is paid when the drive home exceeds one hour.",
+    "field_role_requirements": [
+      "reliable_transportation",
+      "background_check_required"
+    ],
+    "classification_note": "Employment classification, payroll setup, overtime, travel pay, and background-check process require final payroll/legal confirmation before posting."
   },
   "roles": [
     {
-      "id": "freelance_photographer",
-      "title": "Freelance Sports & School Photographer",
-      "employment_type": "independent_contractor_proposed",
-      "publication_status": "blocked_pending_classification_review",
+      "id": "w2_seasonal_youth_sports_photographer",
+      "title": "W-2 Seasonal Youth Sports Photographer",
+      "employment_type": "w2_seasonal_pending_final_confirmation",
+      "publication_status": "draft_pending_business_payroll_legal_approval",
       "classification_review_required": true,
-      "safe_initial_alternative": "seasonal_or_per_diem_w2_photographer",
       "compensation": {
-        "type": "hourly_proposed",
-        "amount": 27,
+        "type": "hourly_range_pending_final_confirmation",
+        "minimum": 22,
+        "maximum": 25,
         "currency": "USD",
         "approval_required": true
       },
+      "equipment_policy": "company_provided_equipment",
       "required_review_fields": [
         "location",
         "travel_radius",
-        "weekday_availability",
-        "weekend_availability",
+        "weekday_after_4pm_availability",
+        "weekend_morning_availability",
         "reliable_transportation",
+        "background_check_acknowledgement",
+        "relevant_photography_experience",
+        "camera_and_lighting_experience",
+        "portfolio",
+        "working_with_children_and_teams"
+      ],
+      "scorecard": {
+        "reliability_and_punctuality": 25,
+        "technical_photography_skills": 25,
+        "consistency_and_workflow": 20,
+        "direction_and_communication": 15,
+        "travel_and_availability": 15
+      }
+    },
+    {
+      "id": "freelance_contract_youth_sports_photographer",
+      "title": "Freelance/Contract Youth Sports Photographer",
+      "employment_type": "independent_contractor_proposed_pending_classification_review",
+      "publication_status": "blocked_pending_classification_review",
+      "classification_review_required": true,
+      "safe_initial_alternative": "w2_seasonal_youth_sports_photographer",
+      "compensation": {
+        "type": "hourly_range_pending_final_confirmation",
+        "minimum": 22,
+        "maximum": 27,
+        "currency": "USD",
+        "approval_required": true
+      },
+      "equipment_policy": "contractor_provides_professional_camera_equipment_lenses_external_flash_and_backup_equipment",
+      "required_review_fields": [
+        "location",
+        "travel_radius",
+        "weekday_after_4pm_availability",
+        "weekend_morning_availability",
+        "reliable_transportation",
+        "background_check_acknowledgement",
         "relevant_photography_experience",
         "equipment_list",
+        "backup_equipment_plan",
         "portfolio",
-        "working_with_children_and_groups"
+        "working_with_children_and_teams"
       ],
       "scorecard": {
         "reliability_and_communication": 25,
@@ -46,12 +97,13 @@
       }
     },
     {
-      "id": "on_site_table_team",
-      "title": "On-Site Photo Day Table Team Member",
-      "employment_type": "w2_seasonal",
-      "publication_status": "draft_pending_business_approval",
+      "id": "photography_assistant_poser",
+      "title": "Photography Assistant/Poser",
+      "employment_type": "seasonal_pending_final_confirmation",
+      "publication_status": "draft_pending_business_payroll_legal_approval",
+      "classification_review_required": true,
       "compensation": {
-        "type": "hourly_proposed",
+        "type": "hourly_pending_final_confirmation",
         "amount": 20,
         "currency": "USD",
         "approval_required": true
@@ -59,38 +111,10 @@
       "required_review_fields": [
         "location",
         "travel_radius",
-        "weekday_availability",
-        "weekend_availability",
+        "weekday_after_4pm_availability",
+        "weekend_morning_availability",
         "reliable_transportation",
-        "customer_service_experience",
-        "detail_and_organization_example",
-        "tablet_or_checkin_comfort"
-      ],
-      "scorecard": {
-        "reliability_and_punctuality": 30,
-        "communication": 20,
-        "attention_to_detail": 20,
-        "organization_under_pressure": 15,
-        "travel_and_availability": 15
-      }
-    },
-    {
-      "id": "photography_assistant",
-      "title": "Photography Assistant / Poser",
-      "employment_type": "w2_seasonal",
-      "publication_status": "draft_pending_business_approval",
-      "compensation": {
-        "type": "hourly_proposed",
-        "amount": 22,
-        "currency": "USD",
-        "approval_required": true
-      },
-      "required_review_fields": [
-        "location",
-        "travel_radius",
-        "weekday_availability",
-        "weekend_availability",
-        "reliable_transportation",
+        "background_check_acknowledgement",
         "experience_with_children_or_groups",
         "comfort_giving_directions",
         "physical_activity_acknowledgement"
@@ -104,35 +128,62 @@
       }
     },
     {
-      "id": "staff_photographer_w2",
-      "title": "Staff Photographer — School & Sports Photography",
-      "employment_type": "w2",
-      "publication_status": "draft_pending_business_approval",
+      "id": "on_site_picture_day_table_staff",
+      "title": "On-Site Picture Day Table Staff",
+      "employment_type": "seasonal_pending_final_confirmation",
+      "publication_status": "draft_pending_business_payroll_legal_approval",
+      "classification_review_required": true,
       "compensation": {
-        "type": "hourly_range_proposed",
-        "minimum": 22,
-        "maximum": 27,
+        "type": "hourly_pending_final_confirmation",
+        "amount": 20,
         "currency": "USD",
         "approval_required": true
       },
       "required_review_fields": [
         "location",
         "travel_radius",
-        "school_day_availability",
-        "evening_availability",
-        "weekend_availability",
+        "weekday_after_4pm_availability",
+        "weekend_morning_availability",
         "reliable_transportation",
-        "relevant_photography_experience",
-        "camera_and_lighting_experience",
-        "portfolio",
-        "working_with_children_and_groups"
+        "background_check_acknowledgement",
+        "customer_service_experience",
+        "detail_and_organization_example",
+        "tablet_or_checkin_comfort"
       ],
       "scorecard": {
-        "reliability_and_punctuality": 25,
-        "technical_photography_skills": 25,
-        "consistency_and_workflow": 20,
-        "direction_and_communication": 15,
+        "reliability_and_punctuality": 30,
+        "communication": 20,
+        "attention_to_detail": 20,
+        "organization_under_pressure": 15,
         "travel_and_availability": 15
+      }
+    },
+    {
+      "id": "methuen_operations_support",
+      "title": "Methuen Operations Support",
+      "employment_type": "operations_role_pending_final_confirmation",
+      "publication_status": "draft_pending_business_payroll_legal_approval",
+      "classification_review_required": true,
+      "compensation": {
+        "type": "hourly_rate_pending_final_approval",
+        "approval_required": true
+      },
+      "required_review_fields": [
+        "location",
+        "methuen_office_availability",
+        "weekday_availability",
+        "occasional_evening_or_weekend_availability",
+        "office_or_operations_experience",
+        "computer_comfort",
+        "detail_organization_example",
+        "confidentiality_acknowledgement"
+      ],
+      "scorecard": {
+        "reliability_and_follow_through": 30,
+        "attention_to_detail": 25,
+        "computer_and_data_entry_comfort": 15,
+        "organization": 15,
+        "methuen_availability": 15
       }
     }
   ],

@@ -1,93 +1,100 @@
 # NESP Short Hiring Post Pack
 
-These condensed posts are designed for Facebook groups, Indeed previews, local college boards, photography groups, and community pages. Replace `[APPLICATION LINK]` after the NESP hiring portal is live.
+These condensed posts are designed for Facebook groups, Indeed previews, local job boards, photography groups, and community pages. Replace `[APPLICATION LINK]` only after the NESP hiring portal is approved and live.
 
 ## General Hiring Post
 
-**NESP IS HIRING FOR SPORTS & SCHOOL PICTURE DAYS**
+**NESP IS HIRING FOR FALL YOUTH SPORTS PICTURE DAYS**
 
-New England Sports Photo is expanding our seasonal photo-day team across Massachusetts, New Hampshire, Rhode Island, and Connecticut.
+New England Sports Photo is expanding our seasonal picture-day team across Massachusetts, Rhode Island, New Hampshire, and Connecticut.
 
 We are hiring:
 
-- Freelance Sports & School Photographers
-- W-2 Staff Photographers
-- Photography Assistants / Posers
-- On-Site Table & Check-In Team Members
+- W-2 Seasonal Youth Sports Photographers - $22-$25/hour based on experience
+- Freelance/Contract Youth Sports Photographers - $22-$27/hour based on experience, pending final classification approval
+- Photography Assistants/Posers - $20/hour
+- On-Site Picture Day Table Staff - $20/hour
+- Methuen Operations Support - hourly rate pending final approval
 
-NESP is a local, family-run photography company serving New England since 1975. We offer organized assignments, training, opportunities to return each season, and room to grow for dependable team members.
+Most fall picture-day work runs September through November. Weekday field assignments are usually after approximately 4:00 PM, and weekend assignments are generally early morning through noon.
 
-Reliable transportation and weekday/weekend availability are important. Photography experience is required for photographer roles but not for table or assistant roles.
-
-Apply: [APPLICATION LINK]
-
-## Freelance Photographer — Short Post
-
-**FREELANCE SPORTS & SCHOOL PHOTOGRAPHERS WANTED**
-
-New England Sports Photo is building our freelance photographer network for recurring seasonal assignments across New England.
-
-Ideal candidates have portrait, sports, school, event, studio, or volume-photography experience; reliable transportation; professional communication; and confidence working with children and groups.
-
-NESP provides established photo-day systems, organized schedules, and production support. You focus on the assignment—we handle the client relationship, products, printing, and customer service.
-
-Proposed lead-assignment rate: approximately $27/hour, subject to final approval and assignment requirements.
+Reliable transportation is required for field roles. Background checks are required for field roles. Photography experience is required for photographer roles but not for assistant or table staff roles.
 
 Apply: [APPLICATION LINK]
 
-## On-Site Table Team — Short Post
+## W-2 Seasonal Youth Sports Photographer - Short Post
 
-**SEASONAL PHOTO DAY TABLE STAFF — NO PHOTOGRAPHY EXPERIENCE REQUIRED**
+**W-2 YOUTH SPORTS PHOTOGRAPHERS WANTED**
 
-New England Sports Photo is hiring friendly, organized team members to help with check-in, customer questions, paperwork, team flow, and photo-day logistics.
+New England Sports Photo is hiring seasonal W-2 photographers for fall youth sports picture days across Massachusetts, Rhode Island, New Hampshire, and Connecticut.
 
-You should be dependable, comfortable speaking with families and coaches, detail-oriented, able to use a tablet, and available for selected weekdays, evenings, and weekends.
+Pay is $22-$25/hour based on experience, pending final payroll/legal confirmation. NESP provides company equipment for W-2 photographer assignments.
 
-Proposed rate: approximately $20/hour, subject to final approval.
-
-Apply: [APPLICATION LINK]
-
-## Photography Assistant / Poser — Short Post
-
-**PHOTOGRAPHY ASSISTANTS / POSERS NEEDED**
-
-Help our photographers organize athletes and students, guide approved poses, check visual details, manage lines, and keep picture day moving smoothly.
-
-No professional photography experience is required. Experience with youth sports, schools, coaching, childcare, camps, events, dance, or theater is helpful. Paid training is planned.
-
-Proposed rate: approximately $22/hour, subject to final approval.
+Most work runs September through November. Weekday assignments are usually after approximately 4:00 PM, and weekends are generally early morning through noon. Reliable transportation and background-check completion are required.
 
 Apply: [APPLICATION LINK]
 
-## W-2 Staff Photographer — Short Post
+## Freelance/Contract Youth Sports Photographer - Short Post
 
-**W-2 SCHOOL & SPORTS PHOTOGRAPHERS WANTED**
+**FREELANCE YOUTH SPORTS PHOTOGRAPHERS WANTED**
 
-New England Sports Photo is hiring staff photographers for recurring school and youth-sports picture-day assignments throughout New England.
+New England Sports Photo is building our freelance photographer network for recurring fall youth sports assignments across Massachusetts, Rhode Island, New Hampshire, and Connecticut.
 
-We are looking for dependable photographers who understand exposure, focus, lighting, posing, and professional file handling and who are comfortable directing children and groups efficiently.
+Pay is $22-$27/hour based on experience, pending final contractor classification approval. Contract photographers must provide their own professional camera equipment, lenses, external flash, and backup equipment.
 
-Assignments may include weekday school hours, evenings, and weekends. Reliable transportation is required.
+Most work runs September through November. Weekday assignments are usually after approximately 4:00 PM, and weekends are generally early morning through noon.
 
-Proposed range: approximately $22–$27/hour based on experience and assignment level, subject to final approval.
+Apply: [APPLICATION LINK]
+
+## Photography Assistant/Poser - Short Post
+
+**PHOTO DAY ASSISTANTS/POSERS NEEDED - $20/HOUR**
+
+Help NESP photographers organize athletes and teams, guide approved poses, check visual details, manage lines, and keep youth sports picture days moving smoothly.
+
+No professional photography experience is required. Experience with youth sports, schools, coaching, childcare, camps, events, dance, or theater is helpful. Reliable transportation and background-check completion are required for field work.
+
+Apply: [APPLICATION LINK]
+
+## On-Site Picture Day Table Staff - Short Post
+
+**SEASONAL PICTURE DAY TABLE STAFF - $20/HOUR**
+
+New England Sports Photo is hiring friendly, organized team members to help with check-in, customer questions, paperwork, team flow, and picture-day logistics.
+
+You should be dependable, comfortable speaking with families and coaches, detail-oriented, and able to use a tablet or simple check-in system. Reliable transportation and background-check completion are required for field work.
+
+Apply: [APPLICATION LINK]
+
+## Methuen Operations Support - Short Post
+
+**METHUEN OPERATIONS SUPPORT - FALL SEASON**
+
+New England Sports Photo is hiring detail-oriented operations support help for our Methuen office during the busy fall picture-day season.
+
+This role helps prepare materials, organize job details, check paperwork, support production flow, and keep office tasks moving. Computer comfort, accuracy, reliability, and respect for confidential information are important.
+
+Pay and final schedule are pending approval before posting.
 
 Apply: [APPLICATION LINK]
 
 ## Suggested Headlines
 
-- Seasonal Sports Photography Jobs — Join a Local Company
-- School & Youth Sports Photographers Needed Across New England
-- Photo Day Assistants and Check-In Staff — Training Available
-- W-2 Staff Photographer — School and Sports Assignments
-- Freelance Photographers — Recurring New England Assignments
+- W-2 Youth Sports Photographer - Fall Picture Days
+- Freelance Youth Sports Photographer - Seasonal Assignments
+- Photo Day Assistant/Poser - No Camera Experience Required
+- Picture Day Table Staff - Seasonal Youth Sports Work
+- Methuen Operations Support - Fall Season
 
-## Suggested Screening Knockout Questions
+## Suggested Screening Questions
 
 These should flag an application for human review rather than automatically reject it:
 
 1. Do you have reliable transportation to assigned locations?
 2. What is your normal travel radius?
-3. Which weekdays, school-day hours, evenings, and weekends are you available?
-4. Can you stand and remain active for several hours?
-5. Are you comfortable working around children and youth-sports programs?
-6. For photographer roles: provide a portfolio or relevant image samples.
+3. Which weekdays after approximately 4:00 PM are you available?
+4. Which weekend mornings are you available?
+5. Can you stand and remain active for several hours?
+6. Are you comfortable working around children and youth-sports programs?
+7. For photographer roles: provide a portfolio or relevant image samples.
+8. For contract photographers: list your camera equipment, lenses, external flash, and backup equipment.

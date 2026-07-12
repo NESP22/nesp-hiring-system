@@ -1,72 +1,75 @@
-# Photography Assistant / Poser
+# Photography Assistant/Poser
 
-**New England Sports Photo — Seasonal W-2 Position**  
-**Sports and school picture days across New England**  
-**Proposed compensation: approximately $22/hour; confirm before posting**
+**New England Sports Photo - Seasonal picture-day role**  
+**Pay: $20 per hour, pending final payroll/legal confirmation**  
+**Locations: Massachusetts, Rhode Island, New Hampshire, and Connecticut**  
+**Primary season: September through November**
 
-New England Sports Photo is hiring energetic, dependable photography assistants to help photographers create consistent individual and team portraits while keeping picture day moving on schedule.
+New England Sports Photo is hiring dependable photography assistants/posers to help photographers create smooth, organized youth sports picture days.
 
-You do not need to be a professional photographer. We will train the right person on our posing, flow, safety, and photo-day procedures. This role is ideal for someone who is comfortable giving clear directions, working with children, staying active, and helping a team succeed.
+You do not need to be a professional photographer. We will train the right person on posing, photo-day flow, safety, and NESP procedures. This is a strong fit for someone who is comfortable giving clear directions, working with children, staying active, and helping a team stay on schedule.
 
-NESP is a local, family-run sports and school photography company serving New England since 1975.
+## Schedule
 
-## What You’ll Do
+- Most fall assignments run September through November.
+- Weekday assignments are usually after approximately 4:00 PM.
+- Weekend assignments are generally early morning through noon.
+- Paid time begins when you leave home and continues through completion of the assignment.
+- Return travel is paid when the drive home exceeds one hour.
 
-- Help set up and break down posing areas, backgrounds, lights, signs, and supplies
-- Organize athletes, students, teams, and coaches before they enter the camera area
-- Guide people into approved poses using NESP standards
-- Check uniforms, hair, spacing, hands, equipment, and other visible details
-- Help photographers move efficiently from one person or team to the next
-- Match athletes and students to the correct team, class, or roster information
-- Keep lines safe, orderly, and positive
-- Watch for mistakes before the photo is taken and communicate them clearly
-- Assist with equipment movement and basic non-technical setup
-- Support table staff and team leads when schedules become busy
+## What You Will Do
 
-## What We’re Looking For
+- Help set up and break down posing areas, lights, signs, and supplies.
+- Organize athletes, teams, coaches, and families before they enter the camera area.
+- Guide people into approved poses using NESP standards.
+- Check uniforms, hair, spacing, hands, equipment, and other visible details.
+- Help photographers move efficiently from one athlete or team to the next.
+- Match athletes to the correct team, roster, or photo flow.
+- Keep lines safe, orderly, and positive.
+- Watch for mistakes before the photo is taken and communicate clearly.
+- Support table staff and team leads when schedules become busy.
 
-- Dependable attendance and punctuality
-- Confidence speaking to children, teenagers, adults, coaches, and school staff
-- Strong attention to visual details
-- Ability to follow a repeatable posing system
-- Positive energy without losing control of the schedule
-- Ability to stand, bend, move equipment, and remain active for several hours
-- Reliable transportation and willingness to travel to assigned locations
-- Availability on selected weekdays, evenings, and weekends during peak seasons
-- Experience in youth sports, schools, camps, coaching, childcare, dance, theater, events, or photography is helpful
+## What We Are Looking For
+
+- Dependable attendance and punctuality.
+- Confidence speaking with children, teenagers, adults, coaches, and league staff.
+- Strong attention to visual details.
+- Ability to follow a repeatable posing system.
+- Positive energy while keeping the schedule moving.
+- Ability to stand, bend, lift light supplies, and remain active for several hours.
+- Reliable transportation to assigned photo locations.
+- Availability on selected weekday evenings and weekend mornings during the fall season.
+- Ability to complete required background-check steps for field work.
+- Experience in youth sports, schools, camps, coaching, childcare, dance, theater, events, or photography is helpful.
 
 ## Why Work With NESP
 
-- Paid training and a clear photo-day process
-- Competitive seasonal hourly pay
-- Opportunities to return each season
-- A path toward lead assistant or photographer responsibilities for strong performers
-- Work with local schools, leagues, and community organizations
+- Paid seasonal work with training.
+- Clear picture-day process and support from experienced team leads.
+- Opportunities to return each season.
+- Path toward lead assistant, photographer, table, scheduling, or office-support responsibilities for dependable team members.
+- Work with local schools, leagues, families, and community organizations.
 
 ## To Apply
 
-Submit your work history, location, travel radius, transportation status, and weekday/weekend availability.
+Apply with your work history, city/state, travel radius, transportation status, and fall weekday/weekend availability. Tell us briefly about any experience working with children, teams, schools, events, or photo-day environments.
 
-### Application Questions
+## Application Questions
 
 1. What city and state are you based in?
-2. Do you have reliable transportation?
-3. How far are you willing to travel for work?
-4. Which weekdays, evenings, and weekends are you normally available?
-5. Describe any experience working with children, teams, schools, events, or photography.
-6. Are you comfortable giving clear posing directions to individuals and groups?
-7. Are you able to stand and remain active for several hours?
-8. Tell us about a time you noticed and corrected a visual or organizational detail.
-9. How would you handle a child who is nervous or does not want to cooperate?
-10. Why would you be a reliable member of a photo-day team?
+2. Do you have reliable transportation to picture-day locations?
+3. What travel radius are you comfortable accepting?
+4. Which weekdays after approximately 4:00 PM are you usually available?
+5. Which weekend mornings are you usually available?
+6. Describe any experience working with children, teams, schools, events, or photography.
+7. Are you comfortable giving clear posing directions to individuals and groups?
+8. Are you able to stand and remain active for several hours?
+9. Tell us about a time you noticed and corrected a visual or organizational detail.
+10. How would you handle a child who is nervous or does not want to cooperate?
+11. Are you willing to complete required background-check steps for field work?
 
-## Human Review Criteria
+## Internal Approval Notes
 
-- Reliability and punctuality
-- Clear direction and confidence
-- Comfort working with children and groups
-- Attention to visual details
-- Ability to follow a repeatable system
-- Transportation, travel radius, and availability
-
-AI may summarize job-related application information, but NESP management makes every interview and hiring decision.
+- Draft only. Do not publish until Craig approves the final posting.
+- Employment classification, payroll setup, overtime, travel pay, and background-check process remain pending final payroll/legal confirmation.
+- AI may summarize job-related application information, but NESP management makes every interview, assignment, and hiring decision.
