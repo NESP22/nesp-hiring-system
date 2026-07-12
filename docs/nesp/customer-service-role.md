@@ -1,57 +1,48 @@
-# NESP Customer Service Representative
+# NESP Part-Time Customer Service Representative
 
 ## Posting summary
 
-**Location:** Hybrid — remote plus Methuen, Massachusetts office work as needed  
-**Hours:** 20–30 hours per week  
-**Pay:** $23–$25 per hour, based on relevant experience and demonstrated skills  
-**Office schedule:** Flexible based on training, workload, and season
+**Location:** Methuen, MA - in office  
+**Employment classification:** W-2, pending final payroll/legal confirmation  
+**Schedule:** Flexible weekday hours, with additional hours during busy spring and fall sports seasons  
+**Pay:** $22-$25 per hour, based on experience
 
-New England Sports Photo is seeking a dependable, organized, and compassionate part-time customer service representative to support families, leagues, schools, and coaches throughout the company's busy photography seasons.
+New England Sports Photo is seeking a dependable, organized, and professional part-time customer service representative to support parents, families, leagues, schools, coordinators, and NESP staff from the Methuen office.
 
 ## Responsibilities
 
 - Respond to customer emails and support tickets.
-- Help with missing orders, shipping questions, photo corrections, digital downloads, reprints, and account issues.
-- Communicate professionally with upset or frustrated customers.
-- Review order details and gather missing information.
-- Document customer conversations and required follow-up.
-- Coordinate with production, shipping, photography, and management.
-- Escalate refunds, unusual complaints, and sensitive situations.
-- Follow company policy without making unauthorized promises.
-- Keep unresolved customer requests organized during busy periods.
+- Help parents with online ordering and account questions.
+- Handle shipping, delivery, and order-status questions.
+- Process reprint and replacement requests according to company policy.
+- Support league and school coordinators.
+- Escalate complex or sensitive issues to Craig.
+- Learn NESP products, packages, and ordering systems.
+- Maintain friendly, professional customer communication.
 
 ## Preferred qualifications
 
-- Strong written communication.
-- Calm and professional customer service style.
-- High attention to detail.
-- Comfortable learning ticketing systems and internal software.
-- Able to work independently and ask for help appropriately.
-- Reliable follow-through.
-- Comfortable in a seasonal, fast-moving business.
-- Customer service, office, retail, hospitality, school, youth-sports, or photography experience is helpful.
+- Excellent written and verbal communication.
+- Strong computer skills.
+- Organized and detail-oriented work habits.
+- Ability to multitask during busy seasons.
+- Customer service experience is preferred.
+- Sports photography experience is helpful but not required.
+- Ability to work in office from Methuen, MA.
 
 ## Application questions
 
-1. Are you available to work 20–30 hours per week?
-2. Can you work remotely and travel to the Methuen office when needed?
-3. What days and hours are you usually available?
-4. Do you have reliable transportation?
-5. Describe your customer service or office experience.
-6. Have you used email support, ticketing software, order systems, or customer databases?
-7. How comfortable are you learning new computer systems?
-8. Describe a time you handled an upset customer.
-9. How do you track several unresolved customer issues at once?
-10. Are you comfortable getting approval before promising a refund, replacement, or special accommodation?
-11. Why are you interested in this position?
-12. When can you start?
-
-## Required work sample
-
-> A parent says: “I ordered pictures several weeks ago and still have not received anything. Nobody has helped me, and I want a full refund immediately.”
->
-> Write the response you would send. Acknowledge the concern, remain professional, request the information needed to investigate, and do not promise a refund before the order is reviewed.
+1. Are you able to work in office from Methuen, MA?
+2. Which weekdays and times are you usually available?
+3. Are you available for additional hours during busy spring and fall sports seasons?
+4. Describe your customer service, office, support, school, sports, retail, hospitality, or related experience.
+5. What computer tools, email systems, ticketing systems, order systems, or customer databases have you used?
+6. How comfortable are you learning new products, packages, and ordering systems?
+7. Tell us about a time you helped a customer with a question or problem.
+8. How do you stay organized when multiple customer questions need follow-up?
+9. Are you comfortable following company policy for reprint and replacement requests?
+10. How would you handle a complex or sensitive issue that needs Craig's review?
+11. Why would you be a reliable member of the NESP customer service team?
 
 ## Human-review scorecard
 
@@ -59,12 +50,12 @@ The system may summarize evidence for the reviewer, but it must not make the fin
 
 | Category | Weight | Evidence to review |
 |---|---:|---|
-| Written communication | 25% | Clear, concise, grammatically sound response |
-| Empathy and professionalism | 20% | Acknowledges frustration without becoming defensive |
-| Judgment and policy discipline | 20% | Does not promise an unauthorized refund or outcome |
-| Organization and follow-through | 15% | Gives a clear investigation and follow-up process |
-| Availability and hybrid fit | 10% | Meets the documented schedule and location requirements |
-| Relevant experience | 10% | Job-related customer service, office, support, or systems experience |
+| Written and verbal communication | 30% | Clear, friendly, professional communication |
+| Organization and detail | 20% | Tracks customer questions and follow-up accurately |
+| Computer skills | 15% | Comfort with email, ticketing, order systems, and web tools |
+| Customer service judgment | 15% | Follows policy and escalates complex or sensitive issues |
+| Busy-season multitasking | 10% | Can handle multiple requests during spring and fall seasons |
+| Methuen office availability | 10% | Meets the documented in-office schedule needs |
 
 ## Recommended applicant stages
 
@@ -72,14 +63,13 @@ The system may summarize evidence for the reviewer, but it must not make the fin
 2. AI summary pending
 3. Human review
 4. Missing information
-5. Work sample review
-6. Phone screen
-7. Interview
-8. Reference check
-9. Offer approval
-10. Hired
-11. Not selected
-12. Future seasonal candidate
+5. Phone screen
+6. Interview
+7. Reference check
+8. Offer approval
+9. Hired
+10. Not selected
+11. Future seasonal candidate
 
 ## AI boundaries
 
@@ -97,4 +87,4 @@ The AI helper must not:
 - Automatically reject, interview, or hire an applicant.
 - Infer or score age, race, ethnicity, sex, gender, religion, disability, medical condition, family status, pregnancy, national origin, or other protected information.
 - Use names, photographs, addresses, graduation years, or similar proxies as ranking factors.
-- send applicant messages without an explicitly approved workflow.
+- Send applicant messages without an explicitly approved workflow.

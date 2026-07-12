@@ -138,17 +138,20 @@ Review only:
 - Travel radius and transportation
 - Background-check acknowledgement
 
-### Methuen Operations Support
+### Part-Time Customer Service Representative
 
 Review only:
 
-- Documented Methuen office availability
-- Weekday daytime or afternoon availability
-- Occasional evening or weekend availability during peak season
-- Office, operations, data-entry, production, school, sports, or customer-service experience
+- Documented Methuen in-office availability
+- Flexible weekday availability
+- Additional-hours availability during busy spring and fall sports seasons
+- Customer service, office, support, school, sports, retail, hospitality, or related experience
 - Computer comfort
-- Detail and organization examples
-- Confidentiality acknowledgement
+- Written and verbal communication
+- Organization and detail examples
+- Multitasking examples
+- Comfort following company policy for reprint and replacement requests
+- Judgment about escalating complex or sensitive issues to Craig
 
 ## Human Approval Gates
 

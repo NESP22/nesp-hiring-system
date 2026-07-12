@@ -14,7 +14,7 @@ We are hiring:
 - Freelance/Contract Youth Sports Photographers - $22-$27/hour based on experience, pending final classification approval
 - Photography Assistants/Posers - $20/hour
 - On-Site Picture Day Table Staff - $20/hour
-- Methuen Operations Support - hourly rate pending final approval
+- Part-Time Customer Service Representative - $22-$25/hour based on experience
 
 Most fall picture-day work runs September through November. Weekday field assignments are usually after approximately 4:00 PM, and weekend assignments are generally early morning through noon.
 
@@ -66,15 +66,15 @@ You should be dependable, comfortable speaking with families and coaches, detail
 
 Apply: [APPLICATION LINK]
 
-## Methuen Operations Support - Short Post
+## Part-Time Customer Service Representative - Short Post
 
-**METHUEN OPERATIONS SUPPORT - FALL SEASON**
+**PART-TIME CUSTOMER SERVICE REPRESENTATIVE - METHUEN OFFICE**
 
-New England Sports Photo is hiring detail-oriented operations support help for our Methuen office during the busy fall picture-day season.
+New England Sports Photo is hiring a part-time W-2 customer service representative for our Methuen, MA office.
 
-This role helps prepare materials, organize job details, check paperwork, support production flow, and keep office tasks moving. Computer comfort, accuracy, reliability, and respect for confidential information are important.
+Pay is $22-$25/hour based on experience. The schedule is flexible weekday hours, with additional hours during busy spring and fall sports seasons.
 
-Pay and final schedule are pending approval before posting.
+This role responds to customer emails and support tickets, helps parents with online ordering and account questions, handles shipping and order-status questions, supports league and school coordinators, processes reprint/replacement requests according to company policy, and escalates complex or sensitive issues to Craig.
 
 Apply: [APPLICATION LINK]
 
@@ -84,7 +84,7 @@ Apply: [APPLICATION LINK]
 - Freelance Youth Sports Photographer - Seasonal Assignments
 - Photo Day Assistant/Poser - No Camera Experience Required
 - Picture Day Table Staff - Seasonal Youth Sports Work
-- Methuen Operations Support - Fall Season
+- Part-Time Customer Service Representative - Methuen Office
 
 ## Suggested Screening Questions
 

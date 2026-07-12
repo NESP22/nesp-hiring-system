@@ -8,7 +8,7 @@ This document defines the first version of the public application experience. It
 
 New England Sports Photo is a local, family-run youth sports photography company serving New England communities since 1975.
 
-We hire dependable people for youth sports picture days, field support, table/check-in work, and seasonal Methuen operations support. Some roles require professional photography experience. Others include training and are a strong fit for people with customer service, youth sports, school, childcare, event, hospitality, office, or organizational experience.
+We hire dependable people for youth sports picture days, field support, table/check-in work, and part-time customer service in our Methuen office. Some roles require professional photography experience. Others include training and are a strong fit for people with customer service, youth sports, school, childcare, event, hospitality, office, or organizational experience.
 
 Current draft opportunities may include:
 
@@ -16,7 +16,7 @@ Current draft opportunities may include:
 - Freelance/Contract Youth Sports Photographer
 - Photography Assistant/Poser
 - On-Site Picture Day Table Staff
-- Methuen Operations Support
+- Part-Time Customer Service Representative
 
 Choose the role or roles that interest you. The application will show the questions required for each selection.
 
@@ -32,7 +32,7 @@ Choose the role or roles that interest you. The application will show the questi
 - Earliest start date
 - Weekday availability after approximately 4:00 PM
 - Weekend morning availability
-- General weekday daytime availability for Methuen operations support
+- General weekday availability for part-time in-office customer service work
 - Reliable transportation response for field roles
 - Travel radius for field roles
 - Referral source
@@ -96,17 +96,19 @@ Display:
 - Travel radius and reliable transportation
 - Background-check acknowledgement for field work
 
-### Methuen Operations Support
+### Part-Time Customer Service Representative
 
 Display:
 
 - Methuen office availability
-- Weekday daytime or afternoon availability
-- Occasional evening/weekend availability during peak season
-- Office, operations, data-entry, production, school, sports, or customer-service experience
+- Flexible weekday availability
+- Additional-hours availability during busy spring and fall sports seasons
+- Customer service, office, support, school, sports, retail, hospitality, or related experience
 - Computer comfort
-- Organization/detail example
-- Confidentiality acknowledgement
+- Written and verbal communication
+- Organization and multitasking example
+- Comfort following company policy for reprint and replacement requests
+- Escalation judgment for complex or sensitive issues
 
 ## Applicant Acknowledgements
 

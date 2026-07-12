@@ -19,7 +19,7 @@ NESP should present itself as a local, family-run company that has served New En
 2. Freelance/Contract Youth Sports Photographer - proposed contract assignments
 3. Photography Assistant/Poser - seasonal picture-day role
 4. On-Site Picture Day Table Staff - seasonal picture-day role
-5. Methuen Operations Support - Methuen office operations role
+5. Part-Time Customer Service Representative - Methuen in-office W-2 customer service role
 
 ## Compensation and schedule assumptions to confirm before posting
 
@@ -29,7 +29,7 @@ These drafts use Craig-approved planning details for the hiring project:
 - Photography assistant/poser: $20 per hour
 - On-site picture day table staff: $20 per hour
 - W-2 seasonal youth sports photographer: $22-$25 per hour based on experience
-- Methuen Operations Support: hourly rate pending final Craig/payroll approval
+- Part-Time Customer Service Representative: $22-$25 per hour based on experience
 - Work locations for field roles: Massachusetts, Rhode Island, New Hampshire, and Connecticut
 - Primary fall season: September through November
 - Expected field availability: weekdays after approximately 4:00 PM and weekends generally early morning through noon

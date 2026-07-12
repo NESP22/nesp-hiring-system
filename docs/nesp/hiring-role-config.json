@@ -159,31 +159,39 @@
       }
     },
     {
-      "id": "methuen_operations_support",
-      "title": "Methuen Operations Support",
-      "employment_type": "operations_role_pending_final_confirmation",
+      "id": "part_time_customer_service_representative",
+      "title": "Part-Time Customer Service Representative",
+      "employment_type": "w2_part_time_pending_final_confirmation",
       "publication_status": "draft_pending_business_payroll_legal_approval",
       "classification_review_required": true,
       "compensation": {
-        "type": "hourly_rate_pending_final_approval",
+        "type": "hourly_range_pending_final_confirmation",
+        "minimum": 22,
+        "maximum": 25,
+        "currency": "USD",
         "approval_required": true
       },
+      "location_policy": "Methuen_MA_in_office",
+      "schedule_policy": "Flexible weekday hours with additional hours during busy spring and fall sports seasons",
       "required_review_fields": [
         "location",
         "methuen_office_availability",
         "weekday_availability",
-        "occasional_evening_or_weekend_availability",
-        "office_or_operations_experience",
+        "busy_season_additional_hours_availability",
+        "customer_service_or_office_experience",
         "computer_comfort",
-        "detail_organization_example",
-        "confidentiality_acknowledgement"
+        "written_and_verbal_communication",
+        "organization_and_multitasking_example",
+        "policy_following_acknowledgement",
+        "escalation_judgment"
       ],
       "scorecard": {
-        "reliability_and_follow_through": 30,
-        "attention_to_detail": 25,
-        "computer_and_data_entry_comfort": 15,
-        "organization": 15,
-        "methuen_availability": 15
+        "communication": 30,
+        "organization_and_detail": 20,
+        "computer_skills": 15,
+        "customer_service_judgment": 15,
+        "multitasking_during_busy_seasons": 10,
+        "methuen_office_availability": 10
       }
     }
   ],
