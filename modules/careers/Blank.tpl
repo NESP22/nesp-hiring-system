@@ -1,5 +1,7 @@
 <?php
+global $careerPage;
 $isNESPCareers = trim((string) $this->siteName) === 'New England Sports Photo';
+$careerAssetPrefix = (isset($careerPage) && $careerPage == true ? '../' : '');
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -20,7 +22,7 @@ $isNESPCareers = trim((string) $this->siteName) === 'New England Sports Photo';
 			<script type="text/javascript" src="<?php echo TemplateUtility::getVersionedAssetURL('js/careersPage.js'); ?>"></script>
         <?php endif; ?>
         <?php if ($isNESPCareers): ?>
-            <link rel="stylesheet" type="text/css" href="<?php echo(isset($careerPage) && $careerPage == true ? '../' : '') . TemplateUtility::getVersionedAssetURL('modules/careers/nespCareers.css'); ?>" />
+            <link rel="stylesheet" type="text/css" href="<?php echo $careerAssetPrefix . TemplateUtility::getVersionedAssetURL('modules/careers/nespCareers.css'); ?>" />
         <?php endif; ?>
         <style type="text/css" media="all">
             <?php echo($this->template['CSS']); ?>
@@ -32,7 +34,9 @@ $isNESPCareers = trim((string) $this->siteName) === 'New England Sports Photo';
     <?php if ($isNESPCareers): ?>
     <div id="nespCareers">
         <header class="nesp-header">
-            <div class="nesp-logo-text" aria-label="New England Sports Photo text logo">NESP</div>
+            <div class="nesp-logo-mark">
+                <img src="<?php echo $careerAssetPrefix . TemplateUtility::getVersionedAssetURL('images/nesp-logo.png'); ?>" alt="New England Sports Photo logo" />
+            </div>
             <div class="nesp-brand">
                 <p class="nesp-kicker">Family-owned since 1975</p>
                 <h1>New England Sports Photo</h1>

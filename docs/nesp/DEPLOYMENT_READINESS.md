@@ -114,7 +114,7 @@ final hosting plan, access controls, and launch timing.
   check language.
 - Contractor-classification review before external publication of the
   Freelance/Contract Youth Sports Photographer role.
-- Approved NESP logo/brand asset for the public portal.
+- Final Craig approval of public logo placement and brand presentation.
 - Production admin setup and access controls.
 - Persistent database and file storage configured and restore-tested.
 - Backups configured and restore-tested.
