@@ -9,6 +9,9 @@ billing approval, outbound email, or real applicant collection.
 - Web service: Render Web Service running the OpenCATS web/PHP stack.
 - Database: persistent private MariaDB service.
 - Worker/background jobs: none required for the first private review launch.
+  Future Vapi, Zoom, AI review, backup, and workflow automation must run inside
+  approved Render services, workers, or cron jobs. Production must not require a
+  desktop computer or manually running local background scripts.
 - Public job board: OpenCATS careers module, eventually mapped to a public
   hostname such as `careers.nesportsphoto.com`.
 - Staff dashboard: OpenCATS admin/staff area, protected separately before any
@@ -121,3 +124,8 @@ final hosting plan, access controls, and launch timing.
 - Outbound email workflow approved, or confirmed disabled.
 - Privacy and applicant-data handling review.
 - No external job-board posting until explicitly approved.
+- Complete workflow features listed in
+  `docs/nesp/WEB_ONLY_HIRING_WORKFLOW_REQUIREMENTS.md` must be browser-based,
+  Render-hosted, server-side stored, individually authenticated, scoped by role,
+  and independent of Craig's Mac, localhost, local databases, local files, or a
+  particular browser profile.
