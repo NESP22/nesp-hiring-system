@@ -6,7 +6,8 @@ Prepared for the first public recruiting campaign using
 Craig has approved including the Freelance/Contract Youth Sports Photographer
 role in this campaign. Facebook is intentionally excluded from this campaign.
 Do not ask applicants to email resumes; send candidates to the matching NESP
-application link.
+application link. The NESP application form is the single applicant workflow
+for this campaign and now includes role-specific prescreening questions.
 
 ## Approved Roles And Direct Links
 
@@ -30,9 +31,9 @@ Important distinction:
 - Indeed: free standard publication is approved. Stop before sponsorship,
   matched-candidate purchase, billing setup, or paid promotion unless Craig
   approves the specific role, price, duration, and total.
-- Craigslist: Craig approved up to `$135` total. The Boston jobs flow currently
-  showed `$45` per selected job category, so four separate `$45` ads would exceed
-  the cap. Use the three-posting plan below unless Craigslist rules prevent it.
+- Craigslist: Craig approved up to `$180` total. The Boston jobs flow previously
+  showed `$45` per selected job category, so prepare four separate compliant
+  `$45` ads and stop before payment confirmation unless Craig is present.
 - College career boards, local job boards, and photography communities: use
   free or low-cost employer postings first. Stop before account creation,
   payment, identity verification, or final publication unless Craig approves.
@@ -160,28 +161,38 @@ Important distinction:
   - `Can you stand for extended periods and lift up to 25 pounds?`
 - Image/logo: approved NESP logo.
 
+## NESP Prescreening Questions
+
+Each direct NESP application form asks job-related prescreening questions before
+CAPTCHA and submission. The form shows this statement above the questions:
+
+`These questions help the NESP hiring team understand your availability and job-related qualifications. Every application is reviewed by a person.`
+
+Answers are stored in OpenCATS candidate questionnaire history as
+`NESP Prescreen - [role title]` and are visible from the candidate profile. The
+answers do not automatically reject, rank, hire, assign, email, or change status.
+
+Do not duplicate these questions in Indeed, Craigslist, Handshake, or other
+platforms when candidates are being directed to the NESP application link.
+
 ## Craigslist Posting Plan
 
-Budget cap: `$135`.
+Budget cap: `$180`.
 
 Observed Boston jobs fee: approximately `$45` per selected job posting.
 
-Use this compliant three-post plan unless Craigslist rules require a different
-structure:
+Use four separate postings because Craigslist permits one job description per
+posting:
 
 1. Customer Service Representative in `boston > northwest/merrimack > jobs >
    customer service`.
 2. Staff Photographer in the most appropriate regional jobs or gigs category,
    such as `art/media/design`, `tv/film/video/radio`, or a photography/event
    gigs category if Craigslist offers it.
-3. Combined seasonal Picture Day field-team recruiting post covering:
-   - Freelance/Contract Youth Sports Photographer
-   - Weekend Table Greeter / Field Assistant
-
-The combined post must clearly separate the two jobs, pay rates,
-classifications, equipment expectations, and application links. If Craigslist
-rules prohibit combining these roles, stop before payment and ask Craig whether
-to publish only three separate ads or increase the budget.
+3. Freelance/Contract Youth Sports Photographer in the closest available
+   photography, creative, or event category.
+4. Weekend Table Greeter / Field Assistant in the closest available event staff,
+   customer service, seasonal, or field support category.
 
 ### Craigslist Post 1 - Customer Service
 
@@ -257,50 +268,75 @@ https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41002
 Applications are reviewed by the New England Sports Photo hiring team.
 ```
 
-### Craigslist Post 3 - Picture Day Field Team
+### Craigslist Post 3 - Freelance Photographer
 
-- Title: `Youth Sports Picture Day Photographers & Field Assistants`
+- Title: `Freelance Youth Sports Photographer - $22-$27/hr`
 - Region: first choice `boston > northwest/merrimack`; choose another region
   only if Craig approves it and budget remains
-- Category: closest available jobs/gigs category for seasonal event,
-  photography, or customer-service field support
+- Category: closest available photography, creative, event, or contract category
 - Cost: expected `$45`
 - Body:
 
 ```text
-New England Sports Photo is recruiting for two separate seasonal Picture Day roles. Please read the descriptions and apply to the role that matches your experience and availability.
+New England Sports Photo is seeking freelance/contract photographers for youth-sports Picture Day assignments.
 
-Role 1: Freelance/Contract Youth Sports Photographer
 Pay: $22-$27 per hour, based on experience
 Classification: Freelance/Independent Contractor
 Territory: MA, RI, NH, and CT
 Schedule: primarily early-morning weekend Picture Day assignments
 Equipment: freelance photographers provide their own approved professional camera body, external speedlight, suitable portrait zoom lens, and backup equipment
 
-Freelance photographer responsibilities:
+What you'll do:
 - Photograph youth athletes and teams at assigned Picture Day events
 - Bring approved professional equipment
 - Follow NESP's Picture Day workflow and event instructions
 - Work professionally with athletes, families, coaches, and league staff
 
-Freelance photographer application:
+What we're looking for:
+- Own a professional or advanced camera body suitable for portrait work
+- Own an external speedlight and suitable portrait zoom lens
+- Comfort using manual camera and flash settings
+- Reliable transportation and early-morning weekend availability
+
+Apply through NESP:
 https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41003
 
-Role 2: Weekend Table Greeter / Field Assistant
+Applications are reviewed by the New England Sports Photo hiring team.
+```
+
+### Craigslist Post 4 - Field Assistant
+
+- Title: `Weekend Table Greeter / Field Assistant - Youth Sports - $18/hr`
+- Region: first choice `boston > northwest/merrimack`; choose another region
+  only if Craig approves it and budget remains
+- Category: closest available event staff, customer service, seasonal, or field
+  support category
+- Cost: expected `$45`
+- Body:
+
+```text
+New England Sports Photo is hiring friendly weekend field assistants to help youth-sports Picture Day events run smoothly.
+
 Pay: $18 per hour
-Classification: part-time temporary seasonal W-2
+Employment type: part-time temporary seasonal W-2
 Territory: primarily MA, with CT, RI, and NH assignments
 Schedule: primarily Saturday mornings, with some Sundays
 Equipment/training: NESP provides training, Picture Day workflow guidance, and posing guides
 
-Field assistant responsibilities:
+What you'll do:
 - Welcome and check in families
 - Organize teams and help manage Picture Day flow
 - Review order forms for completeness and accuracy
 - Help keep portrait and team sessions on schedule
 - Support photographers in the field
 
-Field assistant application:
+What we're looking for:
+- Friendly, professional communication
+- Reliable transportation and valid driver's license
+- Comfortable standing, working outdoors, and lifting up to 25 pounds
+- Ability to pass required background checks
+
+Apply through NESP:
 https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41005
 
 Applications are reviewed by the New England Sports Photo hiring team.

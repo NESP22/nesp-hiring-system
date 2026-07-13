@@ -25,9 +25,27 @@ Backend login:
 1. From Candidates, search by applicant name, email, or recent submission date.
 2. Open the candidate profile.
 3. Review contact details, resume or attachment if provided, application notes,
-   and the job association.
+   role-specific NESP prescreen answers, and the job association.
 4. Confirm the candidate is attached to the expected job before taking notes or
    changing any status.
+
+## Reviewing NESP Prescreen Answers
+
+Each public NESP application form includes job-related prescreening questions.
+The form tells applicants:
+
+`These questions help the NESP hiring team understand your availability and job-related qualifications. Every application is reviewed by a person.`
+
+To review answers:
+
+1. Open the candidate profile.
+2. Open the candidate's questionnaire results/history.
+3. Look for `NESP Prescreen - [role title]`.
+4. Review the answers alongside the job description, resume, notes, and
+   application date.
+
+Prescreen answers are for human review only. They must not automatically reject,
+rank, hire, assign, email, or change applicant status.
 
 ## Adding Notes
 
@@ -132,14 +150,17 @@ Implementation plan:
 1. Add a manual `Analyze Candidate` action on the candidate detail page.
 2. Collect only the candidate fields needed for the selected job:
    contact-independent application text, resume text if provided, job ID, role
-   requirements, availability answers, travel/transportation answers, and
-   equipment answers where relevant.
+   requirements, NESP prescreen answers, availability answers,
+   travel/transportation answers, and equipment answers where relevant.
 3. Run the existing NESP AI review prompt from
    `docs/nesp/AI_SCREENING_PROMPT.md`.
-4. Display the analysis in a preview panel with no status-changing controls.
+4. Display the analysis in a preview panel with no status-changing controls and
+   show which source fields were used.
 5. Allow Craig to copy the summary into a note manually, or save it as an
    explicitly labeled AI-assisted note after Craig reviews it.
-6. Keep outbound email disabled.
-7. Log that analysis was run, who ran it, and when, without logging secrets.
-8. Add tests confirming the feature cannot change candidate status, job
+6. Require Craig's confirmation before saving any AI-assisted note.
+7. Keep outbound email disabled.
+8. Log that analysis was run, who ran it, and when, without logging secrets or
+   full prompt payloads.
+9. Add tests confirming the feature cannot change candidate status, job
    association, hiring decision, rejection decision, or send email.

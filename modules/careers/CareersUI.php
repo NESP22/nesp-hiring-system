@@ -40,6 +40,7 @@ include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
 include_once(LEGACY_ROOT . '/lib/DatabaseSearch.php');
 include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 include_once(LEGACY_ROOT . '/lib/Questionnaire.php');
+include_once(LEGACY_ROOT . '/lib/NESPApplicationQuestions.php');
 include_once(LEGACY_ROOT . '/lib/DocumentToText.php');
 include_once(LEGACY_ROOT . '/lib/FileUtility.php');
 include_once(LEGACY_ROOT . '/lib/ParseUtility.php');
@@ -712,6 +713,7 @@ class CareersUI extends UserInterface
                 ),
                 $template['Content']);
             $template['Content'] = str_replace('<input-extraNotes>', '<textarea name="extraNotes" id="extraNotes" class="inputBoxArea" maxlength="450" onkeyup="mlength=this.getAttribute ? parseInt(this.getAttribute(\'maxlength\')) : \'\'; if (this.getAttribute && this.value.length>(mlength+7)) { alert(\'Sorry, you may only enter \'+mlength+\' characters into the extra notes.\');} if (this.getAttribute && this.value.length>mlength) {this.value=this.value.substring(0,mlength); this.scrollTop = this.scrollHeight;}">'.$extraNotesEscaped.'</textarea>', $template['Content']);
+            $template['Content'] = $this->injectNESPPrescreenQuestions($template['Content'], $jobID, $_POST);
             $template['Content'] = str_replace('<submit', '<input type="submit" class="submitButton"', $template['Content']);
 
             /* EEO inputs. */
@@ -1731,6 +1733,17 @@ class CareersUI extends UserInterface
             CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'The specified job order could not be found.');
             return;
         }
+
+        $prescreenErrors = NESPApplicationQuestions::validatePost($jobOrderID, $_POST);
+        if (!empty($prescreenErrors))
+        {
+            CommonErrors::fatal(
+                COMMONERROR_MISSINGFIELDS,
+                $this,
+                'Please answer the required NESP job-related questions before submitting your application.'
+            );
+            return;
+        }
 	    
         // NOTE: Careers Portal renders these values into HTML without consistent output escaping.
         // TODO (security/xss-hardening): Escape attributes/textarea/title consistently, then switch to getTrimmedInput().
@@ -1968,6 +1981,8 @@ class CareersUI extends UserInterface
             $newApplication = false;
         }
 
+        NESPApplicationQuestions::logCandidateAnswers($jobOrderID, $candidateID, $_POST);
+
         /* Build activity note. */
         if (!$newApplication)
         {
@@ -2195,6 +2210,49 @@ class CareersUI extends UserInterface
         }
 
         return $hiddenTags;
+    }
+
+    private function injectNESPPrescreenQuestions($content, $jobOrderID, $postData)
+    {
+        $prescreenHTML = NESPApplicationQuestions::renderForJob($jobOrderID, $postData);
+        if ($prescreenHTML == '')
+        {
+            return $content;
+        }
+
+        if (preg_match('/<section class="nesp-form-panel">\s*<h3>Additional information<\/h3>/i', $content, $matches, PREG_OFFSET_CAPTURE))
+        {
+            $additionalInfoPosition = $matches[0][1];
+            return substr($content, 0, $additionalInfoPosition)
+                . $prescreenHTML
+                . substr($content, $additionalInfoPosition);
+        }
+
+        $captchaLabelPosition = strpos($content, '<label id="captchaLabel"');
+        if ($captchaLabelPosition !== false)
+        {
+            return substr($content, 0, $captchaLabelPosition)
+                . $prescreenHTML
+                . substr($content, $captchaLabelPosition);
+        }
+
+        $captchaInputPosition = strpos($content, '<input-captcha');
+        if ($captchaInputPosition !== false)
+        {
+            return substr($content, 0, $captchaInputPosition)
+                . $prescreenHTML
+                . substr($content, $captchaInputPosition);
+        }
+
+        $submitPosition = strpos($content, '<submit');
+        if ($submitPosition !== false)
+        {
+            return substr($content, 0, $submitPosition)
+                . $prescreenHTML
+                . substr($content, $submitPosition);
+        }
+
+        return $content . $prescreenHTML;
     }
 
     private function isCandidateRegistered($template)

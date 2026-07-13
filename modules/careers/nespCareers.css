@@ -306,6 +306,25 @@ input.submitButton:hover {
     font: inherit;
 }
 
+.nesp-prescreen-panel {
+    grid-column: 1 / -1;
+}
+
+.nesp-prescreen-note {
+    margin: 0 0 18px;
+    color: #405568;
+    line-height: 1.5;
+}
+
+.nesp-prescreen-field {
+    margin-top: 14px;
+}
+
+.nesp-form-panel select.nesp-prescreen-select,
+.nesp-form-panel textarea.nesp-prescreen-text {
+    margin-top: 4px;
+}
+
 .nesp-form-panel textarea.inputBoxArea,
 #resumeContents {
     min-height: 130px;
