@@ -43,6 +43,14 @@
     margin: 0 0 18px;
 }
 
+.nesp-card-grid-compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.nesp-card-grid-tight {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .nesp-card,
 .nesp-panel {
     border: 1px solid #d7dee8;
@@ -75,6 +83,179 @@
     margin: 0 0 10px;
     color: #071e41;
     font-size: 17px;
+}
+
+.nesp-dashboard-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 16px;
+}
+
+.nesp-dashboard-nav a {
+    border: 1px solid #b9c5d3;
+    background: #f7f9fc;
+    color: #24384d;
+    padding: 7px 10px;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.nesp-dashboard-nav a.active,
+.nesp-dashboard-nav a:hover {
+    border-color: #315f93;
+    background: #315f93;
+    color: #ffffff;
+}
+
+.nesp-queue-section {
+    margin: 0 0 18px;
+}
+
+.nesp-queue-section h3 {
+    margin: 0 0 10px;
+    color: #071e41;
+    font-size: 18px;
+}
+
+.nesp-task-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.nesp-task-card {
+    border: 1px solid #cfd8e4;
+    background: #ffffff;
+    padding: 12px;
+    min-height: 210px;
+    display: flex;
+    flex-direction: column;
+}
+
+.nesp-task-topline {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 0 0 6px;
+}
+
+.nesp-task-topline strong {
+    color: #071e41;
+    font-size: 15px;
+    line-height: 1.25;
+}
+
+.nesp-task-topline span {
+    flex: 0 0 auto;
+    background: #edf1f6;
+    color: #425466;
+    font-size: 11px;
+    padding: 3px 6px;
+}
+
+.nesp-task-role,
+.nesp-muted {
+    color: #596b7d;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.nesp-task-card p {
+    color: #283747;
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 10px 0;
+}
+
+.nesp-task-card dl {
+    display: grid;
+    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 5px 8px;
+    margin: auto 0 12px;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.nesp-task-card dt {
+    color: #66778a;
+    font-weight: bold;
+}
+
+.nesp-task-card dd {
+    margin: 0;
+    color: #1b2733;
+}
+
+.nesp-primary-action,
+.nesp-primary-button,
+.nesp-secondary-button {
+    display: inline-block;
+    border: 1px solid #315f93;
+    background: #315f93;
+    color: #ffffff;
+    padding: 9px 12px;
+    text-align: center;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.nesp-secondary-button {
+    border-color: #4f6578;
+    background: #4f6578;
+}
+
+.nesp-secondary-action,
+.nesp-secondary-actions a {
+    color: #315f93;
+    font-size: 12px;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.nesp-secondary-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.nesp-empty {
+    border: 1px dashed #c9d3df;
+    background: #f7f9fc;
+    color: #536579;
+    padding: 14px;
+    font-size: 13px;
+}
+
+.nesp-form,
+.nesp-scorecard-form {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.nesp-form label,
+.nesp-scorecard-form label {
+    display: grid;
+    gap: 5px;
+    color: #253647;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.nesp-form input,
+.nesp-form select,
+.nesp-scorecard-form select,
+.nesp-scorecard-form textarea {
+    box-sizing: border-box;
+    width: 100%;
+    border: 1px solid #b8c5d3;
+    padding: 7px;
+    font-size: 13px;
 }
 
 .nesp-table {
@@ -130,7 +311,10 @@
     }
 
     .nesp-card-grid,
-    .nesp-two-column {
+    .nesp-card-grid-compact,
+    .nesp-card-grid-tight,
+    .nesp-two-column,
+    .nesp-task-grid {
         grid-template-columns: 1fr;
     }
 

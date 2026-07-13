@@ -9,7 +9,7 @@
                 <p>The NESP workflow database migration has not been applied yet.</p>
             </div>
             <div class="nesp-safety-banner">
-                The workflow is unavailable until migration 394 is installed. No integrations have been enabled.
+                The workflow is unavailable until the Phase 2 additive migration is applied. No integrations have been enabled.
             </div>
         </div>
     </div>

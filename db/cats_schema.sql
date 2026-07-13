@@ -1088,12 +1088,12 @@ CREATE TABLE `nesp_feature_flag` (
 
 /* Data for the table `nesp_feature_flag` */
 
-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('interviewer_portal_enabled', 'Interviewer Portal', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW());
-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('scorecards_enabled', 'Interview Scorecards', 'Browser-based interview scorecards for assigned interviewers.', 0, 1, NOW(), NOW());
-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('vapi_phone_screening_enabled', 'Vapi Phone Screens', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW());
-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('zoom_scheduling_enabled', 'Zoom Scheduling', 'Craig-approved Zoom interview scheduling workflow.', 0, 1, NOW(), NOW());
-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('ai_candidate_review_enabled', 'AI Candidate Review', 'On-demand candidate summary controlled by Craig.', 0, 1, NOW(), NOW());
-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('external_email_enabled', 'Applicant Email', 'Outbound applicant email delivery.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_WORKFLOW_ENABLED', 'NESP Workflow', 'Craig-reviewed hiring workflow dashboard and task queues.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_INTERVIEWER_POOL_ENABLED', 'Interviewer Pool', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0, 1, NOW(), NOW());
 
 /* Table structure for table `nesp_workflow_stage` */
 
@@ -1118,14 +1118,20 @@ CREATE TABLE `nesp_workflow_stage` (
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('new', 'New', 'New application awaiting human review.', 10, 0, 1, NOW(), NOW());
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('needs_review', 'Needs Review', 'Craig or an authorized reviewer needs to inspect the application.', 20, 0, 1, NOW(), NOW());
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('follow_up_needed', 'Follow Up Needed', 'Missing information or clarification is needed.', 30, 0, 1, NOW(), NOW());
+INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('applicant_clarification_requested', 'Applicant Clarification Requested', 'Waiting on the applicant to clarify an application detail.', 35, 0, 1, NOW(), NOW());
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('phone_screen_pending', 'Phone Screen Pending', 'A phone screen is approved but not completed.', 40, 0, 1, NOW(), NOW());
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('phone_screen_complete', 'Phone Screen Complete', 'Phone-screen results are ready for human review.', 50, 0, 1, NOW(), NOW());
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('interview_requested', 'Interview Requested', 'Craig wants an interview scheduled.', 60, 0, 1, NOW(), NOW());
+INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('interview_confirmation_pending', 'Interview Confirmation Pending', 'Waiting for applicant confirmation or reschedule response.', 65, 0, 1, NOW(), NOW());
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('interview_scheduled', 'Interview Scheduled', 'A human interview has been scheduled.', 70, 0, 1, NOW(), NOW());
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('scorecard_pending', 'Scorecard Pending', 'An interviewer scorecard is expected.', 80, 0, 1, NOW(), NOW());
+INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('scorecard_complete', 'Scorecard Complete', 'Completed scorecard is ready for Craig decision.', 85, 0, 1, NOW(), NOW());
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('offer_review', 'Offer Review', 'Craig is reviewing a possible offer.', 90, 0, 1, NOW(), NOW());
 INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('hired', 'Hired', 'Final human hiring decision recorded.', 100, 1, 1, NOW(), NOW());
-INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('declined', 'Declined', 'Final human decline decision recorded.', 110, 1, 1, NOW(), NOW());
+INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('hold', 'Hold', 'Candidate is intentionally paused for future seasonal review.', 105, 1, 1, NOW(), NOW());
+INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('not_selected', 'Not Selected', 'Final human decline decision recorded.', 110, 1, 1, NOW(), NOW());
+INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('withdrawn', 'Withdrawn', 'Candidate withdrew or stopped the process.', 120, 1, 1, NOW(), NOW());
+INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('declined', 'Declined', 'Legacy final human decline decision recorded.', 130, 1, 1, NOW(), NOW());
 
 /* Table structure for table `nesp_candidate_workflow` */
 
@@ -1135,6 +1141,10 @@ CREATE TABLE `nesp_candidate_workflow` (
   `joborder_id` INT(11) NOT NULL,
   `workflow_stage_id` INT(11) NOT NULL,
   `assigned_owner_user_id` INT(11),
+  `waiting_on_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Craig',
+  `summary` TEXT COLLATE utf8mb4_unicode_ci,
+  `next_action_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `due_at` DATETIME,
   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   PRIMARY KEY (`candidate_workflow_id`),
@@ -1160,6 +1170,8 @@ CREATE TABLE `nesp_interviewer_profile` (
   `can_view_ai_review` TINYINT(1) NOT NULL DEFAULT '0',
   `can_change_stage` TINYINT(1) NOT NULL DEFAULT '0',
   `can_view_other_interviewer_notes` TINYINT(1) NOT NULL DEFAULT '0',
+  `can_add_notes` TINYINT(1) NOT NULL DEFAULT '1',
+  `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1',
   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   PRIMARY KEY (`interviewer_profile_id`),
@@ -1232,6 +1244,8 @@ CREATE TABLE `nesp_scorecard_template` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /* Data for the table `nesp_scorecard_template` */
+
+INSERT INTO `nesp_scorecard_template` (`template_key`, `display_name`, `questions_json`, `is_enabled`, `date_created`, `date_modified`) VALUES ('nesp_standard_interview', 'NESP Standard Interview Scorecard', '[{"key":"reliability","label":"Reliability and schedule fit","type":"rating"},{"key":"people_skills","label":"Comfort with athletes, families, coaches, and staff","type":"rating"},{"key":"role_fit","label":"Role-specific skills or trainability","type":"rating"},{"key":"notes","label":"Factual notes from the conversation","type":"textarea"}]', 0, NOW(), NOW());
 
 /* Table structure for table `nesp_scorecard_response` */
 
@@ -1359,6 +1373,66 @@ CREATE TABLE `nesp_audit_event` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /* Data for the table `nesp_audit_event` */
+
+/* Table structure for table `nesp_session_security_event` */
+
+CREATE TABLE `nesp_session_security_event` (
+  `session_security_event_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11),
+  `event_type` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `ip_address` VARCHAR(45) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `user_agent` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `metadata_json` TEXT COLLATE utf8mb4_unicode_ci,
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`session_security_event_id`),
+  KEY `IDX_user_id` (`user_id`),
+  KEY `IDX_event_type` (`event_type`),
+  KEY `IDX_date_created` (`date_created`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Data for the table `nesp_session_security_event` */
+
+/* Table structure for table `nesp_staffing_schedule_history` */
+
+CREATE TABLE `nesp_staffing_schedule_history` (
+  `schedule_history_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `season_year` INT(4) NOT NULL,
+  `season_name` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `week_start` DATE NOT NULL,
+  `event_count` INT(11) NOT NULL DEFAULT '0',
+  `photographer_slots` INT(11) NOT NULL DEFAULT '0',
+  `photographer_hours` DECIMAL(8,2) NOT NULL DEFAULT '0.00',
+  `source_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `notes` TEXT COLLATE utf8mb4_unicode_ci,
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`schedule_history_id`),
+  KEY `IDX_week_start` (`week_start`),
+  KEY `IDX_season` (`season_year`, `season_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Data for the table `nesp_staffing_schedule_history` */
+
+/* Table structure for table `nesp_staffing_forecast` */
+
+CREATE TABLE `nesp_staffing_forecast` (
+  `staffing_forecast_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `forecast_year` INT(4) NOT NULL,
+  `forecast_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `target_week_start` DATE NOT NULL,
+  `expected_event_count` INT(11) NOT NULL DEFAULT '0',
+  `required_photographers` INT(11) NOT NULL DEFAULT '0',
+  `expected_hours` DECIMAL(8,2) NOT NULL DEFAULT '0.00',
+  `confidence_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'low',
+  `notes` TEXT COLLATE utf8mb4_unicode_ci,
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`staffing_forecast_id`),
+  KEY `IDX_target_week_start` (`target_week_start`),
+  KEY `IDX_forecast_year` (`forecast_year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Data for the table `nesp_staffing_forecast` */
 
 /* Table structure for table `zipcodes` */
 

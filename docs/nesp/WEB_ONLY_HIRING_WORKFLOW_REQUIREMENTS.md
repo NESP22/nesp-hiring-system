@@ -190,12 +190,12 @@ not be printed in logs, committed, or stored in docs.
 
 New workflow features must default to disabled until Craig approves:
 
-- `vapi_phone_screening_enabled`
-- `zoom_scheduling_enabled`
-- `ai_candidate_review_enabled`
-- `interviewer_portal_enabled`
-- `scorecards_enabled`
-- `external_email_enabled`
+- `NESP_WORKFLOW_ENABLED`
+- `NESP_INTERVIEWER_POOL_ENABLED`
+- `NESP_PRESCREEN_ENABLED`
+- `NESP_VAPI_ENABLED`
+- `NESP_ZOOM_ENABLED`
+- `NESP_AI_REVIEW_ENABLED`
 
 Outbound email must remain disabled unless Craig separately approves the sender
 domain, templates, test plan, opt-out/compliance handling, and production

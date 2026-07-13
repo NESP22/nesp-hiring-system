@@ -39,14 +39,14 @@ files, local databases, or desktop background scripts.
 
 ## Safe Defaults
 
-These feature flags are seeded disabled:
+Phase 2 supersedes the original Phase 1 flag names with these disabled flags:
 
-- `interviewer_portal_enabled`
-- `scorecards_enabled`
-- `vapi_phone_screening_enabled`
-- `zoom_scheduling_enabled`
-- `ai_candidate_review_enabled`
-- `external_email_enabled`
+- `NESP_WORKFLOW_ENABLED`
+- `NESP_INTERVIEWER_POOL_ENABLED`
+- `NESP_PRESCREEN_ENABLED`
+- `NESP_VAPI_ENABLED`
+- `NESP_ZOOM_ENABLED`
+- `NESP_AI_REVIEW_ENABLED`
 
 The integration-status rows for Vapi, Zoom, AI review, and applicant email are
 also seeded as `disabled`.

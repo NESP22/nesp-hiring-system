@@ -8,12 +8,16 @@ class NESPWorkflowTest extends TestCase
     public function testDefaultFeatureFlagsAreDisabled()
     {
         $flags = NESPWorkflow::getDefaultFeatureFlags();
+        $keys = array();
 
         $this->assertCount(6, $flags);
         foreach ($flags as $flag)
         {
+            $keys[] = $flag[0];
             $this->assertSame(0, $flag[3]);
         }
+
+        $this->assertSame(NESPWorkflow::getRequiredFeatureFlagKeys(), $keys);
     }
 
     public function testDefaultIntegrationsAreDisabled()
@@ -30,12 +34,50 @@ class NESPWorkflowTest extends TestCase
     public function testIntegrationFlagLookupDefaultsToFalse()
     {
         $flags = array(
-            array('flag_key' => 'ai_candidate_review_enabled', 'is_enabled' => 0),
-            array('flag_key' => 'zoom_scheduling_enabled', 'is_enabled' => 1)
+            array('flag_key' => 'NESP_AI_REVIEW_ENABLED', 'is_enabled' => 0),
+            array('flag_key' => 'NESP_ZOOM_ENABLED', 'is_enabled' => 1)
         );
 
-        $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'ai_candidate_review_enabled'));
-        $this->assertTrue(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'zoom_scheduling_enabled'));
-        $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'vapi_phone_screening_enabled'));
+        $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'NESP_AI_REVIEW_ENABLED'));
+        $this->assertTrue(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'NESP_ZOOM_ENABLED'));
+        $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'NESP_VAPI_ENABLED'));
+    }
+
+    public function testDashboardNavigationIncludesTaskViews()
+    {
+        $labels = array_map(
+            function ($item) {
+                return $item['label'];
+            },
+            NESPWorkflow::getDashboardNavigation()
+        );
+
+        $this->assertSame(
+            array('Needs Craig', 'Waiting', 'Interviews', 'Completed', 'Staffing Forecast', 'Settings'),
+            $labels
+        );
+    }
+
+    public function testQueueDefinitionsCoverRequestedDashboardSections()
+    {
+        $queues = NESPWorkflow::getQueueDefinitions();
+
+        $this->assertArrayHasKey('needsCraig', $queues);
+        $this->assertArrayHasKey('waitingApplicant', $queues);
+        $this->assertArrayHasKey('waitingInterviewer', $queues);
+        $this->assertArrayHasKey('upcomingInterviews', $queues);
+        $this->assertArrayHasKey('recentlyCompleted', $queues);
+        $this->assertContains('scorecard_complete', $queues['needsCraig']['stageKeys']);
+        $this->assertContains('applicant_clarification_requested', $queues['waitingApplicant']['stageKeys']);
+        $this->assertContains('scorecard_pending', $queues['waitingInterviewer']['stageKeys']);
+    }
+
+    public function testDefaultScorecardQuestionsAreFactual()
+    {
+        $questions = NESPWorkflow::getDefaultScorecardQuestions();
+
+        $this->assertCount(4, $questions);
+        $this->assertSame('notes', $questions[3]['key']);
+        $this->assertSame('textarea', $questions[3]['type']);
     }
 }
