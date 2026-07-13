@@ -5,7 +5,7 @@ Use these short versions for previews, internal routing, and approved posting dr
 ## Current Lineup
 
 - Part-Time Customer Service Representative - $22-$25/hour, part-time seasonal W-2, Methuen office
-- Weekend Staff Portrait & Team Photographer — Youth Sports - $22-$25/hour, seasonal W-2, weekend field assignments
+- Weekend Staff Portrait & Team Photographer - Youth Sports - $22-$25/hour, seasonal W-2, weekend field assignments
 - Freelance/Contract Youth Sports Photographer - $22-$27/hour, freelance/independent contractor, approved equipment required
 - Weekend Table Greeter / Field Assistant - $18/hour, seasonal W-2, weekend field assignments
 
@@ -17,7 +17,7 @@ The schedule is Monday-Friday on an agreed set schedule, generally 9:00 a.m.-3:0
 
 Apply: `[APPLICATION LINK]`
 
-## Weekend Staff Portrait & Team Photographer — Youth Sports
+## Weekend Staff Portrait & Team Photographer - Youth Sports
 
 New England Sports Photo is hiring seasonal W-2 staff photographers for youth-sports Picture Day assignments. Pay is $22-$25/hour based on experience. NESP provides professional equipment and paid training, so personal camera equipment is not required for this staff role.
 

@@ -5,14 +5,14 @@ These files contain the current NESP hiring-listing source copy. They do not pub
 ## Current Public Lineup
 
 1. Part-Time Customer Service Representative
-2. Weekend Staff Portrait & Team Photographer — Youth Sports
+2. Weekend Staff Portrait & Team Photographer - Youth Sports
 3. Freelance/Contract Youth Sports Photographer
 4. Weekend Table Greeter / Field Assistant
 
 ## Current Pay
 
 - Part-Time Customer Service Representative: $22-$25 per hour, based on experience
-- Weekend Staff Portrait & Team Photographer — Youth Sports: $22-$25 per hour, based on experience
+- Weekend Staff Portrait & Team Photographer - Youth Sports: $22-$25 per hour, based on experience
 - Freelance/Contract Youth Sports Photographer: $22-$27 per hour, based on experience
 - Weekend Table Greeter / Field Assistant: $18 per hour
 

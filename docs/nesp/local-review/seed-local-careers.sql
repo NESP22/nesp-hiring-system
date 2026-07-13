@@ -224,7 +224,7 @@ Apply with your work history, weekday availability, customer-service or office e
 Applications are reviewed by the New England Sports Photo hiring team.',
    'Protected review seed. No real applicant data.', 'H', 'Part-time seasonal W-2', '', '$22-$25 per hour', 'Active', 0, 1, 'Methuen', 'MA', 'US', NULL, NOW(), NOW(), 1, 0, 0, 1, NULL, 0),
   (41002, 10008, NULL, 20001, 10008, 10008, 'NESP-W2-PHOTO',
-   'Weekend Staff Portrait & Team Photographer — Youth Sports',
+   'Weekend Staff Portrait & Team Photographer - Youth Sports',
    'Quick Facts
 
 Pay: $22-$25 per hour, based on experience

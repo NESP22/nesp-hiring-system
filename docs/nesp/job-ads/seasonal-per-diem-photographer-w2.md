@@ -1,4 +1,4 @@
-# Weekend Staff Portrait & Team Photographer — Youth Sports
+# Weekend Staff Portrait & Team Photographer - Youth Sports
 
 ## Quick Facts
 

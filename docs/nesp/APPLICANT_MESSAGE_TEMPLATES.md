@@ -40,13 +40,13 @@ NESP Hiring Team
 
 ## Portfolio Request
 
-**Subject:** Photography samples requested — NESP application
+**Subject:** Photography samples requested - NESP application
 
 Hello [First Name],
 
 Thank you for applying for the [Photographer Role] position with New England Sports Photo.
 
-Please send a portfolio link or upload 5–10 examples that best demonstrate relevant portrait, school, sports, event, studio, or volume-photography experience. Please submit only images that you are authorized to share.
+Please send a portfolio link or upload 5-10 examples that best demonstrate relevant portrait, school, sports, event, studio, or volume-photography experience. Please submit only images that you are authorized to share.
 
 [Secure Upload Link]
 
@@ -58,7 +58,7 @@ NESP Hiring Team
 
 ## Phone Screen Invitation
 
-**Subject:** NESP phone screen invitation — [Role Title]
+**Subject:** NESP phone screen invitation - [Role Title]
 
 Hello [First Name],
 
@@ -76,7 +76,7 @@ NESP Hiring Team
 
 ## Interview Invitation
 
-**Subject:** Interview invitation — New England Sports Photo
+**Subject:** Interview invitation - New England Sports Photo
 
 Hello [First Name],
 
@@ -99,7 +99,7 @@ NESP Hiring Team
 
 ## Skills Evaluation Invitation
 
-**Subject:** NESP skills evaluation — [Role Title]
+**Subject:** NESP skills evaluation - [Role Title]
 
 Hello [First Name],
 
@@ -123,7 +123,7 @@ NESP Hiring Team
 
 ## Reference Request
 
-**Subject:** Reference information requested — NESP application
+**Subject:** Reference information requested - NESP application
 
 Hello [First Name],
 
@@ -176,7 +176,7 @@ Thank you,
 
 NESP Hiring Team
 
-## Offer Discussion — Not a Formal Offer
+## Offer Discussion - Not a Formal Offer
 
 **Subject:** Next step regarding the [Role Title] position
 

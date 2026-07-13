@@ -25,7 +25,7 @@ Relevant job-related factors:
 - Organization, detail accuracy, and multitasking
 - Judgment about escalating complex or sensitive issues
 
-### Weekend Staff Portrait & Team Photographer — Youth Sports
+### Weekend Staff Portrait & Team Photographer - Youth Sports
 
 Relevant job-related factors:
 

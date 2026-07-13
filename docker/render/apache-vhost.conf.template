@@ -1,6 +1,7 @@
 <VirtualHost *:__PORT__>
     ServerName localhost
     DocumentRoot /var/www/html
+    AddDefaultCharset UTF-8
 
     <Directory /var/www/html>
         Options FollowSymLinks

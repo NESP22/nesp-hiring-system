@@ -5,7 +5,7 @@ The NESP careers portal presents four protected job listings while Basic Auth re
 ## Current Public Roles
 
 - Part-Time Customer Service Representative
-- Weekend Staff Portrait & Team Photographer — Youth Sports
+- Weekend Staff Portrait & Team Photographer - Youth Sports
 - Freelance/Contract Youth Sports Photographer
 - Weekend Table Greeter / Field Assistant
 
@@ -24,7 +24,7 @@ The NESP careers portal presents four protected job listings while Basic Auth re
 
 Route candidates who are interested in in-person Methuen office customer service, weekday daytime schedules, customer emails, support tickets, calls, order questions, reprints, replacements, and coordinator support.
 
-### Weekend Staff Portrait & Team Photographer — Youth Sports
+### Weekend Staff Portrait & Team Photographer - Youth Sports
 
 Route candidates interested in W-2 weekend photographer assignments where NESP provides equipment and paid training.
 
