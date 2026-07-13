@@ -2044,6 +2044,326 @@ class CATSSchema
                         WHERE candidate_joborder_status_id = 675
                     );
             ',
+            '394' => "
+                CREATE TABLE IF NOT EXISTS `nesp_feature_flag` (
+                  `feature_flag_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `flag_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `display_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `description` TEXT COLLATE utf8mb4_unicode_ci,
+                  `is_enabled` TINYINT(1) NOT NULL DEFAULT '0',
+                  `requires_admin_approval` TINYINT(1) NOT NULL DEFAULT '1',
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`feature_flag_id`),
+                  UNIQUE KEY `IDX_flag_key` (`flag_key`),
+                  KEY `IDX_is_enabled` (`is_enabled`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_workflow_stage` (
+                  `workflow_stage_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `stage_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `display_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `description` TEXT COLLATE utf8mb4_unicode_ci,
+                  `sort_order` INT(11) NOT NULL DEFAULT '0',
+                  `is_terminal` TINYINT(1) NOT NULL DEFAULT '0',
+                  `is_enabled` TINYINT(1) NOT NULL DEFAULT '1',
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`workflow_stage_id`),
+                  UNIQUE KEY `IDX_stage_key` (`stage_key`),
+                  KEY `IDX_sort_order` (`sort_order`),
+                  KEY `IDX_is_enabled` (`is_enabled`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_candidate_workflow` (
+                  `candidate_workflow_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `candidate_id` INT(11) NOT NULL,
+                  `joborder_id` INT(11) NOT NULL,
+                  `workflow_stage_id` INT(11) NOT NULL,
+                  `assigned_owner_user_id` INT(11),
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`candidate_workflow_id`),
+                  UNIQUE KEY `IDX_candidate_joborder` (`candidate_id`, `joborder_id`),
+                  KEY `IDX_candidate_id` (`candidate_id`),
+                  KEY `IDX_joborder_id` (`joborder_id`),
+                  KEY `IDX_workflow_stage_id` (`workflow_stage_id`),
+                  KEY `IDX_assigned_owner_user_id` (`assigned_owner_user_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_interviewer_profile` (
+                  `interviewer_profile_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `user_id` INT(11),
+                  `display_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `email` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `role_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'interviewer',
+                  `is_active` TINYINT(1) NOT NULL DEFAULT '0',
+                  `can_view_resume` TINYINT(1) NOT NULL DEFAULT '0',
+                  `can_view_ai_review` TINYINT(1) NOT NULL DEFAULT '0',
+                  `can_change_stage` TINYINT(1) NOT NULL DEFAULT '0',
+                  `can_view_other_interviewer_notes` TINYINT(1) NOT NULL DEFAULT '0',
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`interviewer_profile_id`),
+                  UNIQUE KEY `IDX_user_id` (`user_id`),
+                  KEY `IDX_is_active` (`is_active`),
+                  KEY `IDX_role_key` (`role_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_interviewer_candidate_grant` (
+                  `grant_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `interviewer_profile_id` INT(11) NOT NULL,
+                  `candidate_id` INT(11) NOT NULL,
+                  `joborder_id` INT(11) NOT NULL,
+                  `granted_by_user_id` INT(11),
+                  `access_level_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'interview',
+                  `can_view_resume` TINYINT(1) NOT NULL DEFAULT '0',
+                  `can_add_notes` TINYINT(1) NOT NULL DEFAULT '1',
+                  `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1',
+                  `date_granted` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_revoked` DATETIME,
+                  PRIMARY KEY (`grant_id`),
+                  KEY `IDX_interviewer_profile_id` (`interviewer_profile_id`),
+                  KEY `IDX_candidate_id` (`candidate_id`),
+                  KEY `IDX_joborder_id` (`joborder_id`),
+                  KEY `IDX_date_revoked` (`date_revoked`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_interview` (
+                  `interview_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `candidate_id` INT(11) NOT NULL,
+                  `joborder_id` INT(11) NOT NULL,
+                  `interviewer_profile_id` INT(11),
+                  `workflow_stage_id` INT(11),
+                  `scheduled_start` DATETIME,
+                  `scheduled_end` DATETIME,
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+                  `zoom_meeting_id` VARCHAR(128) COLLATE utf8mb4_unicode_ci,
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`interview_id`),
+                  KEY `IDX_candidate_id` (`candidate_id`),
+                  KEY `IDX_joborder_id` (`joborder_id`),
+                  KEY `IDX_interviewer_profile_id` (`interviewer_profile_id`),
+                  KEY `IDX_status_key` (`status_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_scorecard_template` (
+                  `scorecard_template_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `template_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `display_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `questions_json` TEXT COLLATE utf8mb4_unicode_ci,
+                  `is_enabled` TINYINT(1) NOT NULL DEFAULT '0',
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`scorecard_template_id`),
+                  UNIQUE KEY `IDX_template_key` (`template_key`),
+                  KEY `IDX_is_enabled` (`is_enabled`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_scorecard_response` (
+                  `scorecard_response_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `scorecard_template_id` INT(11),
+                  `interview_id` INT(11),
+                  `candidate_id` INT(11) NOT NULL,
+                  `joborder_id` INT(11) NOT NULL,
+                  `interviewer_profile_id` INT(11),
+                  `answers_json` TEXT COLLATE utf8mb4_unicode_ci,
+                  `overall_recommendation` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+                  `submitted_at` DATETIME,
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`scorecard_response_id`),
+                  KEY `IDX_candidate_id` (`candidate_id`),
+                  KEY `IDX_joborder_id` (`joborder_id`),
+                  KEY `IDX_interviewer_profile_id` (`interviewer_profile_id`),
+                  KEY `IDX_status_key` (`status_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_integration_status` (
+                  `integration_status_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `integration_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `display_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'disabled',
+                  `last_checked_at` DATETIME,
+                  `message` TEXT COLLATE utf8mb4_unicode_ci,
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`integration_status_id`),
+                  UNIQUE KEY `IDX_integration_key` (`integration_key`),
+                  KEY `IDX_status_key` (`status_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_vapi_phone_screen` (
+                  `vapi_phone_screen_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `candidate_id` INT(11) NOT NULL,
+                  `joborder_id` INT(11) NOT NULL,
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_requested',
+                  `provider_call_id` VARCHAR(128) COLLATE utf8mb4_unicode_ci,
+                  `result_summary` TEXT COLLATE utf8mb4_unicode_ci,
+                  `transcript_storage_path` VARCHAR(255) COLLATE utf8mb4_unicode_ci,
+                  `approved_by_user_id` INT(11),
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`vapi_phone_screen_id`),
+                  KEY `IDX_candidate_id` (`candidate_id`),
+                  KEY `IDX_joborder_id` (`joborder_id`),
+                  KEY `IDX_status_key` (`status_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_zoom_interview` (
+                  `zoom_interview_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `interview_id` INT(11),
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_scheduled',
+                  `zoom_meeting_id` VARCHAR(128) COLLATE utf8mb4_unicode_ci,
+                  `meeting_metadata_json` TEXT COLLATE utf8mb4_unicode_ci,
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`zoom_interview_id`),
+                  KEY `IDX_interview_id` (`interview_id`),
+                  KEY `IDX_status_key` (`status_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_ai_candidate_review` (
+                  `ai_candidate_review_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `candidate_id` INT(11) NOT NULL,
+                  `joborder_id` INT(11) NOT NULL,
+                  `requested_by_user_id` INT(11),
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+                  `source_fields_json` TEXT COLLATE utf8mb4_unicode_ci,
+                  `review_text` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+                  `human_approved` TINYINT(1) NOT NULL DEFAULT '0',
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`ai_candidate_review_id`),
+                  KEY `IDX_candidate_id` (`candidate_id`),
+                  KEY `IDX_joborder_id` (`joborder_id`),
+                  KEY `IDX_status_key` (`status_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_audit_event` (
+                  `audit_event_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `actor_user_id` INT(11),
+                  `event_type` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `entity_type` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `entity_id` INT(11),
+                  `ip_address` VARCHAR(45) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `user_agent` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `metadata_json` TEXT COLLATE utf8mb4_unicode_ci,
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`audit_event_id`),
+                  KEY `IDX_actor_user_id` (`actor_user_id`),
+                  KEY `IDX_event_type` (`event_type`),
+                  KEY `IDX_entity` (`entity_type`, `entity_id`),
+                  KEY `IDX_date_created` (`date_created`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'interviewer_portal_enabled', 'Interviewer Portal', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'interviewer_portal_enabled');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'scorecards_enabled', 'Interview Scorecards', 'Browser-based interview scorecards for assigned interviewers.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'scorecards_enabled');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'vapi_phone_screening_enabled', 'Vapi Phone Screens', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'vapi_phone_screening_enabled');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'zoom_scheduling_enabled', 'Zoom Scheduling', 'Craig-approved Zoom interview scheduling workflow.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'zoom_scheduling_enabled');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'ai_candidate_review_enabled', 'AI Candidate Review', 'On-demand candidate summary controlled by Craig.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'ai_candidate_review_enabled');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'external_email_enabled', 'Applicant Email', 'Outbound applicant email delivery.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'external_email_enabled');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'new', 'New', 'New application awaiting human review.', 10, 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'new');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'needs_review', 'Needs Review', 'Craig or an authorized reviewer needs to inspect the application.', 20, 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'needs_review');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'follow_up_needed', 'Follow Up Needed', 'Missing information or clarification is needed.', 30, 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'follow_up_needed');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'phone_screen_pending', 'Phone Screen Pending', 'A phone screen is approved but not completed.', 40, 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'phone_screen_pending');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'phone_screen_complete', 'Phone Screen Complete', 'Phone-screen results are ready for human review.', 50, 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'phone_screen_complete');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'interview_requested', 'Interview Requested', 'Craig wants an interview scheduled.', 60, 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'interview_requested');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'interview_scheduled', 'Interview Scheduled', 'A human interview has been scheduled.', 70, 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'interview_scheduled');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'scorecard_pending', 'Scorecard Pending', 'An interviewer scorecard is expected.', 80, 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'scorecard_pending');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'offer_review', 'Offer Review', 'Craig is reviewing a possible offer.', 90, 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'offer_review');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'hired', 'Hired', 'Final human hiring decision recorded.', 100, 1, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'hired');
+
+                INSERT INTO nesp_workflow_stage
+                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                SELECT 'declined', 'Declined', 'Final human decline decision recorded.', 110, 1, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'declined');
+
+                INSERT INTO nesp_integration_status
+                    (integration_key, display_name, status_key, message, date_created, date_modified)
+                SELECT 'vapi', 'Vapi Phone Screening', 'disabled', 'Disabled in Phase 1. No calls can be placed.', NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_integration_status WHERE integration_key = 'vapi');
+
+                INSERT INTO nesp_integration_status
+                    (integration_key, display_name, status_key, message, date_created, date_modified)
+                SELECT 'zoom', 'Zoom Scheduling', 'disabled', 'Disabled in Phase 1. No meetings can be created.', NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_integration_status WHERE integration_key = 'zoom');
+
+                INSERT INTO nesp_integration_status
+                    (integration_key, display_name, status_key, message, date_created, date_modified)
+                SELECT 'ai_review', 'AI Candidate Review', 'disabled', 'Disabled in Phase 1. No model calls can run.', NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_integration_status WHERE integration_key = 'ai_review');
+
+                INSERT INTO nesp_integration_status
+                    (integration_key, display_name, status_key, message, date_created, date_modified)
+                SELECT 'email', 'Applicant Email', 'disabled', 'Disabled in Phase 1. No outbound applicant email can be sent.', NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_integration_status WHERE integration_key = 'email');
+            ",
 
         );
     }

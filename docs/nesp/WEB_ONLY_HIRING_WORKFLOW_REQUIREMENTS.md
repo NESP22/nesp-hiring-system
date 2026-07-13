@@ -267,3 +267,33 @@ The complete NESP hiring workflow is not ready until:
 - Security review confirms HTTPS, sessions, CSRF, RBAC, timeout, and secret
   handling.
 - Craig validates the workflow from a different computer/browser session.
+
+## Phase 1 Implementation Status
+
+Phase 1 adds the browser-hosted foundation for the NESP workflow inside the
+existing Render/OpenCATS application:
+
+- Authenticated `NESP Hiring` staff tab.
+- ADHD-friendly dashboard skeleton with simple status cards.
+- Durable MariaDB tables for feature flags, workflow stages, interviewer
+  profiles, candidate grants, interviews, scorecards, Vapi status, Zoom status,
+  AI review records, and audit events.
+- Read-only feature-flag review page.
+- Read-only interviewer access summary.
+- Read-only audit-log page.
+- Schema migration `394` for existing deployments.
+- Fresh-install schema coverage in `db/cats_schema.sql`.
+
+Phase 1 intentionally does not:
+
+- Create real interviewer accounts.
+- Grant interviewer access to real candidates.
+- Place Vapi calls.
+- Create Zoom meetings.
+- Run AI reviews.
+- Send applicant email or SMS.
+- Automatically reject, rank, hire, assign, or change candidate status.
+
+All Phase 1 integration flags are seeded disabled. Later phases must add
+reviewed admin controls, CSRF-protected state changes, scoped candidate detail
+views, and explicit Craig approval gates before any integration can run.
