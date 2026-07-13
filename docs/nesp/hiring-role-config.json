@@ -1,198 +1,125 @@
 {
-  "version": 3,
-  "status": "draft_for_human_approval",
+  "version": 4,
+  "status": "protected_review",
   "company": {
     "name": "New England Sports Photo",
     "short_name": "NESP",
     "base_location": "Methuen, Massachusetts",
-    "service_area": [
-      "Massachusetts",
-      "Rhode Island",
-      "New Hampshire",
-      "Connecticut"
-    ],
-    "primary_fall_season": "September through November"
+    "description": "New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England."
   },
   "global_rules": {
-    "publication_status": "draft_only_do_not_publish",
     "decision_authority": "human_only",
     "applicant_communications": "draft_only_human_approval_required",
-    "field_role_availability_expectation": "Weekdays after approximately 4:00 PM and weekends generally early morning through noon",
-    "field_role_travel_pay": "Paid time begins when the worker leaves home and continues through completion of the assignment. Return travel is paid when the drive home exceeds one hour.",
-    "field_role_requirements": [
-      "reliable_transportation",
-      "background_check_required"
-    ],
-    "classification_note": "Employment classification, payroll setup, overtime, travel pay, and background-check process require final payroll/legal confirmation before posting."
+    "automatic_rejection_enabled": false,
+    "automatic_selection_enabled": false,
+    "automatic_hiring_enabled": false,
+    "outbound_email_enabled": false,
+    "real_applicant_test_data_allowed": false
   },
   "roles": [
     {
-      "id": "w2_seasonal_youth_sports_photographer",
-      "title": "W-2 Seasonal Youth Sports Photographer",
-      "employment_type": "w2_seasonal_pending_final_confirmation",
-      "publication_status": "draft_pending_business_payroll_legal_approval",
-      "classification_review_required": true,
-      "compensation": {
-        "type": "hourly_range_pending_final_confirmation",
-        "minimum": 22,
-        "maximum": 25,
-        "currency": "USD",
-        "approval_required": true
-      },
-      "equipment_policy": "company_provided_equipment",
-      "required_review_fields": [
-        "location",
-        "travel_radius",
-        "weekday_after_4pm_availability",
-        "weekend_morning_availability",
-        "reliable_transportation",
-        "background_check_acknowledgement",
-        "relevant_photography_experience",
-        "camera_and_lighting_experience",
-        "portfolio",
-        "working_with_children_and_teams"
-      ],
-      "scorecard": {
-        "reliability_and_punctuality": 25,
-        "technical_photography_skills": 25,
-        "consistency_and_workflow": 20,
-        "direction_and_communication": 15,
-        "travel_and_availability": 15
-      }
-    },
-    {
-      "id": "freelance_contract_youth_sports_photographer",
-      "title": "Freelance/Contract Youth Sports Photographer",
-      "employment_type": "independent_contractor_proposed_pending_classification_review",
-      "publication_status": "blocked_pending_classification_review",
-      "classification_review_required": true,
-      "safe_initial_alternative": "w2_seasonal_youth_sports_photographer",
-      "compensation": {
-        "type": "hourly_range_pending_final_confirmation",
-        "minimum": 22,
-        "maximum": 27,
-        "currency": "USD",
-        "approval_required": true
-      },
-      "equipment_policy": "contractor_provides_professional_camera_equipment_lenses_external_flash_and_backup_equipment",
-      "required_review_fields": [
-        "location",
-        "travel_radius",
-        "weekday_after_4pm_availability",
-        "weekend_morning_availability",
-        "reliable_transportation",
-        "background_check_acknowledgement",
-        "relevant_photography_experience",
-        "equipment_list",
-        "backup_equipment_plan",
-        "portfolio",
-        "working_with_children_and_teams"
-      ],
-      "scorecard": {
-        "reliability_and_communication": 25,
-        "relevant_image_quality": 25,
-        "workflow_and_direction": 20,
-        "equipment_readiness": 15,
-        "travel_and_availability": 15
-      }
-    },
-    {
-      "id": "photography_assistant_poser",
-      "title": "Photography Assistant/Poser",
-      "employment_type": "seasonal_pending_final_confirmation",
-      "publication_status": "draft_pending_business_payroll_legal_approval",
-      "classification_review_required": true,
-      "compensation": {
-        "type": "hourly_pending_final_confirmation",
-        "amount": 20,
-        "currency": "USD",
-        "approval_required": true
-      },
-      "required_review_fields": [
-        "location",
-        "travel_radius",
-        "weekday_after_4pm_availability",
-        "weekend_morning_availability",
-        "reliable_transportation",
-        "background_check_acknowledgement",
-        "experience_with_children_or_groups",
-        "comfort_giving_directions",
-        "physical_activity_acknowledgement"
-      ],
-      "scorecard": {
-        "reliability_and_punctuality": 30,
-        "direction_and_confidence": 20,
-        "working_with_children_and_groups": 20,
-        "visual_attention_to_detail": 15,
-        "travel_and_availability": 15
-      }
-    },
-    {
-      "id": "on_site_picture_day_table_staff",
-      "title": "On-Site Picture Day Table Staff",
-      "employment_type": "seasonal_pending_final_confirmation",
-      "publication_status": "draft_pending_business_payroll_legal_approval",
-      "classification_review_required": true,
-      "compensation": {
-        "type": "hourly_pending_final_confirmation",
-        "amount": 20,
-        "currency": "USD",
-        "approval_required": true
-      },
-      "required_review_fields": [
-        "location",
-        "travel_radius",
-        "weekday_after_4pm_availability",
-        "weekend_morning_availability",
-        "reliable_transportation",
-        "background_check_acknowledgement",
-        "customer_service_experience",
-        "detail_and_organization_example",
-        "tablet_or_checkin_comfort"
-      ],
-      "scorecard": {
-        "reliability_and_punctuality": 30,
-        "communication": 20,
-        "attention_to_detail": 20,
-        "organization_under_pressure": 15,
-        "travel_and_availability": 15
-      }
-    },
-    {
+      "job_id": 41001,
       "id": "part_time_customer_service_representative",
       "title": "Part-Time Customer Service Representative",
-      "employment_type": "w2_part_time_pending_final_confirmation",
-      "publication_status": "draft_pending_business_payroll_legal_approval",
-      "classification_review_required": true,
-      "compensation": {
-        "type": "hourly_range_pending_final_confirmation",
-        "minimum": 22,
-        "maximum": 25,
-        "currency": "USD",
-        "approval_required": true
-      },
-      "location_policy": "Methuen_MA_in_office",
-      "schedule_policy": "Flexible weekday hours with additional hours during busy spring and fall sports seasons",
+      "public": true,
+      "status": "Active",
+      "employment_classification": "Part-time, seasonal W-2",
+      "display_classification": "Part-Time Seasonal W-2",
+      "pay": "$22-$25 per hour, based on experience",
+      "location": "In person at the NESP office in Methuen, Massachusetts",
+      "schedule": "Monday-Friday, agreed set schedule, generally 9:00 a.m.-3:00 p.m. or 10:00 a.m.-4:00 p.m.",
+      "season": "Approximately 20-30 hours per week during spring and fall peak seasons; reduced hours or scheduled time off may occur during slower summer and winter periods",
+      "equipment_policy": "NESP office systems and training provided",
       "required_review_fields": [
-        "location",
         "methuen_office_availability",
-        "weekday_availability",
-        "busy_season_additional_hours_availability",
-        "customer_service_or_office_experience",
-        "computer_comfort",
+        "weekday_daytime_availability",
+        "customer_service_or_administrative_experience",
         "written_and_verbal_communication",
-        "organization_and_multitasking_example",
-        "policy_following_acknowledgement",
+        "computer_comfort",
+        "organization_and_multitasking",
         "escalation_judgment"
-      ],
-      "scorecard": {
-        "communication": 30,
-        "organization_and_detail": 20,
-        "computer_skills": 15,
-        "customer_service_judgment": 15,
-        "multitasking_during_busy_seasons": 10,
-        "methuen_office_availability": 10
-      }
+      ]
+    },
+    {
+      "job_id": 41002,
+      "id": "weekend_staff_portrait_team_photographer_youth_sports",
+      "title": "Weekend Staff Portrait & Team Photographer — Youth Sports",
+      "public": true,
+      "status": "Active",
+      "employment_classification": "Part-time, temporary, seasonal W-2",
+      "display_classification": "Seasonal W-2",
+      "pay": "$22-$25 per hour, based on experience",
+      "territory": "Primarily Massachusetts, with additional assignments in Connecticut, Rhode Island, Vermont, and New Hampshire",
+      "schedule": "Most assignments are Saturdays, with some Sundays and early-morning weekend availability",
+      "season": "Late April through early June, with optional after-school weekday assignments and future seasonal opportunities possible",
+      "equipment_policy": "NESP provides professional equipment for staff photographer assignments",
+      "required_review_fields": [
+        "weekend_early_morning_availability",
+        "reliable_transportation",
+        "travel_ability",
+        "working_with_children_and_families",
+        "photography_or_customer_facing_experience",
+        "structured_workflow_fit",
+        "background_check_acknowledgement"
+      ]
+    },
+    {
+      "job_id": 41003,
+      "id": "freelance_contract_youth_sports_photographer",
+      "title": "Freelance/Contract Youth Sports Photographer",
+      "public": true,
+      "status": "Active",
+      "employment_classification": "Freelance/Independent Contractor",
+      "display_classification": "Freelance/Independent Contractor",
+      "pay": "$22-$27 per hour, based on experience",
+      "territory": "Massachusetts, Rhode Island, New Hampshire, and Connecticut",
+      "schedule": "Seasonal youth-sports Picture Day assignments, primarily weekends",
+      "season": "Assignments commonly run from morning through early or mid-afternoon; optional after-school weekday work may be available",
+      "equipment_policy": "Freelance photographers provide their own approved professional equipment",
+      "required_review_fields": [
+        "weekend_availability",
+        "territory_and_travel_radius",
+        "relevant_photography_experience",
+        "camera_and_flash_knowledge",
+        "approved_equipment_list",
+        "reliable_transportation",
+        "structured_workflow_fit"
+      ]
+    },
+    {
+      "job_id": 41005,
+      "id": "weekend_table_greeter_field_assistant",
+      "title": "Weekend Table Greeter / Field Assistant",
+      "public": true,
+      "status": "Active",
+      "employment_classification": "Part-time, temporary, seasonal W-2",
+      "display_classification": "Seasonal W-2",
+      "pay": "$18 per hour",
+      "territory": "Primarily Massachusetts, with additional events in Connecticut, Rhode Island, and New Hampshire",
+      "work_location": "Youth-sports fields and facilities",
+      "schedule": "Primarily Saturdays, with some Sundays and early-morning availability",
+      "season": "Mid-April through early June; training and early assignments may begin in April",
+      "equipment_policy": "Training, workflow guidance, and posing guides provided by NESP",
+      "required_review_fields": [
+        "weekend_early_morning_availability",
+        "reliable_transportation",
+        "valid_drivers_license",
+        "customer_facing_communication",
+        "organization_and_detail_accuracy",
+        "comfort_directing_groups",
+        "outdoor_work_acknowledgement",
+        "physical_requirements_acknowledgement",
+        "background_check_acknowledgement"
+      ]
+    }
+  ],
+  "inactive_roles": [
+    {
+      "job_id": 41004,
+      "id": "photography_assistant_poser",
+      "title": "Photography Assistant/Poser",
+      "public": false,
+      "status": "Inactive"
     }
   ],
   "ai_policy": {

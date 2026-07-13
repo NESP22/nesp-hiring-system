@@ -207,8 +207,8 @@ input.submitButton:hover {
 }
 
 .nesp-job-card-meta {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, max-content));
     gap: 10px;
     margin: 0;
 }
@@ -223,6 +223,7 @@ input.submitButton:hover {
     background: #f4f7f9;
     font-size: 14px;
     font-weight: 700;
+    white-space: normal;
 }
 
 .nesp-detail-grid {
@@ -234,7 +235,7 @@ input.submitButton:hover {
 
 .nesp-facts {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     margin: 0 0 24px;
 }
@@ -365,6 +366,7 @@ input.submitButton:hover {
     .nesp-job-card,
     .nesp-detail-grid,
     .nesp-form-grid,
+    .nesp-job-card-meta,
     .nesp-facts {
         grid-template-columns: 1fr;
     }

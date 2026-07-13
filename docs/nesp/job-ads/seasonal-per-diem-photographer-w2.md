@@ -1,75 +1,57 @@
-# W-2 Seasonal Youth Sports Photographer
+# Weekend Staff Portrait & Team Photographer — Youth Sports
 
-**New England Sports Photo - Seasonal W-2 role**  
-**Pay: $22-$25 per hour, based on experience, pending final payroll/legal confirmation**  
-**Locations: Massachusetts, Rhode Island, New Hampshire, and Connecticut**  
-**Primary season: September through November**
+## Quick Facts
 
-New England Sports Photo is hiring dependable seasonal photographers for youth sports picture days across New England.
+**Pay:** $22-$25 per hour, based on experience
+**Territory:** Primarily Massachusetts, with additional assignments in Connecticut, Rhode Island, Vermont, and New Hampshire
+**Employment type:** Part-time, temporary, seasonal W-2
+**Typical schedule:** Most assignments are on Saturdays, with some Sundays and early-morning weekend availability
+**Season:** Spring season generally runs from late April through early June; optional after-school weekday assignments and future seasonal opportunities may be available
 
-This is a good fit for photographers who enjoy working with athletes, teams, coaches, and families and want organized seasonal assignments with a local company. NESP provides the picture-day workflow, scheduling details, production support, and company-provided equipment for W-2 photographers.
+New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 
-## Schedule
+We are hiring weekend staff photographers to create individual portraits and team photographs at youth-sports Picture Day events. Photography experience is helpful, but the bigger requirements are reliability, a professional attitude, comfort working with children and families, and willingness to learn a structured Picture Day system.
 
-- Most fall assignments run September through November.
-- Weekday assignments are usually after approximately 4:00 PM.
-- Weekend assignments are generally early morning through noon.
-- Assignment volume varies by season, client schedule, location, and weather.
-- Paid time begins when you leave home and continues through completion of the assignment.
-- Return travel is paid when the drive home exceeds one hour.
+## Why This Role May Be a Good Fit
 
-## What You Will Do
+- No personal camera equipment required
+- Professional equipment supplied by NESP
+- Paid training provided
+- Learn a repeatable Picture Day workflow
+- Work with youth athletes and community sports leagues
+- Seasonal schedule with opportunities to return
 
-- Photograph individual athletes, teams, coaches, and league staff.
-- Use NESP-provided camera and lighting equipment for assigned W-2 work.
-- Follow NESP standards for posing, lighting, camera settings, naming, and file handling.
-- Direct children and groups clearly, respectfully, and efficiently.
-- Keep photo lines moving while maintaining image quality.
-- Work with assistants, table staff, coaches, league contacts, and NESP leads.
-- Report schedule, roster, weather, customer, or equipment issues promptly.
-- Protect image files and complete end-of-assignment transfer steps.
+## What You'll Do
 
-## What We Are Looking For
+- Photograph individual athletes and teams using NESP equipment
+- Set up cameras, lighting, and related gear
+- Represent NESP professionally at assigned locations
+- Work comfortably with athletes, parents, coaches, and league staff
+- Assist with setup and breakdown
+- Follow the NESP Picture Day workflow
+- Help keep events organized and on schedule
 
-- Portrait, sports, school, event, studio, or volume-photography experience.
-- Strong reliability, punctuality, and professional communication.
-- Comfort directing children, teenagers, adults, and teams.
-- Working knowledge of exposure, focus, and basic lighting.
-- Ability to follow a repeatable high-volume workflow.
-- Reliable transportation to assigned photo locations.
-- Ability to carry, set up, and break down photo equipment.
-- Availability on selected weekday evenings and weekend mornings during the fall season.
-- Ability to complete required background-check steps for field work.
+## What We're Looking For
 
-## Why Work With NESP
+- Valid driver's license
+- Reliable personal transportation
+- Ability to travel to assigned locations
+- Comfort working with children and families
+- Strong communication and organizational skills
+- Dependability for accepted assignments
+- Ability to learn technical skills and follow a structured process
+- Ability to pass required background checks and youth-sports screenings
 
-- Seasonal W-2 payroll role, pending final payroll/legal confirmation.
-- Company-provided equipment for W-2 photographer assignments.
-- Organized schedules and established picture-day procedures.
-- Support from assistants, table staff, scheduling, customer service, and production.
-- Opportunity to return each season and grow into lead assignments based on reliability and quality.
+## What NESP Provides
 
-## To Apply
+NESP provides the camera equipment and lighting used for staff photographer assignments, along with paid training, event workflow guidance, and Picture Day processes. You do not need to provide your own camera gear for this W-2 staff role.
 
-Apply with your work history or resume, city/state, travel radius, fall availability, and a portfolio link or 5-10 relevant sample images. Tell us briefly about your experience photographing youth sports, children, teams, portraits, events, or other high-volume work.
+## Schedule and Travel Expectations
 
-## Application Questions
+Most assignments are Saturday mornings, with some Sundays. Optional weekday after-school assignments may be available. Paid drive time is handled in accordance with NESP policy.
 
-1. What city and state are you based in?
-2. Do you have reliable transportation to picture-day locations?
-3. What travel radius are you comfortable accepting?
-4. Which weekdays after approximately 4:00 PM are you usually available?
-5. Which weekend mornings are you usually available?
-6. Describe your relevant photography experience.
-7. What camera and lighting systems have you used?
-8. Are you comfortable using company-provided equipment and required settings?
-9. Are you comfortable directing children and groups quickly and respectfully?
-10. Provide a portfolio link or upload 5-10 relevant image samples.
-11. Are you able to lift, carry, set up, and break down photography equipment?
-12. Are you willing to complete required background-check steps for field work?
+## Apply Now
 
-## Internal Approval Notes
+Apply with your availability, location, transportation information, and any photography, youth-sports, school, event, or customer-facing experience.
 
-- Draft only. Do not publish until Craig approves the final posting.
-- W-2 classification, payroll setup, overtime, travel pay, and background-check process remain pending final payroll/legal confirmation.
-- AI may summarize job-related application information, but NESP management makes every interview, assignment, and hiring decision.
+Applications are reviewed by the New England Sports Photo hiring team.

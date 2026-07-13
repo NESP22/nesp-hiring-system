@@ -56,7 +56,7 @@ $careerAssetPrefix = (isset($careerPage) && $careerPage == true ? '../' : '');
     <?php echo($this->template['Footer']); ?>
     <?php if ($isNESPCareers): ?>
         <footer class="nesp-footer">
-            <strong>Local review only.</strong> These draft job postings are prepared for NESP review and are not published externally.
+            Applications are reviewed by the New England Sports Photo hiring team.
         </footer>
     </div>
     <?php endif; ?>

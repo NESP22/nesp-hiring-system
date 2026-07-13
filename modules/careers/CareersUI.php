@@ -974,6 +974,10 @@ class CareersUI extends UserInterface
             $template['Content'] = str_replace('<rate>',         $jobRateEscaped, $template['Content']);
             $template['Content'] = str_replace('<salary>',       $jobSalaryEscaped, $template['Content']);
             $template['Content'] = str_replace('<daysOld>',      $jobDaysOldEscaped, $template['Content']);
+            $nespFacts = $this->getNESPJobFacts($jobOrderData);
+            $template['Content'] = str_replace('<classification>', htmlspecialchars($nespFacts['classification'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING), $template['Content']);
+            $template['Content'] = str_replace('<schedule>', htmlspecialchars($nespFacts['schedule'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING), $template['Content']);
+            $template['Content'] = str_replace('<season>', htmlspecialchars($nespFacts['season'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING), $template['Content']);
 
             $isRegistered = $this->isCandidateRegistered($template['Content - Candidate Registration']);
 
@@ -1528,7 +1532,10 @@ class CareersUI extends UserInterface
                     $line['country']
                 ), ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
                 $salary = htmlspecialchars((string) $line['salary'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
-                $type = htmlspecialchars((string) JobOrders::typeCodeToString($line['type']), ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+                $nespFacts = $this->getNESPJobFacts($line);
+                $classification = htmlspecialchars($nespFacts['classification'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+                $schedule = htmlspecialchars($nespFacts['schedule'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+                $season = htmlspecialchars($nespFacts['season'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
 
                 $html .= '<article class="nesp-job-card">' . "\n";
                 $html .= '<div>' . "\n";
@@ -1542,9 +1549,17 @@ class CareersUI extends UserInterface
                 {
                     $html .= '<span>Location: ' . $location . '</span>';
                 }
-                if ($type != '')
+                if ($classification != '')
                 {
-                    $html .= '<span>Type: ' . $type . '</span>';
+                    $html .= '<span>Classification: ' . $classification . '</span>';
+                }
+                if ($schedule != '')
+                {
+                    $html .= '<span>Schedule: ' . $schedule . '</span>';
+                }
+                if ($season != '')
+                {
+                    $html .= '<span>Season: ' . $season . '</span>';
                 }
                 $html .= '</p>' . "\n";
                 $html .= '</div>' . "\n";
@@ -1630,6 +1645,48 @@ class CareersUI extends UserInterface
         $html .= '</table>';
 
         return $html;
+    }
+
+    private function getNESPJobFacts($jobOrderData)
+    {
+        $jobOrderID = isset($jobOrderData['jobOrderID'])
+            ? (int) $jobOrderData['jobOrderID']
+            : (isset($jobOrderData['joborder_id']) ? (int) $jobOrderData['joborder_id'] : 0);
+
+        $facts = array(
+            'classification' => '',
+            'schedule' => '',
+            'season' => ''
+        );
+
+        switch ($jobOrderID)
+        {
+            case 41001:
+                $facts['classification'] = 'Part-Time Seasonal W-2';
+                $facts['schedule'] = 'Monday-Friday, set daytime schedule';
+                $facts['season'] = 'Spring and fall peak seasons';
+                break;
+
+            case 41002:
+                $facts['classification'] = 'Seasonal W-2';
+                $facts['schedule'] = 'Most Saturdays, some Sundays';
+                $facts['season'] = 'Late April through early June';
+                break;
+
+            case 41003:
+                $facts['classification'] = 'Freelance/Independent Contractor';
+                $facts['schedule'] = 'Primarily weekends';
+                $facts['season'] = 'Seasonal Picture Day assignments';
+                break;
+
+            case 41005:
+                $facts['classification'] = 'Seasonal W-2';
+                $facts['schedule'] = 'Primarily Saturdays, some Sundays';
+                $facts['season'] = 'Mid-April through early June';
+                break;
+        }
+
+        return $facts;
     }
 
     private function getLocationString($city, $state, $country)

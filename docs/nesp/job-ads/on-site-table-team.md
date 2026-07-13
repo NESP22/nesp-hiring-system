@@ -1,75 +1,63 @@
-# On-Site Picture Day Table Staff
+# Weekend Table Greeter / Field Assistant
 
-**New England Sports Photo - Seasonal picture-day role**  
-**Pay: $20 per hour, pending final payroll/legal confirmation**  
-**Locations: Massachusetts, Rhode Island, New Hampshire, and Connecticut**  
-**Primary season: September through November**
+## Quick Facts
 
-New England Sports Photo is hiring organized, friendly on-site picture day table staff to help run smooth youth sports photo days.
+**Pay:** $18 per hour
+**Territory:** Primarily Massachusetts, with additional events in Connecticut, Rhode Island, and New Hampshire
+**Work location:** Youth-sports fields and facilities
+**Employment type:** Part-time, temporary, seasonal W-2
+**Typical schedule:** Primarily Saturdays, with some Sundays and early-morning availability
+**Season:** Mid-April through early June; training and early assignments may begin in April
 
-This is not a photography position. You will often be one of the first people families, athletes, coaches, and league staff meet when they arrive. The best candidates are dependable, calm under pressure, comfortable speaking with people, and able to keep details organized in a busy environment.
+New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 
-## Schedule
+We are hiring friendly, organized field assistants to help Picture Day run smoothly at youth-sports events. This is an active weekend role for someone who enjoys helping people, keeping details straight, and supporting a photographer and event team in the field.
 
-- Most fall assignments run September through November.
-- Weekday assignments are usually after approximately 4:00 PM.
-- Weekend assignments are generally early morning through noon.
-- Paid time begins when you leave home and continues through completion of the assignment.
-- Return travel is paid when the drive home exceeds one hour.
+You will often be one of the first NESP team members families meet when they arrive. A calm, welcoming attitude and careful attention to names, teams, forms, and player numbers help the whole event stay on track.
 
-## What You Will Do
+## Why This Role May Be a Good Fit
 
-- Set up and organize the registration, check-in, and information table.
-- Greet families, athletes, coaches, and league staff.
-- Help people understand the picture-day process and where to go next.
-- Confirm names, teams, order information, and other required details.
-- Keep paperwork and digital check-in information accurate and organized.
-- Answer basic questions and direct support issues to the correct NESP team member.
-- Help teams arrive in the correct order and keep the schedule moving.
-- Assist with signs, line control, supplies, and end-of-day breakdown.
-- Communicate quickly when a schedule, roster, payment, or customer issue needs attention.
+- No prior experience required
+- Training provided
+- Active weekend work
+- Paid drive time both directions
+- Work with a supportive Picture Day team
+- Clear posing and workflow guides
+- Flexible seasonal scheduling
 
-## What We Are Looking For
+## What You'll Do
 
-- Excellent attendance and punctuality.
-- Friendly, confident communication.
-- Strong attention to names, teams, numbers, and written details.
-- Comfort using a tablet, phone, or simple check-in system.
-- Ability to stand for extended periods and work indoors or outdoors.
-- Reliable transportation to assigned photo locations.
-- Ability to remain patient and professional when lines are busy.
-- Availability on selected weekday evenings and weekend mornings during the fall season.
-- Ability to complete required background-check steps for field work.
-- Customer service, event, school, youth-sports, retail, hospitality, or office experience is helpful.
+- Welcome and check in families
+- Organize teams and manage Picture Day flow
+- Guide athletes using NESP posing guides
+- Review order forms for completeness and accuracy
+- Assign player number codes carefully
+- Help keep portrait and team sessions on schedule
+- Support photographers
+- Assist with reasonable setup and breakdown duties
 
-## Why Work With NESP
+## What We're Looking For
 
-- Paid seasonal work with training.
-- Clear picture-day process and support from experienced team leads.
-- Opportunities to return each season.
-- Advancement into lead table, posing, scheduling, or office-support roles for dependable team members.
-- Work with local schools, leagues, families, and community organizations.
+- Friendly and professional communication
+- Organized, detail-oriented work habits
+- Comfort directing groups
+- Reliability and punctuality
+- Comfort working outdoors
+- Reliable transportation and a valid driver's license
+- Ability to stand for extended periods
+- Ability to lift up to 25 pounds
+- Ability to pass required background checks
 
-## To Apply
+## What NESP Provides
 
-Apply with your work history, city/state, transportation status, travel radius, and fall weekday/weekend availability. Tell us briefly about your customer service, event, youth-sports, retail, hospitality, office, or school experience.
+NESP provides training, Picture Day workflow guidance, posing guides, and support from the event team. You do not need previous photography experience for this role.
 
-## Application Questions
+## Schedule and Travel Expectations
 
-1. What city and state are you based in?
-2. Do you have reliable transportation to picture-day locations?
-3. What travel radius are you comfortable accepting?
-4. Which weekdays after approximately 4:00 PM are you usually available?
-5. Which weekend mornings are you usually available?
-6. Describe your customer service, event, retail, office, school, or youth-sports experience.
-7. Are you comfortable standing and working in a fast-moving environment for several hours?
-8. Are you comfortable using a tablet or web-based check-in system?
-9. How do you stay organized when multiple people ask questions at once?
-10. Tell us about a time you caught an important detail before it became a larger problem.
-11. Are you willing to complete required background-check steps for field work?
+Most assignments are early weekend events, especially Saturdays, during the busiest late-April through early-June period. Paid drive time is provided both directions.
 
-## Internal Approval Notes
+## Apply Now
 
-- Draft only. Do not publish until Craig approves the final posting.
-- Employment classification, payroll setup, overtime, travel pay, and background-check process remain pending final payroll/legal confirmation.
-- AI may summarize job-related application information, but NESP management makes every interview, assignment, and hiring decision.
+Apply with your location, weekend availability, transportation information, and any customer-service, event, coaching, childcare, camp, school, retail, or team-support experience that shows reliability and comfort helping people.
+
+Applications are reviewed by the New England Sports Photo hiring team.
