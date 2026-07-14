@@ -41,6 +41,7 @@ include_once(LEGACY_ROOT . '/lib/DatabaseSearch.php');
 include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 include_once(LEGACY_ROOT . '/lib/Questionnaire.php');
 include_once(LEGACY_ROOT . '/lib/NESPApplicationQuestions.php');
+include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
 include_once(LEGACY_ROOT . '/lib/DocumentToText.php');
 include_once(LEGACY_ROOT . '/lib/FileUtility.php');
 include_once(LEGACY_ROOT . '/lib/ParseUtility.php');
@@ -663,7 +664,14 @@ class CareersUI extends UserInterface
             $email2Escaped = htmlspecialchars((string) $email2, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $emailconfirmEscaped = htmlspecialchars((string) $emailconfirm, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $keySkillsEscaped = htmlspecialchars((string) $keySkills, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+            $trackedSource = NESPRecruitingAds::sourceFromRequest($_REQUEST);
+            if ($source === '' && $trackedSource !== '')
+            {
+                $source = $trackedSource;
+            }
+            $trackingSourceKey = NESPRecruitingAds::normalizeSourceKey(isset($_REQUEST['nesp_source']) ? $_REQUEST['nesp_source'] : '');
             $sourceEscaped = htmlspecialchars((string) $source, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+            $trackingSourceKeyEscaped = htmlspecialchars((string) $trackingSourceKey, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $employerEscaped = htmlspecialchars((string) $employer, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $resumeFileLocationEscaped = htmlspecialchars((string) $resumeFileLocation, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $resumeContentsEscaped = htmlspecialchars((string) $resumeContents, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
@@ -796,6 +804,7 @@ class CareersUI extends UserInterface
                     . 'enctype="multipart/form-data" method="post" onsubmit="return applyValidate();">'
                     . '<input type="hidden" name="ID" value="' . $jobID . '">'
                     . '<input type="hidden" name="candidateID" value="' . $candidateID . '">'
+                    . '<input type="hidden" name="nesp_source" value="' . $trackingSourceKeyEscaped . '">'
                     . $template['Content'] . '</form>' . "\n" . $endTD;
             }
             else
@@ -806,7 +815,8 @@ class CareersUI extends UserInterface
                         . '?m=careers&amp;p=onApplyToJobOrder" '
                         . 'enctype="multipart/form-data" method="post" onsubmit="return applyValidate();">'
                         . '<input type="hidden" name="ID" value="' . $jobID . '">'
-                        . '<input type="hidden" name="candidateID" value="' . $candidateID . '">',
+                        . '<input type="hidden" name="candidateID" value="' . $candidateID . '">'
+                        . '<input type="hidden" name="nesp_source" value="' . $trackingSourceKeyEscaped . '">',
                         $template['Content'])
                     . "\n" . $endTD;
             }
@@ -1797,7 +1807,8 @@ class CareersUI extends UserInterface
 
         if (empty($source))
         {
-            $source = 'Online Careers Website';
+            $trackedSource = NESPRecruitingAds::sourceFromRequest($_POST);
+            $source = $trackedSource !== '' ? $trackedSource : 'Online Careers Website';
         }
 
         $users = new Users();

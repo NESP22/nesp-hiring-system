@@ -3,6 +3,7 @@ use PHPUnit\Framework\TestCase;
 
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
+include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
 
 class NESPWorkflowTest extends TestCase
 {
@@ -70,9 +71,35 @@ class NESPWorkflowTest extends TestCase
         );
 
         $this->assertSame(
-            array('Needs Craig', 'Waiting', 'Interviews', 'Phone Screens', 'Completed', 'Staffing Forecast', 'Settings'),
+            array('Needs Craig', 'Waiting', 'Interviews', 'Phone Screens', 'Job Ads', 'Completed', 'Staffing Forecast', 'Settings'),
             $labels
         );
+    }
+
+    public function testRecruitingSourceParametersAreSafeAndTracked()
+    {
+        $this->assertSame('Indeed', NESPRecruitingAds::getSourceLabel('indeed'));
+        $this->assertSame('NESP Ad: Facebook', NESPRecruitingAds::sourceFromRequest(array('utm_source' => 'facebook')));
+        $this->assertSame('', NESPRecruitingAds::sourceFromRequest(array('nesp_source' => 'not a platform')));
+
+        $link = NESPRecruitingAds::trackedApplicationURL(41002, 'craigslist');
+        $this->assertStringContainsString('ID=41002', $link);
+        $this->assertStringContainsString('nesp_source=craigslist', $link);
+    }
+
+    public function testRecruitingAdTemplatesFlagMissingUnapprovedRoles()
+    {
+        $templates = NESPRecruitingAds::getRequestedRoleAdTemplates();
+        $byRole = array();
+        foreach ($templates as $template)
+        {
+            $byRole[$template['role_key']] = $template;
+        }
+
+        $this->assertSame('Prepared draft', $byRole['weekend_sports_photographer']['status']);
+        $this->assertStringContainsString('nesp_source=nesp_website', $byRole['weekend_sports_photographer']['application_link']);
+        $this->assertSame('Missing Craig-approved fields', $byRole['school_photographer']['status']);
+        $this->assertSame('Missing Craig-approved fields', $byRole['sales_representative']['status']);
     }
 
     public function testQueueDefinitionsCoverRequestedDashboardSections()

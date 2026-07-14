@@ -18,6 +18,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_scorecard_template',
             'nesp_scorecard_response',
             'nesp_integration_status',
+            'nesp_recruiting_campaign_control',
             'nesp_vapi_phone_screen',
             'nesp_vapi_phone_screen_setting',
             'nesp_vapi_availability_block',
@@ -53,6 +54,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countRows('nesp_interviewer_availability'));
         $this->assertSame(0, $this->countRows('nesp_interview_slot'));
         $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
+        $this->assertSame(0, $this->countRows('nesp_recruiting_campaign_control'));
         $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
         $this->assertSame(8, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'timezone' AND setting_value = 'America/New_York'"));
@@ -100,6 +102,9 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_scheduling_activity', 'activity_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_webhook_event', 'provider_event_id'));
         $this->assertSame(1, $this->countUniqueIndexes('nesp_vapi_webhook_event', 'IDX_provider_event_id'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_recruiting_campaign_control', 'platform_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_recruiting_campaign_control', 'manual_spend'));
+        $this->assertSame(1, $this->countUniqueIndexes('nesp_recruiting_campaign_control', 'IDX_platform_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_batch', 'undone_at'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_row', 'source_row_hash'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_issue', 'status_key'));

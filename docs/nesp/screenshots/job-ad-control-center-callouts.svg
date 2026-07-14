@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Sanitized NESP job-ad control center callouts</title>
+  <desc id="desc">A sanitized dashboard mockup with numbered callouts for the job-ad control center.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f4d7a"/>
+    </marker>
+    <style>
+      .bg{fill:#f6f8fb}.panel{fill:#fff;stroke:#c9d3df;stroke-width:2}.nav{fill:#12324d}.navtext{fill:#fff;font:700 18px Arial}.h{fill:#1f2933;font:700 24px Arial}.t{fill:#243447;font:15px Arial}.muted{fill:#65758b;font:13px Arial}.table{fill:#f9fbfd;stroke:#d5dde8}.btn{fill:#1f6feb}.btntext{fill:#fff;font:700 14px Arial}.num{fill:#1f4d7a}.numtext{fill:#fff;font:700 18px Arial}.line{stroke:#1f4d7a;stroke-width:3;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <rect class="nav" x="40" y="34" width="1120" height="58" rx="4"/>
+  <text class="navtext" x="66" y="70">NESP Hiring</text>
+  <text class="navtext" x="250" y="70">Phone Screens</text>
+  <text class="navtext" x="450" y="70">Job Ads</text>
+  <text class="navtext" x="590" y="70">Settings</text>
+
+  <rect class="panel" x="70" y="128" width="1060" height="126" rx="6"/>
+  <text class="h" x="100" y="168">Campaign Controls</text>
+  <rect class="table" x="100" y="190" width="970" height="38"/>
+  <text class="t" x="120" y="214">Indeed</text>
+  <text class="t" x="260" y="214">Draft</text>
+  <text class="t" x="420" y="214">Renewal date</text>
+  <text class="t" x="620" y="214">Manual spend</text>
+  <rect class="btn" x="910" y="196" width="82" height="26" rx="4"/>
+  <text class="btntext" x="934" y="214">Save</text>
+
+  <rect class="panel" x="70" y="286" width="500" height="196" rx="6"/>
+  <text class="h" x="100" y="326">Source Reporting</text>
+  <text class="t" x="100" y="364">Applications by platform</text>
+  <text class="t" x="100" y="394">Scheduled and completed phone screens</text>
+  <text class="t" x="100" y="424">Manual spend and cost per applicant</text>
+
+  <rect class="panel" x="630" y="286" width="500" height="196" rx="6"/>
+  <text class="h" x="660" y="326">Platform Matrix</text>
+  <text class="t" x="660" y="364">Free or paid</text>
+  <text class="t" x="660" y="394">Manual or API posting method</text>
+  <text class="t" x="660" y="424">Required access and approval gates</text>
+
+  <rect class="panel" x="70" y="520" width="1060" height="160" rx="6"/>
+  <text class="h" x="100" y="560">Reusable Ad Templates</text>
+  <text class="t" x="100" y="598">Approved roles show prepared copy and tracked links.</text>
+  <text class="t" x="100" y="628">Unapproved roles show missing Craig-approved fields.</text>
+  <text class="muted" x="100" y="656">The control center never publishes ads, spends money, or sends messages.</text>
+
+  <circle class="num" cx="52" cy="208" r="20"/><text class="numtext" x="46" y="215">1</text>
+  <line class="line" x1="72" y1="208" x2="100" y2="208"/>
+  <circle class="num" cx="52" cy="394" r="20"/><text class="numtext" x="46" y="401">2</text>
+  <line class="line" x1="72" y1="394" x2="100" y2="394"/>
+  <circle class="num" cx="602" cy="394" r="20"/><text class="numtext" x="596" y="401">3</text>
+  <line class="line" x1="622" y1="394" x2="660" y2="394"/>
+  <circle class="num" cx="52" cy="622" r="20"/><text class="numtext" x="46" y="629">4</text>
+  <line class="line" x1="72" y1="622" x2="100" y2="622"/>
+</svg>

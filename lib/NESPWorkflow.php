@@ -8,6 +8,7 @@
  */
 
 include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
+include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
 
 class NESPWorkflow
 {
@@ -53,6 +54,7 @@ class NESPWorkflow
             array('key' => 'waiting', 'label' => 'Waiting', 'action' => 'waiting'),
             array('key' => 'interviews', 'label' => 'Interviews', 'action' => 'interviews'),
             array('key' => 'phoneScreens', 'label' => 'Phone Screens', 'action' => 'phoneScreens'),
+            array('key' => 'jobAds', 'label' => 'Job Ads', 'action' => 'jobAds'),
             array('key' => 'completed', 'label' => 'Completed', 'action' => 'completed'),
             array('key' => 'staffingForecast', 'label' => 'Staffing Forecast', 'action' => 'staffingForecast'),
             array('key' => 'settings', 'label' => 'Settings', 'action' => 'settings')
@@ -112,7 +114,7 @@ class NESPWorkflow
             return 'NESP_WORKFLOW_ENABLED';
         }
 
-        if (in_array($action, array('waiting', 'interviews', 'completed', 'auditLog')))
+        if (in_array($action, array('waiting', 'interviews', 'completed', 'auditLog', 'jobAds')))
         {
             return 'NESP_WORKFLOW_ENABLED';
         }
@@ -154,6 +156,11 @@ class NESPWorkflow
             'deletePhoneScreenBlackout',
             'savePhoneScreenReview'
         )))
+        {
+            return 'NESP_WORKFLOW_ENABLED';
+        }
+
+        if (in_array($action, array('saveRecruitingCampaignControl')))
         {
             return 'NESP_WORKFLOW_ENABLED';
         }
@@ -636,6 +643,7 @@ class NESPWorkflow
             'nesp_vapi_blackout_date',
             'nesp_vapi_scheduling_activity',
             'nesp_vapi_webhook_event',
+            'nesp_recruiting_campaign_control',
             'nesp_audit_event',
             'nesp_session_security_event',
             'nesp_staffing_schedule_history',
@@ -674,6 +682,7 @@ class NESPWorkflow
             array('nesp_vapi_blackout_date', 'blackout_date'),
             array('nesp_vapi_scheduling_activity', 'activity_key'),
             array('nesp_vapi_webhook_event', 'provider_event_id'),
+            array('nesp_recruiting_campaign_control', 'manual_spend'),
             array('nesp_staffing_import_batch', 'undone_at'),
             array('nesp_staffing_import_row', 'source_row_hash'),
             array('nesp_staffing_import_issue', 'status_key')
@@ -878,6 +887,203 @@ class NESPWorkflow
                 'SELECT COUNT(*) AS total FROM nesp_interviewer_availability WHERE is_active = 1'
             )
         );
+    }
+
+    public function getRecruitingPlatformMatrix()
+    {
+        return NESPRecruitingAds::getPlatformMatrix();
+    }
+
+    public function getRecruitingAdTemplates()
+    {
+        return NESPRecruitingAds::getRequestedRoleAdTemplates();
+    }
+
+    public function getRecruitingCampaignControls()
+    {
+        $controls = array();
+        foreach (NESPRecruitingAds::getPlatformMatrix() as $platform)
+        {
+            $controls[$platform['platform_key']] = array(
+                'platform_key' => $platform['platform_key'],
+                'display_name' => $platform['platform'],
+                'campaign_status' => 'draft',
+                'renewal_date' => '',
+                'manual_spend' => '0.00',
+                'owner_approval_required' => 1,
+                'notes' => '',
+                'date_modified' => ''
+            );
+        }
+
+        $rows = $this->_db->getAllAssoc(
+            'SELECT
+                platform_key,
+                display_name,
+                campaign_status,
+                renewal_date,
+                manual_spend,
+                owner_approval_required,
+                notes,
+                date_modified
+             FROM
+                nesp_recruiting_campaign_control
+             ORDER BY
+                display_name'
+        );
+
+        foreach ($rows as $row)
+        {
+            $key = $row['platform_key'];
+            if (isset($controls[$key]))
+            {
+                $controls[$key] = array_merge($controls[$key], $row);
+            }
+        }
+
+        return array_values($controls);
+    }
+
+    public function saveRecruitingCampaignControl($input, $actorUserID)
+    {
+        $platformKey = isset($input['platformKey']) ? preg_replace('/[^a-z0-9_]/', '', strtolower((string) $input['platformKey'])) : '';
+
+        $matrix = NESPRecruitingAds::getPlatformMatrix();
+        $platform = null;
+        foreach ($matrix as $row)
+        {
+            if ($row['platform_key'] === $platformKey)
+            {
+                $platform = $row;
+                break;
+            }
+        }
+
+        if ($platform === null)
+        {
+            return false;
+        }
+
+        $allowedStatuses = array('draft', 'ready_for_review', 'approved_to_publish_manually', 'published_manually', 'paused', 'expired', 'removed');
+        $status = isset($input['campaignStatus']) ? strtolower(trim((string) $input['campaignStatus'])) : 'draft';
+        if (!in_array($status, $allowedStatuses, true))
+        {
+            $status = 'draft';
+        }
+
+        $renewalDate = isset($input['renewalDate']) ? trim((string) $input['renewalDate']) : '';
+        if ($renewalDate !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $renewalDate))
+        {
+            $renewalDate = '';
+        }
+
+        $manualSpend = isset($input['manualSpend']) ? preg_replace('/[^0-9.]/', '', (string) $input['manualSpend']) : '0';
+        $manualSpend = number_format(max(0, (float) $manualSpend), 2, '.', '');
+        $notes = isset($input['notes']) ? substr(trim((string) $input['notes']), 0, 1000) : '';
+
+        $this->_db->query(
+            sprintf(
+                'INSERT INTO nesp_recruiting_campaign_control
+                    (platform_key, display_name, campaign_status, renewal_date, manual_spend, owner_approval_required, notes, updated_by_user_id, date_created, date_modified)
+                 VALUES
+                    (%s, %s, %s, %s, %s, 1, %s, %s, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE
+                    display_name = VALUES(display_name),
+                    campaign_status = VALUES(campaign_status),
+                    renewal_date = VALUES(renewal_date),
+                    manual_spend = VALUES(manual_spend),
+                    owner_approval_required = 1,
+                    notes = VALUES(notes),
+                    updated_by_user_id = VALUES(updated_by_user_id),
+                    date_modified = NOW()',
+                $this->_db->makeQueryString($platformKey),
+                $this->_db->makeQueryString($platform['platform']),
+                $this->_db->makeQueryString($status),
+                $renewalDate === '' ? 'NULL' : $this->_db->makeQueryString($renewalDate),
+                $this->_db->makeQueryString($manualSpend),
+                $this->_db->makeQueryString($notes),
+                $this->_db->makeQueryInteger($actorUserID)
+            )
+        );
+
+        $this->logAuditEvent($actorUserID, 'recruiting_campaign_control_saved', 'nesp_recruiting_campaign_control', 0, array('platform_key' => $platformKey, 'campaign_status' => $status));
+        return true;
+    }
+
+    public function getRecruitingSourceReport()
+    {
+        $report = array();
+        $spendByPlatform = array();
+        foreach ($this->getRecruitingCampaignControls() as $control)
+        {
+            $spendByPlatform[$control['platform_key']] = (float) $control['manual_spend'];
+        }
+
+        foreach (NESPRecruitingAds::getSourceOptions() as $sourceKey => $label)
+        {
+            $sourceLabel = NESPRecruitingAds::getCandidateSourceLabel($sourceKey);
+            $sourceSQL = $this->_db->makeQueryString($sourceLabel);
+            $applications = $this->countRows(
+                sprintf(
+                    'SELECT COUNT(*) AS total
+                     FROM candidate
+                     WHERE is_active = 1
+                       AND source = %s',
+                    $sourceSQL
+                )
+            );
+            $qualified = $this->countRows(
+                sprintf(
+                    'SELECT COUNT(DISTINCT c.candidate_id) AS total
+                     FROM candidate c
+                     INNER JOIN nesp_candidate_workflow cw
+                        ON cw.candidate_id = c.candidate_id
+                     INNER JOIN nesp_workflow_stage ws
+                        ON ws.workflow_stage_id = cw.workflow_stage_id
+                     WHERE c.is_active = 1
+                       AND c.source = %s
+                       AND ws.stage_key NOT IN ("new", "needs_review", "follow_up_needed")',
+                    $sourceSQL
+                )
+            );
+            $scheduled = $this->countRows(
+                sprintf(
+                    'SELECT COUNT(*) AS total
+                     FROM nesp_vapi_phone_screen ps
+                     INNER JOIN candidate c
+                        ON c.candidate_id = ps.candidate_id
+                     WHERE c.source = %s
+                       AND ps.status_key IN ("phone_screen_scheduled", "call_due", "call_started", "ringing", "in_progress", "completed", "no_answer")',
+                    $sourceSQL
+                )
+            );
+            $completed = $this->countRows(
+                sprintf(
+                    'SELECT COUNT(*) AS total
+                     FROM nesp_vapi_phone_screen ps
+                     INNER JOIN candidate c
+                        ON c.candidate_id = ps.candidate_id
+                     WHERE c.source = %s
+                       AND ps.status_key = "completed"',
+                    $sourceSQL
+                )
+            );
+
+            $spend = isset($spendByPlatform[$sourceKey]) ? $spendByPlatform[$sourceKey] : 0;
+            $report[] = array(
+                'source_key' => $sourceKey,
+                'platform' => $label,
+                'candidate_source_label' => $sourceLabel,
+                'applications' => $applications,
+                'qualified_applicants' => $qualified,
+                'scheduled_phone_screens' => $scheduled,
+                'completed_phone_screens' => $completed,
+                'manual_spend' => number_format($spend, 2, '.', ''),
+                'cost_per_applicant' => $applications > 0 ? number_format($spend / $applications, 2, '.', '') : ''
+            );
+        }
+
+        return $report;
     }
 
     public function getDashboardQueues()

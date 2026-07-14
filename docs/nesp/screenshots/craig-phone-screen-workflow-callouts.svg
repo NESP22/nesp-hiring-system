@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">Sanitized NESP phone-screen workflow callouts</title>
+  <desc id="desc">A sanitized dashboard mockup with numbered callouts for Craig's phone-screen workflow.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f4d7a"/>
+    </marker>
+    <style>
+      .bg{fill:#f6f8fb}.panel{fill:#fff;stroke:#c9d3df;stroke-width:2}.nav{fill:#12324d}.navtext{fill:#fff;font:700 18px Arial}.h{fill:#1f2933;font:700 24px Arial}.t{fill:#243447;font:15px Arial}.muted{fill:#65758b;font:13px Arial}.btn{fill:#1f6feb}.btntext{fill:#fff;font:700 14px Arial}.pill{fill:#e7f0fb;stroke:#9dc0e5}.num{fill:#1f4d7a}.numtext{fill:#fff;font:700 18px Arial}.line{stroke:#1f4d7a;stroke-width:3;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1200" height="760"/>
+  <rect class="nav" x="40" y="34" width="1120" height="58" rx="4"/>
+  <text class="navtext" x="66" y="70">NESP Hiring</text>
+  <text class="navtext" x="250" y="70">Needs Craig</text>
+  <text class="navtext" x="410" y="70">Phone Screens</text>
+  <text class="navtext" x="600" y="70">Job Ads</text>
+  <text class="navtext" x="730" y="70">Settings</text>
+
+  <rect class="panel" x="70" y="128" width="500" height="250" rx="6"/>
+  <text class="h" x="100" y="168">Needs Craig</text>
+  <rect class="pill" x="100" y="196" width="420" height="132" rx="6"/>
+  <text class="t" x="124" y="228">Sanitized Applicant</text>
+  <text class="muted" x="124" y="254">Weekend Sports Photographer</text>
+  <text class="muted" x="124" y="280">Application awaiting human review</text>
+  <rect class="btn" x="124" y="298" width="250" height="34" rx="4"/>
+  <text class="btntext" x="144" y="320">Invite to Schedule Phone Screen</text>
+
+  <rect class="panel" x="630" y="128" width="500" height="250" rx="6"/>
+  <text class="h" x="660" y="168">Phone Screen Review</text>
+  <text class="t" x="660" y="208">Copy-only invitation</text>
+  <rect class="pill" x="660" y="226" width="420" height="66" rx="5"/>
+  <text class="muted" x="680" y="254">Hi [First Name], please choose a convenient time...</text>
+  <rect class="btn" x="660" y="314" width="150" height="34" rx="4"/>
+  <text class="btntext" x="682" y="336">Mark Copied</text>
+  <rect class="pill" x="830" y="314" width="150" height="34" rx="4"/>
+  <text class="t" x="858" y="336">Revoke Link</text>
+
+  <rect class="panel" x="70" y="430" width="500" height="240" rx="6"/>
+  <text class="h" x="100" y="470">Availability Settings</text>
+  <text class="t" x="100" y="508">Timezone: America/New_York</text>
+  <text class="t" x="100" y="538">Mon-Fri 9:00 AM-6:00 PM</text>
+  <text class="t" x="100" y="568">Saturday 9:00 AM-1:00 PM</text>
+  <text class="t" x="100" y="598">Buffers, notice period, daily limits, blackout dates</text>
+
+  <rect class="panel" x="630" y="430" width="500" height="240" rx="6"/>
+  <text class="h" x="660" y="470">Phone Screen Queues</text>
+  <text class="t" x="660" y="508">Phone Screens Today</text>
+  <text class="t" x="660" y="538">Upcoming Phone Screens</text>
+  <text class="t" x="660" y="568">No Answer / Reschedule Needed</text>
+  <text class="t" x="660" y="598">Completed Phone Screens</text>
+
+  <circle class="num" cx="56" cy="308" r="20"/><text class="numtext" x="50" y="315">1</text>
+  <line class="line" x1="76" y1="308" x2="120" y2="308"/>
+  <circle class="num" cx="592" cy="252" r="20"/><text class="numtext" x="586" y="259">2</text>
+  <line class="line" x1="612" y1="252" x2="660" y2="252"/>
+  <circle class="num" cx="56" cy="530" r="20"/><text class="numtext" x="50" y="537">3</text>
+  <line class="line" x1="76" y1="530" x2="100" y2="530"/>
+  <circle class="num" cx="592" cy="566" r="20"/><text class="numtext" x="586" y="573">4</text>
+  <line class="line" x1="612" y1="566" x2="660" y2="566"/>
+</svg>

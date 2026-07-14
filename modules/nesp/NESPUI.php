@@ -23,6 +23,7 @@ class NESPUI extends UserInterface
             'Waiting' => CATSUtility::getIndexName() . '?m=nesp&amp;a=waiting*al=' . ACCESS_LEVEL_READ,
             'Interviews' => CATSUtility::getIndexName() . '?m=nesp&amp;a=interviews*al=' . ACCESS_LEVEL_READ,
             'Phone Screens' => CATSUtility::getIndexName() . '?m=nesp&amp;a=phoneScreens*al=' . ACCESS_LEVEL_READ,
+            'Job Ads' => CATSUtility::getIndexName() . '?m=nesp&amp;a=jobAds*al=' . ACCESS_LEVEL_READ,
             'Completed' => CATSUtility::getIndexName() . '?m=nesp&amp;a=completed*al=' . ACCESS_LEVEL_READ,
             'Staffing Forecast' => CATSUtility::getIndexName() . '?m=nesp&amp;a=staffingForecast*al=' . ACCESS_LEVEL_READ,
             'Settings' => CATSUtility::getIndexName() . '?m=nesp&amp;a=settings*al=' . ACCESS_LEVEL_SA
@@ -122,6 +123,17 @@ class NESPUI extends UserInterface
             case 'phoneScreens':
                 $this->adminOnly();
                 $this->phoneScreens();
+                break;
+
+            case 'jobAds':
+                $this->adminOnly();
+                $this->jobAds();
+                break;
+
+            case 'saveRecruitingCampaignControl':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->saveRecruitingCampaignControl();
                 break;
 
             case 'phoneScreenAvailability':
@@ -459,6 +471,29 @@ class NESPUI extends UserInterface
         $this->_template->assign('phoneScreens', $this->_workflow->getVapiPhoneScreenSummaries(75));
         $this->_template->assign('phoneScreenQueues', $this->_workflow->getVapiPhoneScreenQueues());
         $this->_template->display('./modules/nesp/PhoneScreens.tpl');
+    }
+
+    private function jobAds()
+    {
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Job Ads');
+        $this->_template->assign('viewKey', 'jobAds');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('platformMatrix', $this->_workflow->getRecruitingPlatformMatrix());
+        $this->_template->assign('campaignControls', $this->_workflow->getRecruitingCampaignControls());
+        $this->_template->assign('sourceReport', $this->_workflow->getRecruitingSourceReport());
+        $this->_template->assign('adTemplates', $this->_workflow->getRecruitingAdTemplates());
+        $this->_template->display('./modules/nesp/JobAds.tpl');
+    }
+
+    private function saveRecruitingCampaignControl()
+    {
+        if ($this->_workflow->saveRecruitingCampaignControl($_POST, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid recruiting platform.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=jobAds');
     }
 
     private function phoneScreenAvailability()
