@@ -33,6 +33,7 @@ This report covers safe local and PR-branch development only. No production merg
 - Added preflight checks for required Phase 2 columns and the staffing import source index shape.
 - Added unit and schema-test coverage for the feature-gate map, multi-role forecast math, staffing import columns, and import index shape.
 - Improved mobile table handling with horizontal overflow inside NESP panels/cards.
+- Added Craig-facing documentation for the daily workflow, ADHD-friendly queues, applicant dashboard view, scoped interviewer access, interviewer scorecards, integration safety, incident rollback, preview expectations, Vapi, Zoom, and AI review.
 
 ## Feature Flags
 
@@ -64,6 +65,7 @@ All Phase 2 feature flags remain default-off in migration and schema seed data:
 - Real Google Drive staffing files were not imported. The importer and forecast paths remain fixture/sanitized-data oriented until Craig approves Drive configuration and access in a separate task.
 - Vapi, Zoom, AI review, prescreening, outbound email, and SMS remain disabled and were not exercised against real services.
 - No production backup, production preflight, production migration, Render deployment, or rollout gate was run in this pass.
+- Integration documents are implementation guardrails only; they do not enable provider credentials, routes, calls, meetings, AI requests, email, or SMS.
 
 ## Craig Review Notes
 
