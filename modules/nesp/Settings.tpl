@@ -103,6 +103,20 @@
             </div>
 
             <div class="nesp-panel">
+                <h3>Vapi Configuration Status</h3>
+                <p class="nesp-help-text">This panel shows only presence and safety state. It never reveals secret values or full provider IDs.</p>
+                <div class="nesp-card-grid nesp-card-grid-tight">
+                    <div class="nesp-card"><span class="nesp-card-label">Vapi API Configured</span><strong><?php echo($this->vapiConfiguration['api_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Hiring Phone Configured</span><strong><?php echo($this->vapiConfiguration['hiring_phone_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Hiring Assistant Configured</span><strong><?php echo($this->vapiConfiguration['hiring_assistant_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Webhook Secret Configured</span><strong><?php echo($this->vapiConfiguration['webhook_secret_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Recording Disabled</span><strong><?php echo($this->vapiConfiguration['recording_disabled'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Feature Enabled</span><strong><?php echo($this->vapiConfiguration['feature_enabled'] ? 'Yes' : 'No'); ?></strong></div>
+                </div>
+                <p class="nesp-help-text">Webhook URL after deployment: <?php $this->_($this->vapiConfiguration['webhook_url']); ?></p>
+            </div>
+
+            <div class="nesp-panel">
                 <h3>Interviewer Profiles</h3>
                 <table class="nesp-table">
                     <tr>

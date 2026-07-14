@@ -2,6 +2,7 @@
 use PHPUnit\Framework\TestCase;
 
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
 
 class NESPWorkflowTest extends TestCase
 {
@@ -52,6 +53,8 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('assignedCandidate'));
         $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('submitScorecard'));
         $this->assertSame('NESP_STAFFING_FORECAST_ENABLED', NESPWorkflow::getFeatureFlagForAction('staffingForecast'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreens'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('startPhoneScreen'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('unexpectedAction'));
     }
 
@@ -65,7 +68,7 @@ class NESPWorkflowTest extends TestCase
         );
 
         $this->assertSame(
-            array('Needs Craig', 'Waiting', 'Interviews', 'Completed', 'Staffing Forecast', 'Settings'),
+            array('Needs Craig', 'Waiting', 'Interviews', 'Phone Screens', 'Completed', 'Staffing Forecast', 'Settings'),
             $labels
         );
     }
@@ -214,5 +217,120 @@ class NESPWorkflowTest extends TestCase
 
         $this->assertContains('duplicate_source_row', $issueKeys);
         $this->assertSame('needs_review', $result['rows'][1]['status_key']);
+    }
+
+    public function testVapiWebhookRejectsMissingSecret()
+    {
+        $result = NESPVapiIntegration::validateWebhookRequest(
+            array(),
+            'application/json',
+            '{}',
+            1000,
+            ''
+        );
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('webhook_secret_missing', $result['error']);
+    }
+
+    public function testVapiWebhookRejectsExpiredTimestamp()
+    {
+        $body = json_encode(array('message' => array('type' => 'status-update', 'status' => 'ringing', 'call' => array('id' => 'call_fixture'))));
+        $result = NESPVapiIntegration::validateWebhookRequest(
+            array('X-Vapi-Secret' => 'secret', 'X-Vapi-Timestamp' => '1000'),
+            'application/json',
+            $body,
+            2000,
+            'secret'
+        );
+
+        $this->assertFalse($result['ok']);
+        $this->assertSame('expired_timestamp', $result['error']);
+    }
+
+    public function testVapiWebhookAcceptsValidStatusUpdate()
+    {
+        $body = json_encode(array('message' => array('type' => 'status-update', 'status' => 'ringing', 'call' => array('id' => 'call_fixture'))));
+        $result = NESPVapiIntegration::validateWebhookRequest(
+            array('Authorization' => 'Bearer secret', 'X-Vapi-Timestamp' => '1000', 'X-Vapi-Event-Id' => 'evt_fixture'),
+            'application/json',
+            $body,
+            1000,
+            'secret'
+        );
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame('status-update', $result['event_type']);
+        $this->assertSame('evt_fixture', $result['event_id']);
+        $this->assertSame('call_fixture', $result['provider_call_id']);
+    }
+
+    public function testVapiConsentRefusalDoesNotRetainTranscript()
+    {
+        $message = array(
+            'type' => 'end-of-call-report',
+            'endedReason' => 'hangup',
+            'call' => array('id' => 'call_fixture'),
+            'artifact' => array(
+                'transcript' => 'Assistant: Do you consent to continue? User: I do not consent.'
+            )
+        );
+
+        $update = NESPVapiIntegration::buildScreenUpdateFromWebhookMessage($message);
+
+        $this->assertSame('refused', $update['consent_status']);
+        $this->assertSame('', $update['transcript_text']);
+    }
+
+    public function testVapiWebhookRedactedPayloadDoesNotStoreTranscript()
+    {
+        $payload = array(
+            'message' => array(
+                'type' => 'end-of-call-report',
+                'endedReason' => 'hangup',
+                'call' => array('id' => 'call_fixture'),
+                'artifact' => array(
+                    'transcript' => 'Assistant: consent prompt. User: yes. User: private applicant answer.'
+                ),
+                'analysis' => array(
+                    'structuredData' => array(
+                        'experience_summary' => 'private applicant details'
+                    )
+                )
+            )
+        );
+
+        $redacted = NESPVapiIntegration::redactedPayloadForStorage($payload);
+
+        $this->assertStringNotContainsString('private applicant answer', $redacted);
+        $this->assertStringNotContainsString('private applicant details', $redacted);
+        $this->assertStringContainsString('has_transcript', $redacted);
+        $this->assertStringContainsString('has_structured_result', $redacted);
+    }
+
+    public function testVapiOutboundPayloadUsesDedicatedConfiguredResources()
+    {
+        putenv('VAPI_HIRING_ASSISTANT_ID=assistant_fixture');
+        putenv('VAPI_PHONE_NUMBER_ID=phone_fixture');
+
+        $payload = NESPVapiIntegration::buildOutboundCallPayload(
+            '(555) 111-2222',
+            array('candidate_id' => 123),
+            array('joborder_id' => 41003, 'title' => 'Freelance Photographer'),
+            'request_fixture'
+        );
+
+        $this->assertSame('assistant_fixture', $payload['assistantId']);
+        $this->assertSame('phone_fixture', $payload['phoneNumberId']);
+        $this->assertSame('+15551112222', $payload['customer']['number']);
+        $this->assertArrayNotHasKey('metadata', $payload);
+        $this->assertFalse($payload['assistantOverrides']['artifactPlan']['recordingEnabled']);
+        $this->assertTrue($payload['assistantOverrides']['artifactPlan']['transcriptPlan']['enabled']);
+        $this->assertSame('Freelance Photographer', $payload['assistantOverrides']['variableValues']['role']);
+        $this->assertSame('off', $payload['assistantOverrides']['variableValues']['audio_recording']);
+        $this->assertSame('request_fixture', $payload['assistantOverrides']['metadata']['nesp_call_request_key']);
+
+        putenv('VAPI_HIRING_ASSISTANT_ID');
+        putenv('VAPI_PHONE_NUMBER_ID');
     }
 }

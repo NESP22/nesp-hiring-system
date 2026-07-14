@@ -192,6 +192,7 @@
                                         <div class="nesp-secondary-actions">
                                             <a href="<?php echo($card['candidate_url']); ?>">Candidate</a>
                                             <a href="<?php echo($card['job_url']); ?>">Role</a>
+                                            <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmPhoneScreen&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Invite to Phone Screen</a>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
