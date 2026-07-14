@@ -74,7 +74,7 @@ jobs:
           timeout 180s bash -c "until [ \"\$(docker inspect --format '{{.State.Health.Status}}' \"${integrationtestdb_container}\" 2>/dev/null)\" = \"healthy\" ]; do sleep 3; done"
 
           # 2. Pre-clean the integration database
-          docker compose -f docker-compose-test.yml exec -T integrationtestdb mysql -udev -pdev -e "DROP DATABASE IF EXISTS cats_integrationtest; CREATE DATABASE cats_integrationtest;"
+          docker compose -f docker-compose-test.yml exec -T integrationtestdb mysql -uroot -pdev -e "DROP DATABASE IF EXISTS cats_integrationtest; CREATE DATABASE cats_integrationtest;"
 
           # 3. DIAGNOSTIC: Check if PHP can resolve the database hostname
           echo "Diagnostic: Resolving integrationtestdb from PHP container..."
