@@ -102,6 +102,46 @@ class NESPWorkflow
         return false;
     }
 
+    public static function getFeatureFlagForAction($action)
+    {
+        if ($action === null || $action === '' || $action === 'dashboard')
+        {
+            return 'NESP_WORKFLOW_ENABLED';
+        }
+
+        if (in_array($action, array('waiting', 'interviews', 'completed', 'auditLog')))
+        {
+            return 'NESP_WORKFLOW_ENABLED';
+        }
+
+        if (in_array($action, array(
+            'assignedCandidates',
+            'assignedCandidate',
+            'submitScorecard',
+            'unlockScorecard',
+            'interviewerAccess',
+            'createInterviewer',
+            'createInterviewerRoleRule',
+            'createCandidateGrant',
+            'createInterviewerAvailability'
+        )))
+        {
+            return 'NESP_INTERVIEWER_POOL_ENABLED';
+        }
+
+        if (in_array($action, array('staffingForecast', 'createStaffingRecommendation')))
+        {
+            return 'NESP_STAFFING_FORECAST_ENABLED';
+        }
+
+        if (in_array($action, array('settings', 'featureFlags', 'saveFeatureFlags')))
+        {
+            return '';
+        }
+
+        return 'NESP_WORKFLOW_ENABLED';
+    }
+
     public static function getQueueDefinitions()
     {
         return array(
@@ -481,13 +521,17 @@ class NESPWorkflow
             $week = date('Y-m-d', strtotime('monday this week', strtotime($row['event_date'])));
             $weekday = date('l', strtotime($row['event_date']));
             $eventKey = $row['event_date'] . '|' . $row['event_name'] . '|' . $row['state'];
+            $isNewEvent = !isset($events[$eventKey]);
             $events[$eventKey] = true;
 
-            self::incrementMetric($metrics['events_by_season'], $season, 1);
-            self::incrementMetric($metrics['events_by_week'], $week, 1);
-            self::incrementMetric($metrics['events_by_weekday'], $weekday, 1);
-            self::incrementMetric($metrics['events_by_state'], $row['state'] === '' ? 'Unknown' : $row['state'], 1);
-            self::incrementMetric($metrics['events_by_sport'], $row['sport'] === '' ? 'Unknown' : $row['sport'], 1);
+            if ($isNewEvent)
+            {
+                self::incrementMetric($metrics['events_by_season'], $season, 1);
+                self::incrementMetric($metrics['events_by_week'], $week, 1);
+                self::incrementMetric($metrics['events_by_weekday'], $weekday, 1);
+                self::incrementMetric($metrics['events_by_state'], $row['state'] === '' ? 'Unknown' : $row['state'], 1);
+                self::incrementMetric($metrics['events_by_sport'], $row['sport'] === '' ? 'Unknown' : $row['sport'], 1);
+            }
             self::incrementMetric($metrics['staff_by_role'], $row['role_key'] === '' ? 'unknown' : $row['role_key'], max(1, (int) $row['staff_count']));
 
             if (!isset($staffBySeason[$season]))
@@ -496,7 +540,14 @@ class NESPWorkflow
             }
             if ($row['staff_name'] !== '')
             {
-                $staffBySeason[$season][$row['staff_name']] = true;
+                foreach (preg_split('/[;,]+/', $row['staff_name']) as $staffName)
+                {
+                    $staffName = trim($staffName);
+                    if ($staffName !== '')
+                    {
+                        $staffBySeason[$season][$staffName] = true;
+                    }
+                }
             }
 
             if (!isset($dayStaff[$row['event_date']]))
@@ -542,36 +593,55 @@ class NESPWorkflow
 
     public function isSchemaInstalled()
     {
-        $featureFlags = $this->_db->getAssoc(
-            "SHOW TABLES LIKE 'nesp_feature_flag'"
+        $requiredTables = array(
+            'nesp_feature_flag',
+            'nesp_candidate_workflow',
+            'nesp_interviewer_role_rule',
+            'nesp_interviewer_availability',
+            'nesp_interview_slot',
+            'nesp_staffing_schedule_history',
+            'nesp_staffing_import_batch',
+            'nesp_staffing_import_row',
+            'nesp_staffing_import_issue',
+            'nesp_staffing_forecast',
+            'nesp_staffing_recommendation'
         );
 
-        $staffingHistory = $this->_db->getAssoc(
-            "SHOW TABLES LIKE 'nesp_staffing_schedule_history'"
+        foreach ($requiredTables as $table)
+        {
+            $tableExists = $this->_db->getAssoc(
+                sprintf("SHOW TABLES LIKE %s", $this->_db->makeQueryString($table))
+            );
+            if (empty($tableExists))
+            {
+                return false;
+            }
+        }
+
+        $requiredColumns = array(
+            array('nesp_candidate_workflow', 'summary'),
+            array('nesp_candidate_workflow', 'next_action_label'),
+            array('nesp_staffing_import_batch', 'undone_at'),
+            array('nesp_staffing_import_row', 'source_row_hash'),
+            array('nesp_staffing_import_issue', 'status_key')
         );
 
-        $staffingImport = $this->_db->getAssoc(
-            "SHOW TABLES LIKE 'nesp_staffing_import_batch'"
-        );
+        foreach ($requiredColumns as $column)
+        {
+            $columnExists = $this->_db->getAssoc(
+                sprintf(
+                    "SHOW COLUMNS FROM %s LIKE %s",
+                    $column[0],
+                    $this->_db->makeQueryString($column[1])
+                )
+            );
+            if (empty($columnExists))
+            {
+                return false;
+            }
+        }
 
-        $assignmentRules = $this->_db->getAssoc(
-            "SHOW TABLES LIKE 'nesp_interviewer_role_rule'"
-        );
-
-        $availability = $this->_db->getAssoc(
-            "SHOW TABLES LIKE 'nesp_interviewer_availability'"
-        );
-
-        $workflowSummary = $this->_db->getAssoc(
-            "SHOW COLUMNS FROM nesp_candidate_workflow LIKE 'summary'"
-        );
-
-        return !empty($featureFlags)
-            && !empty($staffingHistory)
-            && !empty($staffingImport)
-            && !empty($assignmentRules)
-            && !empty($availability)
-            && !empty($workflowSummary);
+        return true;
     }
 
     public function getFeatureFlags()
@@ -622,6 +692,26 @@ class NESPWorkflow
         );
 
         return true;
+    }
+
+    public function isFeatureFlagEnabled($flagKey)
+    {
+        if (!in_array($flagKey, self::getRequiredFeatureFlagKeys()))
+        {
+            return false;
+        }
+
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT is_enabled
+                 FROM nesp_feature_flag
+                 WHERE flag_key = %s
+                 LIMIT 1',
+                $this->_db->makeQueryString($flagKey)
+            )
+        );
+
+        return !empty($row) && ((int) $row['is_enabled']) === 1;
     }
 
     public function getWorkflowStages()
@@ -740,7 +830,40 @@ class NESPWorkflow
     public function getDashboardQueues()
     {
         $rows = $this->getDashboardCandidateRows(120);
+        $queues = $this->buildDashboardQueueSet($rows, true);
+
+        foreach ($queues as $queueKey => $cards)
+        {
+            $queues[$queueKey] = array_slice($cards, 0, 12);
+        }
+
+        return $queues;
+    }
+
+    public function getDashboardQueueCounts()
+    {
+        $rows = $this->getDashboardCandidateRows(120);
+        $queues = $this->buildDashboardQueueSet($rows, false);
+        $counts = array();
+
+        foreach ($queues as $queueKey => $cards)
+        {
+            $counts[$queueKey] = count($cards);
+        }
+
+        return $counts;
+    }
+
+    private function buildDashboardQueueSet($rows, $prioritizeOverdue)
+    {
         $queues = array(
+            'needsCraig' => array(),
+            'waitingApplicant' => array(),
+            'waitingInterviewer' => array(),
+            'upcomingInterviews' => array(),
+            'recentlyCompleted' => array()
+        );
+        $seen = array(
             'needsCraig' => array(),
             'waitingApplicant' => array(),
             'waitingInterviewer' => array(),
@@ -752,32 +875,41 @@ class NESPWorkflow
         foreach ($rows as $row)
         {
             $card = $this->normalizeDashboardCard($row);
+            $cardKey = $row['candidate_workflow_id'];
             foreach (array('needsCraig', 'waitingApplicant', 'waitingInterviewer', 'recentlyCompleted') as $queueKey)
             {
-                if (in_array($row['stage_key'], $definitions[$queueKey]['stageKeys']))
+                if (in_array($row['stage_key'], $definitions[$queueKey]['stageKeys']) && !isset($seen[$queueKey][$cardKey]))
                 {
                     $queues[$queueKey][] = $card;
+                    $seen[$queueKey][$cardKey] = true;
                 }
             }
 
             if ($row['scheduled_start'] !== null && $row['scheduled_start'] !== ''
-                && in_array($row['interview_status_key'], array('scheduled', 'confirmed', 'needs_notes')))
+                && strtotime($row['scheduled_start']) >= time()
+                && in_array($row['interview_status_key'], array('scheduled', 'confirmed', 'needs_notes'))
+                && !isset($seen['upcomingInterviews'][$cardKey]))
             {
                 $queues['upcomingInterviews'][] = $card;
+                $seen['upcomingInterviews'][$cardKey] = true;
             }
 
             if ($row['due_at'] !== null && $row['due_at'] !== ''
                 && strtotime($row['due_at']) < time()
-                && !in_array($row['stage_key'], array('hired', 'hold', 'not_selected', 'withdrawn', 'declined')))
+                && !in_array($row['stage_key'], array('hired', 'hold', 'not_selected', 'withdrawn', 'declined'))
+                && !isset($seen['needsCraig'][$cardKey]))
             {
                 $card['summary'] = 'Overdue item: ' . $card['summary'];
-                array_unshift($queues['needsCraig'], $card);
+                if ($prioritizeOverdue)
+                {
+                    array_unshift($queues['needsCraig'], $card);
+                }
+                else
+                {
+                    $queues['needsCraig'][] = $card;
+                }
+                $seen['needsCraig'][$cardKey] = true;
             }
-        }
-
-        foreach ($queues as $queueKey => $cards)
-        {
-            $queues[$queueKey] = array_slice($cards, 0, 12);
         }
 
         return $queues;
@@ -873,6 +1005,7 @@ class NESPWorkflow
                     ON ip.interviewer_profile_id = i.interviewer_profile_id
                 WHERE
                     i.scheduled_start IS NOT NULL
+                    AND i.scheduled_start >= NOW()
                     AND i.status_key IN ("scheduled", "confirmed", "needs_notes")
                 ORDER BY
                     i.scheduled_start ASC
@@ -986,6 +1119,27 @@ class NESPWorkflow
         $jobOrderID = (int) $jobOrderID;
 
         if ($interviewerProfileID <= 0 || $candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return false;
+        }
+
+        $candidateJobOrder = $this->_db->getAssoc(
+            sprintf(
+                'SELECT cjo.candidate_joborder_id
+                 FROM candidate_joborder cjo
+                 INNER JOIN candidate c
+                    ON c.candidate_id = cjo.candidate_id
+                    AND c.is_active = 1
+                 INNER JOIN joborder jo
+                    ON jo.joborder_id = cjo.joborder_id
+                 WHERE cjo.candidate_id = %s
+                   AND cjo.joborder_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID)
+            )
+        );
+        if (empty($candidateJobOrder))
         {
             return false;
         }
@@ -1121,7 +1275,7 @@ class NESPWorkflow
                 ip.is_active,
                 COUNT(DISTINCT cg.grant_id) AS active_grants,
                 COUNT(DISTINCT CASE WHEN i.status_key IN ("scheduled", "confirmed", "needs_notes") THEN i.interview_id END) AS open_interviews,
-                COUNT(DISTINCT CASE WHEN sr.status_key = "draft" THEN sr.scorecard_response_id END) AS scorecards_due,
+                COUNT(DISTINCT CASE WHEN cg.grant_id IS NOT NULL AND (sr.scorecard_response_id IS NULL OR sr.status_key = "draft") THEN cg.grant_id END) AS scorecards_due,
                 COUNT(DISTINCT CASE WHEN cw.due_at IS NOT NULL AND cw.due_at < NOW() THEN cw.candidate_workflow_id END) AS overdue_items,
                 COUNT(DISTINCT ia.availability_id) AS availability_blocks
              FROM
@@ -1133,6 +1287,8 @@ class NESPWorkflow
                 ON i.interviewer_profile_id = ip.interviewer_profile_id
              LEFT JOIN nesp_scorecard_response sr
                 ON sr.interviewer_profile_id = ip.interviewer_profile_id
+                AND sr.candidate_id = cg.candidate_id
+                AND sr.joborder_id = cg.joborder_id
              LEFT JOIN nesp_candidate_workflow cw
                 ON cw.candidate_id = cg.candidate_id
                 AND cw.joborder_id = cg.joborder_id
@@ -1410,6 +1566,15 @@ class NESPWorkflow
                 $this->_db->makeQueryInteger($rs['interviewer_profile_id'])
             )
         );
+        $rs['scorecard_answers'] = array();
+        if (!empty($rs['scorecard']) && isset($rs['scorecard']['answers_json']))
+        {
+            $decodedAnswers = json_decode($rs['scorecard']['answers_json'], true);
+            if (is_array($decodedAnswers))
+            {
+                $rs['scorecard_answers'] = $decodedAnswers;
+            }
+        }
 
         return $rs;
     }
@@ -1536,7 +1701,79 @@ class NESPWorkflow
             array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID)
         );
 
+        if ($statusKey === 'submitted')
+        {
+            $this->markWorkflowScorecardComplete($userID, $candidateID, $jobOrderID, $responseID);
+        }
+
         return $responseID;
+    }
+
+    private function markWorkflowScorecardComplete($actorUserID, $candidateID, $jobOrderID, $scorecardResponseID)
+    {
+        $targetStage = $this->_db->getAssoc(
+            "SELECT workflow_stage_id, stage_key
+             FROM nesp_workflow_stage
+             WHERE stage_key = 'scorecard_complete'
+             LIMIT 1"
+        );
+        if (empty($targetStage))
+        {
+            return false;
+        }
+
+        $workflow = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    cw.candidate_workflow_id,
+                    cw.workflow_stage_id,
+                    ws.stage_key
+                 FROM nesp_candidate_workflow cw
+                 LEFT JOIN nesp_workflow_stage ws
+                    ON ws.workflow_stage_id = cw.workflow_stage_id
+                 WHERE cw.candidate_id = %s
+                   AND cw.joborder_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID)
+            )
+        );
+        if (empty($workflow))
+        {
+            return false;
+        }
+
+        $sql = sprintf(
+            'UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = %s,
+                 waiting_on_key = "Craig",
+                 summary = "Scorecard submitted by interviewer and ready for Craig review.",
+                 next_action_label = "Review scorecard",
+                 due_at = NOW(),
+                 date_modified = NOW()
+             WHERE candidate_workflow_id = %s',
+            $this->_db->makeQueryInteger($targetStage['workflow_stage_id']),
+            $this->_db->makeQueryInteger($workflow['candidate_workflow_id'])
+        );
+        $this->_db->query($sql);
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'candidate_workflow_stage_changed',
+            'candidate_workflow',
+            $workflow['candidate_workflow_id'],
+            array(
+                'candidate_id' => (int) $candidateID,
+                'joborder_id' => (int) $jobOrderID,
+                'previous_stage' => isset($workflow['stage_key']) ? $workflow['stage_key'] : '',
+                'new_stage' => 'scorecard_complete',
+                'reason' => 'scorecard_submitted',
+                'scorecard_response_id' => (int) $scorecardResponseID,
+                'result' => 'ready_for_craig_review'
+            )
+        );
+
+        return true;
     }
 
     public function getEnabledScorecardTemplate()
@@ -1705,6 +1942,9 @@ class NESPWorkflow
                     issue.date_created
                  FROM
                     nesp_staffing_import_issue issue
+                 INNER JOIN nesp_staffing_import_batch batch
+                    ON batch.import_batch_id = issue.import_batch_id
+                    AND batch.undone_at IS NULL
                  WHERE
                     issue.status_key = "open"
                  ORDER BY
@@ -1781,6 +2021,8 @@ class NESPWorkflow
             }
         }
 
+        $transactionStarted = $this->_db->beginTransaction();
+
         $sql = sprintf(
             'INSERT INTO nesp_staffing_import_batch
                 (source_type, source_identifier, source_checksum, source_label, status_key, discovered_file_count, imported_file_count, rows_imported, rows_requiring_review, created_by_user_id, last_imported_at, date_created, date_modified)
@@ -1842,6 +2084,11 @@ class NESPWorkflow
                 $this->_db->makeQueryString($issue['message'])
             );
             $this->_db->query($issueSQL);
+        }
+
+        if ($transactionStarted)
+        {
+            $this->_db->commitTransaction();
         }
 
         $this->logAuditEvent(

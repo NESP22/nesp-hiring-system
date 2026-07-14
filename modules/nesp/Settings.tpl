@@ -340,6 +340,7 @@
                         <th>Recommendation</th>
                         <th>Submitted</th>
                         <th>Lock</th>
+                        <th>Action</th>
                     </tr>
                     <?php foreach ($this->scorecards as $scorecard): ?>
                     <tr>
@@ -356,11 +357,25 @@
                                 Open
                             <?php endif; ?>
                         </td>
+                        <td>
+                            <?php if ($scorecard['locked_at'] !== null && $scorecard['unlocked_at'] === null): ?>
+                                <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=unlockScorecard" class="nesp-inline-form">
+                                    <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                    <input type="hidden" name="scorecardResponseID" value="<?php echo((int) $scorecard['scorecard_response_id']); ?>" />
+                                    <input type="hidden" name="candidateID" value="<?php echo((int) $scorecard['candidate_id']); ?>" />
+                                    <input type="hidden" name="jobOrderID" value="<?php echo((int) $scorecard['joborder_id']); ?>" />
+                                    <input type="hidden" name="redirectTo" value="settings" />
+                                    <button type="submit" class="nesp-secondary-button">Unlock</button>
+                                </form>
+                            <?php else: ?>
+                                <span class="nesp-muted">No action</span>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (!count($this->scorecards)): ?>
                     <tr>
-                        <td colspan="7">No scorecards have been saved.</td>
+                        <td colspan="8">No scorecards have been saved.</td>
                     </tr>
                     <?php endif; ?>
                 </table>

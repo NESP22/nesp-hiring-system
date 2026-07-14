@@ -1521,7 +1521,7 @@ CREATE TABLE `nesp_staffing_import_batch` (
   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   PRIMARY KEY (`import_batch_id`),
-  UNIQUE KEY `IDX_nesp_import_source` (`source_type`, `source_identifier`, `source_checksum`),
+  KEY `IDX_nesp_import_source` (`source_type`, `source_identifier`, `source_checksum`),
   KEY `IDX_status_key` (`status_key`),
   KEY `IDX_last_imported_at` (`last_imported_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

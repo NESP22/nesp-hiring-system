@@ -68,29 +68,31 @@
                         <input type="hidden" name="candidateID" value="<?php echo((int) $this->candidate['candidate_id']); ?>" />
                         <input type="hidden" name="jobOrderID" value="<?php echo((int) $this->candidate['joborder_id']); ?>" />
                         <?php foreach ($this->scorecardQuestions as $question): ?>
+                            <?php $answerValue = isset($this->candidate['scorecard_answers'][$question['key']]) ? $this->candidate['scorecard_answers'][$question['key']] : ''; ?>
                             <label>
                                 <?php $this->_($question['label']); ?>
                                 <?php if ($question['type'] === 'rating'): ?>
                                     <select name="answers[<?php $this->_($question['key']); ?>]">
                                         <option value="">Select</option>
-                                        <option value="1">1 - concern</option>
-                                        <option value="2">2 - mixed</option>
-                                        <option value="3">3 - solid</option>
-                                        <option value="4">4 - strong</option>
-                                        <option value="5">5 - excellent</option>
+                                        <option value="1"<?php if ((string) $answerValue === '1'): ?> selected="selected"<?php endif; ?>>1 - concern</option>
+                                        <option value="2"<?php if ((string) $answerValue === '2'): ?> selected="selected"<?php endif; ?>>2 - mixed</option>
+                                        <option value="3"<?php if ((string) $answerValue === '3'): ?> selected="selected"<?php endif; ?>>3 - solid</option>
+                                        <option value="4"<?php if ((string) $answerValue === '4'): ?> selected="selected"<?php endif; ?>>4 - strong</option>
+                                        <option value="5"<?php if ((string) $answerValue === '5'): ?> selected="selected"<?php endif; ?>>5 - excellent</option>
                                     </select>
                                 <?php else: ?>
-                                    <textarea name="answers[<?php $this->_($question['key']); ?>]" rows="4"></textarea>
+                                    <textarea name="answers[<?php $this->_($question['key']); ?>]" rows="4"><?php $this->_($answerValue); ?></textarea>
                                 <?php endif; ?>
                             </label>
                         <?php endforeach; ?>
                         <label>
                             Overall recommendation
                             <select name="overallRecommendation">
-                                <option value="advance">Advance</option>
-                                <option value="hold">Hold</option>
-                                <option value="not_selected">Not selected</option>
-                                <option value="needs_craig_review">Needs Craig review</option>
+                                <?php $recommendation = !empty($this->candidate['scorecard']) ? $this->candidate['scorecard']['overall_recommendation'] : ''; ?>
+                                <option value="advance"<?php if ($recommendation === 'advance'): ?> selected="selected"<?php endif; ?>>Advance</option>
+                                <option value="hold"<?php if ($recommendation === 'hold'): ?> selected="selected"<?php endif; ?>>Hold</option>
+                                <option value="not_selected"<?php if ($recommendation === 'not_selected'): ?> selected="selected"<?php endif; ?>>Not selected</option>
+                                <option value="needs_craig_review"<?php if ($recommendation === 'needs_craig_review'): ?> selected="selected"<?php endif; ?>>Needs Craig review</option>
                             </select>
                         </label>
                         <div class="nesp-button-row">

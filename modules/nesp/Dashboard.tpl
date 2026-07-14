@@ -33,15 +33,15 @@
             <div class="nesp-card-grid nesp-card-grid-compact">
                 <div class="nesp-card">
                     <span class="nesp-card-label">Needs Craig</span>
-                    <strong><?php $this->_(count($this->queues['needsCraig'])); ?></strong>
+                    <strong><?php $this->_($this->queueCounts['needsCraig']); ?></strong>
                 </div>
                 <div class="nesp-card">
                     <span class="nesp-card-label">Waiting on Applicant</span>
-                    <strong><?php $this->_(count($this->queues['waitingApplicant'])); ?></strong>
+                    <strong><?php $this->_($this->queueCounts['waitingApplicant']); ?></strong>
                 </div>
                 <div class="nesp-card">
                     <span class="nesp-card-label">Waiting on Interviewer</span>
-                    <strong><?php $this->_(count($this->queues['waitingInterviewer'])); ?></strong>
+                    <strong><?php $this->_($this->queueCounts['waitingInterviewer']); ?></strong>
                 </div>
                 <div class="nesp-card">
                     <span class="nesp-card-label">Interviews This Week</span>

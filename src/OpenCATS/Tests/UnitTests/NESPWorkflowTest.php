@@ -43,6 +43,18 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'NESP_VAPI_ENABLED'));
     }
 
+    public function testFeatureGateMappingKeepsSettingsOpen()
+    {
+        $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('settings'));
+        $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('saveFeatureFlags'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('dashboard'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('waiting'));
+        $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('assignedCandidate'));
+        $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('submitScorecard'));
+        $this->assertSame('NESP_STAFFING_FORECAST_ENABLED', NESPWorkflow::getFeatureFlagForAction('staffingForecast'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('unexpectedAction'));
+    }
+
     public function testDashboardNavigationIncludesTaskViews()
     {
         $labels = array_map(
@@ -167,6 +179,23 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('Medium', $metrics['confidence']);
         $this->assertArrayHasKey('recommended_pool', $metrics['formulas']);
         $this->assertGreaterThanOrEqual(0, $metrics['hiring_gap']);
+    }
+
+    public function testStaffingForecastMetricsCountMultiRoleEventsOnce()
+    {
+        $rows = array(
+            array('event_date' => '2024-04-20', 'event_name' => 'Fixture Opener', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'photographer', 'staff_name' => 'Alex Fixture; Sam Fixture', 'staff_count' => 2, 'staff_hours' => 8, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_name' => 'Fixture Opener', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'assistant', 'staff_name' => 'Taylor Fixture', 'staff_count' => 1, 'staff_hours' => 4, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_name' => 'Fixture Opener', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'table_staff', 'staff_name' => 'Jordan Fixture', 'staff_count' => 1, 'staff_hours' => 4, 'issue_count' => 0)
+        );
+
+        $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows);
+
+        $this->assertSame(1, $metrics['total_events']);
+        $this->assertSame(1, $metrics['events_by_season']['2024']);
+        $this->assertSame(1, $metrics['events_by_state']['MA']);
+        $this->assertSame(4, $metrics['unique_staff_by_season']['2024']);
+        $this->assertSame(4, $metrics['peak_day_staffing']);
     }
 
     public function testStaffingCSVParserFlagsDuplicateSourceRows()

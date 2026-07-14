@@ -17,7 +17,7 @@ class NESPUI extends UserInterface
         $this->_authenticationRequired = true;
         $this->_moduleDirectory = 'nesp';
         $this->_moduleName = 'nesp';
-        $this->_moduleTabText = 'NESP Hiring*al=' . ACCESS_LEVEL_READ;
+        $this->_moduleTabText = 'NESP Hiring*al=' . ACCESS_LEVEL_SA;
         $this->_subTabs = array(
             'Needs Craig' => CATSUtility::getIndexName() . '?m=nesp*al=' . ACCESS_LEVEL_READ,
             'Waiting' => CATSUtility::getIndexName() . '?m=nesp&amp;a=waiting*al=' . ACCESS_LEVEL_READ,
@@ -37,6 +37,17 @@ class NESPUI extends UserInterface
         if (!$this->_workflow->isSchemaInstalled())
         {
             $this->schemaMissing();
+            return;
+        }
+
+        $featureFlagKey = NESPWorkflow::getFeatureFlagForAction($action);
+        if ($featureFlagKey !== '' && !$this->_workflow->isFeatureFlagEnabled($featureFlagKey))
+        {
+            if ($_SERVER['REQUEST_METHOD'] === 'POST')
+            {
+                $this->requirePostCSRF();
+            }
+            $this->featureDisabled($featureFlagKey);
             return;
         }
 
@@ -114,6 +125,7 @@ class NESPUI extends UserInterface
                 break;
 
             case 'staffingForecast':
+                $this->adminOnly();
                 $this->staffingForecast();
                 break;
 
@@ -122,6 +134,7 @@ class NESPUI extends UserInterface
             case 'completed':
             case 'dashboard':
             default:
+                $this->adminOnly();
                 $this->dashboard($action);
                 break;
         }
@@ -140,6 +153,7 @@ class NESPUI extends UserInterface
         $this->_template->assign('viewKey', $viewKey);
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('summary', $this->_workflow->getDashboardSummary());
+        $this->_template->assign('queueCounts', $this->_workflow->getDashboardQueueCounts());
         $this->_template->assign('queueDefinitions', NESPWorkflow::getQueueDefinitions());
         $this->_template->assign('queues', $queues);
         $this->_template->assign('upcomingInterviews', $this->_workflow->getUpcomingInterviews(20));
@@ -332,12 +346,18 @@ class NESPUI extends UserInterface
         $scorecardResponseID = isset($_POST['scorecardResponseID']) ? (int) $_POST['scorecardResponseID'] : 0;
         $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
         $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+        $redirectTo = isset($_POST['redirectTo']) ? $_POST['redirectTo'] : '';
         if ($scorecardResponseID <= 0)
         {
             CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid scorecard.');
         }
 
         $this->_workflow->unlockScorecard($this->_userID, $scorecardResponseID);
+        if ($redirectTo === 'settings')
+        {
+            CATSUtility::transferRelativeURI('m=nesp&a=settings');
+            return;
+        }
         CATSUtility::transferRelativeURI('m=nesp&a=assignedCandidate&candidateID=' . $candidateID . '&jobOrderID=' . $jobOrderID);
     }
 
@@ -371,6 +391,14 @@ class NESPUI extends UserInterface
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Dashboard');
         $this->_template->display('./modules/nesp/SchemaMissing.tpl');
+    }
+
+    private function featureDisabled($featureFlagKey)
+    {
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Settings');
+        $this->_template->assign('featureFlagKey', $featureFlagKey);
+        $this->_template->display('./modules/nesp/FeatureDisabled.tpl');
     }
 
     private function adminOnly()

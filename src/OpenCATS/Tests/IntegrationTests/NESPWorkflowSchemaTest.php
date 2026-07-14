@@ -66,6 +66,10 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_role_rule', 'assignment_mode'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_availability', 'slot_minutes'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interview_slot', 'zoom_status_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_batch', 'undone_at'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_row', 'source_row_hash'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_issue', 'status_key'));
+        $this->assertSame(0, $this->countUniqueIndexes('nesp_staffing_import_batch', 'IDX_nesp_import_source'));
     }
 
     private function countMatchingTables($table)
@@ -116,5 +120,21 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $row = mysqli_fetch_assoc($result);
 
         return (int) $row['total'];
+    }
+
+    private function countUniqueIndexes($table, $index)
+    {
+        global $mySQLConnection;
+
+        $result = mysqli_query(
+            $mySQLConnection,
+            sprintf(
+                "SHOW INDEX FROM `%s` WHERE Key_name = '%s' AND Non_unique = 0",
+                mysqli_real_escape_string($mySQLConnection, $table),
+                mysqli_real_escape_string($mySQLConnection, $index)
+            )
+        );
+
+        return mysqli_num_rows($result);
     }
 }

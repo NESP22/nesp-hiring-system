@@ -52,6 +52,24 @@ WHERE table_schema = DATABASE()
   )
 ORDER BY table_name;
 
+SELECT CONCAT(table_name, '.', column_name) AS required_phase2_column
+FROM information_schema.columns
+WHERE table_schema = DATABASE()
+  AND (
+    (table_name = 'nesp_candidate_workflow' AND column_name IN ('summary', 'next_action_label', 'due_at'))
+    OR (table_name = 'nesp_staffing_import_batch' AND column_name IN ('status_key', 'undone_at'))
+    OR (table_name = 'nesp_staffing_import_row' AND column_name IN ('source_row_hash', 'raw_source_text', 'unresolved_json'))
+    OR (table_name = 'nesp_staffing_import_issue' AND column_name IN ('status_key', 'severity_key'))
+  )
+ORDER BY table_name, column_name;
+
+SELECT 'staffing_import_source_unique_indexes' AS check_name, COUNT(*) AS check_value
+FROM information_schema.statistics
+WHERE table_schema = DATABASE()
+  AND table_name = 'nesp_staffing_import_batch'
+  AND index_name = 'IDX_nesp_import_source'
+  AND non_unique = 0;
+
 SELECT flag_key AS existing_phase2_flag, is_enabled
 FROM nesp_feature_flag
 WHERE flag_key IN (
