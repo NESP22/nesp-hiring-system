@@ -2092,7 +2092,9 @@ class CATSSchema
                   KEY `IDX_candidate_id` (`candidate_id`),
                   KEY `IDX_joborder_id` (`joborder_id`),
                   KEY `IDX_workflow_stage_id` (`workflow_stage_id`),
-                  KEY `IDX_assigned_owner_user_id` (`assigned_owner_user_id`)
+                  KEY `IDX_assigned_owner_user_id` (`assigned_owner_user_id`),
+                  KEY `IDX_nesp_dashboard_due` (`due_at`),
+                  KEY `IDX_nesp_waiting_on` (`waiting_on_key`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
                 CREATE TABLE IF NOT EXISTS `nesp_interviewer_profile` (
@@ -2151,7 +2153,8 @@ class CATSSchema
                   KEY `IDX_candidate_id` (`candidate_id`),
                   KEY `IDX_joborder_id` (`joborder_id`),
                   KEY `IDX_interviewer_profile_id` (`interviewer_profile_id`),
-                  KEY `IDX_status_key` (`status_key`)
+                  KEY `IDX_status_key` (`status_key`),
+                  KEY `IDX_nesp_interview_schedule` (`scheduled_start`, `status_key`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
                 CREATE TABLE IF NOT EXISTS `nesp_scorecard_template` (
@@ -2178,13 +2181,19 @@ class CATSSchema
                   `overall_recommendation` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
                   `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
                   `submitted_at` DATETIME,
+                  `locked_at` DATETIME,
+                  `unlocked_at` DATETIME,
+                  `unlocked_by_user_id` INT(11),
+                  `lock_reason` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
                   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   PRIMARY KEY (`scorecard_response_id`),
                   KEY `IDX_candidate_id` (`candidate_id`),
                   KEY `IDX_joborder_id` (`joborder_id`),
                   KEY `IDX_interviewer_profile_id` (`interviewer_profile_id`),
-                  KEY `IDX_status_key` (`status_key`)
+                  KEY `IDX_status_key` (`status_key`),
+                  KEY `IDX_nesp_scorecard_interview` (`interview_id`),
+                  KEY `IDX_nesp_scorecard_submitted` (`submitted_at`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
                 CREATE TABLE IF NOT EXISTS `nesp_integration_status` (
@@ -2296,6 +2305,74 @@ class CATSSchema
                   KEY `IDX_season` (`season_year`, `season_name`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+                CREATE TABLE IF NOT EXISTS `nesp_staffing_import_batch` (
+                  `import_batch_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `source_type` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `source_identifier` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `source_checksum` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `source_label` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+                  `discovered_file_count` INT(11) NOT NULL DEFAULT '0',
+                  `imported_file_count` INT(11) NOT NULL DEFAULT '0',
+                  `rows_imported` INT(11) NOT NULL DEFAULT '0',
+                  `rows_requiring_review` INT(11) NOT NULL DEFAULT '0',
+                  `created_by_user_id` INT(11),
+                  `last_imported_at` DATETIME,
+                  `undone_at` DATETIME,
+                  `undone_by_user_id` INT(11),
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`import_batch_id`),
+                  UNIQUE KEY `IDX_nesp_import_source` (`source_type`, `source_identifier`, `source_checksum`),
+                  KEY `IDX_status_key` (`status_key`),
+                  KEY `IDX_last_imported_at` (`last_imported_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_staffing_import_row` (
+                  `import_row_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `import_batch_id` INT(11) NOT NULL,
+                  `source_row_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `source_sheet_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `source_row_number` INT(11) NOT NULL DEFAULT '0',
+                  `event_date` DATE,
+                  `event_start_time` TIME,
+                  `event_end_time` TIME,
+                  `state` VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `sport` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `event_name` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `role_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `staff_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `staff_count` INT(11) NOT NULL DEFAULT '0',
+                  `staff_hours` DECIMAL(8,2) NOT NULL DEFAULT '0.00',
+                  `raw_source_text` TEXT COLLATE utf8mb4_unicode_ci,
+                  `unresolved_json` TEXT COLLATE utf8mb4_unicode_ci,
+                  `issue_count` INT(11) NOT NULL DEFAULT '0',
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'normalized',
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`import_row_id`),
+                  UNIQUE KEY `IDX_nesp_import_row_lineage` (`import_batch_id`, `source_row_hash`),
+                  KEY `IDX_event_date` (`event_date`),
+                  KEY `IDX_state` (`state`),
+                  KEY `IDX_role_key` (`role_key`),
+                  KEY `IDX_status_key` (`status_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_staffing_import_issue` (
+                  `import_issue_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `import_batch_id` INT(11) NOT NULL,
+                  `import_row_id` INT(11),
+                  `issue_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `severity_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'review',
+                  `message` TEXT COLLATE utf8mb4_unicode_ci,
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'open',
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_resolved` DATETIME,
+                  PRIMARY KEY (`import_issue_id`),
+                  KEY `IDX_import_batch_id` (`import_batch_id`),
+                  KEY `IDX_import_row_id` (`import_row_id`),
+                  KEY `IDX_status_key` (`status_key`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
                 CREATE TABLE IF NOT EXISTS `nesp_staffing_forecast` (
                   `staffing_forecast_id` INT(11) NOT NULL AUTO_INCREMENT,
                   `forecast_year` INT(4) NOT NULL,
@@ -2311,6 +2388,19 @@ class CATSSchema
                   PRIMARY KEY (`staffing_forecast_id`),
                   KEY `IDX_target_week_start` (`target_week_start`),
                   KEY `IDX_forecast_year` (`forecast_year`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_staffing_recommendation` (
+                  `staffing_recommendation_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `created_by_user_id` INT(11),
+                  `title` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `recommendation_json` TEXT COLLATE utf8mb4_unicode_ci,
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`staffing_recommendation_id`),
+                  KEY `IDX_status_key` (`status_key`),
+                  KEY `IDX_created_by_user_id` (`created_by_user_id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
                 INSERT INTO nesp_feature_flag
@@ -2342,6 +2432,16 @@ class CATSSchema
                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
                 SELECT 'NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0, 1, NOW(), NOW()
                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_AI_REVIEW_ENABLED');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_STAFFING_FORECAST_ENABLED');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_STAFFING_DRIVE_IMPORT_ENABLED');
 
                 INSERT INTO nesp_workflow_stage
                     (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)

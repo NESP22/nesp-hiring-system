@@ -28,7 +28,11 @@ The rollback removes:
 - Disabled standard scorecard template
 - `nesp_session_security_event`
 - `nesp_staffing_schedule_history`
+- `nesp_staffing_import_batch`
+- `nesp_staffing_import_row`
+- `nesp_staffing_import_issue`
 - `nesp_staffing_forecast`
+- `nesp_staffing_recommendation`
 - Phase 2 dashboard helper columns from `nesp_candidate_workflow`
 - Phase 2 interviewer helper columns from `nesp_interviewer_profile`
 
@@ -44,6 +48,7 @@ After rollback:
 
 - `SELECT COUNT(*) FROM nesp_feature_flag WHERE flag_key LIKE 'NESP_%';` returns `0`.
 - `SHOW TABLES LIKE 'nesp_staffing_schedule_history';` returns no rows.
+- `SHOW TABLES LIKE 'nesp_staffing_import_batch';` returns no rows.
 - `SHOW TABLES LIKE 'nesp_staffing_forecast';` returns no rows.
 - `SHOW TABLES LIKE 'nesp_session_security_event';` returns no rows.
 - Legacy OpenCATS login and candidate pages still load.

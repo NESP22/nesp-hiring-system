@@ -83,6 +83,18 @@ class NESPUI extends UserInterface
                 $this->submitScorecard();
                 break;
 
+            case 'unlockScorecard':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->unlockScorecard();
+                break;
+
+            case 'createStaffingRecommendation':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->createStaffingRecommendation();
+                break;
+
             case 'staffingForecast':
                 $this->staffingForecast();
                 break;
@@ -118,6 +130,7 @@ class NESPUI extends UserInterface
         $this->_template->assign('subActive', 'Settings');
         $this->_template->assign('featureFlags', $this->_workflow->getFeatureFlags());
         $this->_template->assign('interviewerProfiles', $this->_workflow->getInterviewerProfiles());
+        $this->_template->assign('scorecards', $this->_workflow->getScorecardSummaries(50));
         $this->_template->assign('summary', $this->_workflow->getInterviewerAccessSummary());
         $this->_template->display('./modules/nesp/Settings.tpl');
     }
@@ -213,12 +226,51 @@ class NESPUI extends UserInterface
             CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid scorecard candidate.');
         }
 
-        if ($this->_workflow->submitScorecard($this->_userID, $candidateID, $jobOrderID, $answers, $recommendation) === false)
+        $action = isset($_POST['scorecardAction']) ? $_POST['scorecardAction'] : 'submit';
+        if ($action === 'saveDraft')
+        {
+            $result = $this->_workflow->saveScorecardDraft($this->_userID, $candidateID, $jobOrderID, $answers, $recommendation);
+        }
+        else
+        {
+            $result = $this->_workflow->submitScorecard($this->_userID, $candidateID, $jobOrderID, $answers, $recommendation);
+        }
+
+        if ($result === false)
         {
             CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You cannot submit a scorecard for this candidate.');
         }
 
         CATSUtility::transferRelativeURI('m=nesp&a=assignedCandidate&candidateID=' . $candidateID . '&jobOrderID=' . $jobOrderID);
+    }
+
+    private function unlockScorecard()
+    {
+        $scorecardResponseID = isset($_POST['scorecardResponseID']) ? (int) $_POST['scorecardResponseID'] : 0;
+        $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
+        $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+        if ($scorecardResponseID <= 0)
+        {
+            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid scorecard.');
+        }
+
+        $this->_workflow->unlockScorecard($this->_userID, $scorecardResponseID);
+        CATSUtility::transferRelativeURI('m=nesp&a=assignedCandidate&candidateID=' . $candidateID . '&jobOrderID=' . $jobOrderID);
+    }
+
+    private function createStaffingRecommendation()
+    {
+        $forecast = $this->_workflow->getStaffingForecast();
+        $this->_workflow->createDraftStaffingRecommendation(
+            $this->_userID,
+            'NESP staffing recommendation ' . date('Y-m-d'),
+            array(
+                'metrics' => $forecast['metrics'],
+                'source_status' => $forecast['sourceStatus'],
+                'created_from' => 'staffing_forecast_screen'
+            )
+        );
+        CATSUtility::transferRelativeURI('m=nesp&a=staffingForecast');
     }
 
     private function staffingForecast()

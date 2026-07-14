@@ -24,7 +24,9 @@ class NESPWorkflow
             array('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0),
             array('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0),
             array('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0),
-            array('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0)
+            array('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0),
+            array('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0),
+            array('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0)
         );
     }
 
@@ -36,7 +38,9 @@ class NESPWorkflow
             'NESP_PRESCREEN_ENABLED',
             'NESP_VAPI_ENABLED',
             'NESP_ZOOM_ENABLED',
-            'NESP_AI_REVIEW_ENABLED'
+            'NESP_AI_REVIEW_ENABLED',
+            'NESP_STAFFING_FORECAST_ENABLED',
+            'NESP_STAFFING_DRIVE_IMPORT_ENABLED'
         );
     }
 
@@ -160,6 +164,312 @@ class NESPWorkflow
         );
     }
 
+    public static function getDefaultStaffingForecastConfig()
+    {
+        return array(
+            'photographer_ratio' => 1.0,
+            'assistant_ratio' => 0.35,
+            'table_staff_ratio' => 0.25,
+            'buffer_percent' => 25,
+            'expected_returning_staff' => 0,
+            'confirmed_available_staff' => 0,
+            'active_staff' => 0
+        );
+    }
+
+    public static function parseStaffingCSVText($csvText, $sourceLabel = 'uploaded CSV')
+    {
+        $lines = preg_split('/\r\n|\n|\r/', $csvText);
+        $rows = array();
+        foreach ($lines as $line)
+        {
+            if (trim($line) === '')
+            {
+                continue;
+            }
+            $rows[] = str_getcsv($line);
+        }
+
+        return self::normalizeStaffingRows($rows, $sourceLabel, 'CSV');
+    }
+
+    public static function parseStaffingXLSXFile($filePath, $sourceLabel = 'uploaded XLSX')
+    {
+        if (!class_exists('ZipArchive'))
+        {
+            return array(
+                'rows' => array(),
+                'issues' => array(
+                    array('row_number' => 0, 'issue_key' => 'xlsx_unavailable', 'message' => 'XLSX parsing requires the PHP ZipArchive extension.')
+                ),
+                'checksum' => is_file($filePath) ? hash_file('sha256', $filePath) : '',
+                'source_label' => $sourceLabel
+            );
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($filePath) !== true)
+        {
+            return array(
+                'rows' => array(),
+                'issues' => array(
+                    array('row_number' => 0, 'issue_key' => 'xlsx_open_failed', 'message' => 'The XLSX file could not be opened.')
+                ),
+                'checksum' => is_file($filePath) ? hash_file('sha256', $filePath) : '',
+                'source_label' => $sourceLabel
+            );
+        }
+
+        $sharedStrings = array();
+        $sharedXML = $zip->getFromName('xl/sharedStrings.xml');
+        if ($sharedXML !== false)
+        {
+            $xml = @simplexml_load_string($sharedXML);
+            if ($xml !== false)
+            {
+                foreach ($xml->si as $stringItem)
+                {
+                    $sharedStrings[] = (string) $stringItem->t;
+                }
+            }
+        }
+
+        $sheetXML = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $rows = array();
+        if ($sheetXML !== false)
+        {
+            $xml = @simplexml_load_string($sheetXML);
+            if ($xml !== false)
+            {
+                foreach ($xml->sheetData->row as $row)
+                {
+                    $values = array();
+                    foreach ($row->c as $cell)
+                    {
+                        $value = (string) $cell->v;
+                        if ((string) $cell['t'] === 's' && isset($sharedStrings[(int) $value]))
+                        {
+                            $value = $sharedStrings[(int) $value];
+                        }
+                        $values[] = $value;
+                    }
+                    $rows[] = $values;
+                }
+            }
+        }
+        $zip->close();
+
+        $result = self::normalizeStaffingRows($rows, $sourceLabel, 'XLSX');
+        $result['checksum'] = is_file($filePath) ? hash_file('sha256', $filePath) : '';
+        return $result;
+    }
+
+    public static function normalizeStaffingRows($rows, $sourceLabel, $sourceType = 'CSV')
+    {
+        $normalized = array();
+        $issues = array();
+        if (empty($rows))
+        {
+            return array(
+                'rows' => $normalized,
+                'issues' => array(array('row_number' => 0, 'issue_key' => 'empty_source', 'message' => 'No rows were found.')),
+                'checksum' => hash('sha256', ''),
+                'source_label' => $sourceLabel,
+                'source_type' => $sourceType
+            );
+        }
+
+        $headerRowIndex = self::findStaffingHeaderRow($rows);
+        $header = self::normalizeHeader($rows[$headerRowIndex]);
+        $dateColumns = array();
+        foreach ($header as $index => $name)
+        {
+            $sourceHeader = isset($rows[$headerRowIndex][$index]) ? $rows[$headerRowIndex][$index] : $name;
+            $date = self::parseStaffingDate($sourceHeader);
+            if ($date !== '')
+            {
+                $dateColumns[$index] = $date;
+            }
+        }
+
+        $seenHashes = array();
+        for ($i = $headerRowIndex + 1; $i < count($rows); $i++)
+        {
+            $row = $rows[$i];
+            $rawText = implode(' | ', $row);
+            if (trim($rawText) === '')
+            {
+                continue;
+            }
+
+            $rowNumber = $i + 1;
+            if (!empty($dateColumns))
+            {
+                foreach ($dateColumns as $columnIndex => $date)
+                {
+                    $staffText = isset($row[$columnIndex]) ? trim($row[$columnIndex]) : '';
+                    if ($staffText === '')
+                    {
+                        continue;
+                    }
+
+                    $base = self::rowValueMap($header, $row);
+                    $base['date'] = $date;
+                    $base['staff'] = $staffText;
+                    $result = self::normalizeStaffingRow($base, $rowNumber, $rawText, $sourceLabel);
+                    if (isset($seenHashes[$result['row']['source_row_hash']]))
+                    {
+                        $result['issues'][] = array(
+                            'row_number' => $rowNumber,
+                            'issue_key' => 'duplicate_source_row',
+                            'message' => 'This source row appears to duplicate an earlier normalized row.'
+                        );
+                        $result['row']['issue_count']++;
+                        $result['row']['status_key'] = 'needs_review';
+                        $result['row']['source_row_hash'] = hash('sha256', $result['row']['source_row_hash'] . '|' . $rowNumber);
+                    }
+                    $seenHashes[$result['row']['source_row_hash']] = true;
+                    $normalized[] = $result['row'];
+                    $issues = array_merge($issues, $result['issues']);
+                }
+                continue;
+            }
+
+            $mapped = self::rowValueMap($header, $row);
+            $result = self::normalizeStaffingRow($mapped, $rowNumber, $rawText, $sourceLabel);
+            if (isset($seenHashes[$result['row']['source_row_hash']]))
+            {
+                $result['issues'][] = array(
+                    'row_number' => $rowNumber,
+                    'issue_key' => 'duplicate_source_row',
+                    'message' => 'This source row appears to duplicate an earlier normalized row.'
+                );
+                $result['row']['issue_count']++;
+                $result['row']['status_key'] = 'needs_review';
+                $result['row']['source_row_hash'] = hash('sha256', $result['row']['source_row_hash'] . '|' . $rowNumber);
+            }
+            $seenHashes[$result['row']['source_row_hash']] = true;
+            $normalized[] = $result['row'];
+            $issues = array_merge($issues, $result['issues']);
+        }
+
+        return array(
+            'rows' => $normalized,
+            'issues' => $issues,
+            'checksum' => hash('sha256', json_encode($rows)),
+            'source_label' => $sourceLabel,
+            'source_type' => $sourceType
+        );
+    }
+
+    public static function calculateStaffingForecastMetrics($rows, $config = array())
+    {
+        $config = array_merge(self::getDefaultStaffingForecastConfig(), $config);
+        $metrics = array(
+            'events_by_season' => array(),
+            'events_by_week' => array(),
+            'events_by_weekday' => array(),
+            'events_by_state' => array(),
+            'events_by_sport' => array(),
+            'unique_staff_by_season' => array(),
+            'staff_by_role' => array(),
+            'staff_hours' => 0.0,
+            'total_events' => 0,
+            'total_staff_assignments' => 0,
+            'peak_day_staffing' => 0,
+            'peak_concurrent_staff' => 0,
+            'average_staff_per_event' => 0,
+            'recommended_pool' => 0,
+            'recommended_backup' => 0,
+            'hiring_gap' => 0,
+            'confidence' => 'Low',
+            'formulas' => array(
+                'recommended_pool' => 'ceil(peak_day_staffing * (1 + buffer_percent / 100))',
+                'recommended_backup' => 'ceil(recommended_pool * buffer_percent / 100)',
+                'hiring_gap' => 'max(0, recommended_pool + recommended_backup - active_staff - expected_returning_staff - confirmed_available_staff)',
+                'confidence' => 'High requires at least 3 usable seasons and no open import issues; Medium requires at least 2 usable seasons.'
+            )
+        );
+
+        $events = array();
+        $dayStaff = array();
+        $staffBySeason = array();
+        $openIssues = 0;
+        foreach ($rows as $row)
+        {
+            if (!empty($row['issue_count']))
+            {
+                $openIssues += (int) $row['issue_count'];
+            }
+
+            if (empty($row['event_date']))
+            {
+                continue;
+            }
+
+            $season = substr($row['event_date'], 0, 4);
+            $week = date('Y-m-d', strtotime('monday this week', strtotime($row['event_date'])));
+            $weekday = date('l', strtotime($row['event_date']));
+            $eventKey = $row['event_date'] . '|' . $row['event_name'] . '|' . $row['state'];
+            $events[$eventKey] = true;
+
+            self::incrementMetric($metrics['events_by_season'], $season, 1);
+            self::incrementMetric($metrics['events_by_week'], $week, 1);
+            self::incrementMetric($metrics['events_by_weekday'], $weekday, 1);
+            self::incrementMetric($metrics['events_by_state'], $row['state'] === '' ? 'Unknown' : $row['state'], 1);
+            self::incrementMetric($metrics['events_by_sport'], $row['sport'] === '' ? 'Unknown' : $row['sport'], 1);
+            self::incrementMetric($metrics['staff_by_role'], $row['role_key'] === '' ? 'unknown' : $row['role_key'], max(1, (int) $row['staff_count']));
+
+            if (!isset($staffBySeason[$season]))
+            {
+                $staffBySeason[$season] = array();
+            }
+            if ($row['staff_name'] !== '')
+            {
+                $staffBySeason[$season][$row['staff_name']] = true;
+            }
+
+            if (!isset($dayStaff[$row['event_date']]))
+            {
+                $dayStaff[$row['event_date']] = 0;
+            }
+            $dayStaff[$row['event_date']] += max(1, (int) $row['staff_count']);
+            $metrics['staff_hours'] += (float) $row['staff_hours'];
+            $metrics['total_staff_assignments'] += max(1, (int) $row['staff_count']);
+        }
+
+        foreach ($staffBySeason as $season => $staff)
+        {
+            $metrics['unique_staff_by_season'][$season] = count($staff);
+        }
+
+        $metrics['total_events'] = count($events);
+        $metrics['peak_day_staffing'] = empty($dayStaff) ? 0 : max($dayStaff);
+        $metrics['peak_concurrent_staff'] = $metrics['peak_day_staffing'];
+        $metrics['average_staff_per_event'] = $metrics['total_events'] > 0
+            ? round($metrics['total_staff_assignments'] / $metrics['total_events'], 2)
+            : 0;
+        $metrics['staff_hours'] = round($metrics['staff_hours'], 2);
+        $metrics['recommended_pool'] = (int) ceil($metrics['peak_day_staffing'] * (1 + ((float) $config['buffer_percent'] / 100)));
+        $metrics['recommended_backup'] = (int) ceil($metrics['recommended_pool'] * ((float) $config['buffer_percent'] / 100));
+        $available = (int) $config['active_staff'] + (int) $config['expected_returning_staff'] + (int) $config['confirmed_available_staff'];
+        $metrics['hiring_gap'] = max(0, $metrics['recommended_pool'] + $metrics['recommended_backup'] - $available);
+
+        $usableSeasons = count($metrics['events_by_season']);
+        if ($usableSeasons >= 3 && $openIssues === 0)
+        {
+            $metrics['confidence'] = 'High';
+        }
+        else if ($usableSeasons >= 2)
+        {
+            $metrics['confidence'] = 'Medium';
+        }
+
+        ksort($metrics['events_by_season']);
+        ksort($metrics['events_by_week']);
+        return $metrics;
+    }
+
     public function isSchemaInstalled()
     {
         $featureFlags = $this->_db->getAssoc(
@@ -170,11 +480,15 @@ class NESPWorkflow
             "SHOW TABLES LIKE 'nesp_staffing_schedule_history'"
         );
 
+        $staffingImport = $this->_db->getAssoc(
+            "SHOW TABLES LIKE 'nesp_staffing_import_batch'"
+        );
+
         $workflowSummary = $this->_db->getAssoc(
             "SHOW COLUMNS FROM nesp_candidate_workflow LIKE 'summary'"
         );
 
-        return !empty($featureFlags) && !empty($staffingHistory) && !empty($workflowSummary);
+        return !empty($featureFlags) && !empty($staffingHistory) && !empty($staffingImport) && !empty($workflowSummary);
     }
 
     public function getFeatureFlags()
@@ -190,7 +504,7 @@ class NESPWorkflow
             FROM
                 nesp_feature_flag
             WHERE
-                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_AI_REVIEW_ENABLED")
+                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED")
             ORDER BY
                 display_name'
         );
@@ -305,6 +619,13 @@ class NESPWorkflow
                 'SELECT COUNT(*) AS total
                  FROM nesp_audit_event
                  WHERE date_created >= DATE_SUB(NOW(), INTERVAL 7 DAY)'
+            ),
+            'interviewsThisWeek' => $this->countRows(
+                'SELECT COUNT(*) AS total
+                 FROM nesp_interview
+                 WHERE scheduled_start >= CURDATE()
+                   AND scheduled_start < DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+                   AND status_key IN ("scheduled", "confirmed", "needs_notes")'
             )
         );
     }
@@ -482,6 +803,42 @@ class NESPWorkflow
         );
     }
 
+    public function getScorecardSummaries($limit)
+    {
+        $limit = max(1, min(200, (int) $limit));
+
+        return $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT
+                    sr.scorecard_response_id,
+                    sr.candidate_id,
+                    sr.joborder_id,
+                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                    jo.title AS role_title,
+                    ip.display_name AS interviewer_name,
+                    sr.status_key,
+                    sr.overall_recommendation,
+                    sr.submitted_at,
+                    sr.locked_at,
+                    sr.unlocked_at,
+                    sr.date_modified
+                 FROM
+                    nesp_scorecard_response sr
+                 INNER JOIN candidate c
+                    ON c.candidate_id = sr.candidate_id
+                 INNER JOIN joborder jo
+                    ON jo.joborder_id = sr.joborder_id
+                 LEFT JOIN nesp_interviewer_profile ip
+                    ON ip.interviewer_profile_id = sr.interviewer_profile_id
+                 ORDER BY
+                    sr.date_modified DESC,
+                    sr.scorecard_response_id DESC
+                 LIMIT %s',
+                $this->_db->makeQueryInteger($limit)
+            )
+        );
+    }
+
     public function createInactiveInterviewerProfile($displayName, $email, $roleKey, $actorUserID)
     {
         $displayName = trim($displayName);
@@ -653,7 +1010,7 @@ class NESPWorkflow
 
         $rs['scorecard'] = $this->_db->getAssoc(
             sprintf(
-                'SELECT scorecard_response_id, status_key, overall_recommendation, answers_json, submitted_at
+                'SELECT scorecard_response_id, status_key, overall_recommendation, answers_json, submitted_at, locked_at, unlocked_at, lock_reason
                  FROM nesp_scorecard_response
                  WHERE candidate_id = %s
                    AND joborder_id = %s
@@ -671,8 +1028,50 @@ class NESPWorkflow
 
     public function submitScorecard($userID, $candidateID, $jobOrderID, $answers, $recommendation)
     {
+        return $this->persistScorecard($userID, $candidateID, $jobOrderID, $answers, $recommendation, 'submitted');
+    }
+
+    public function saveScorecardDraft($userID, $candidateID, $jobOrderID, $answers, $recommendation)
+    {
+        return $this->persistScorecard($userID, $candidateID, $jobOrderID, $answers, $recommendation, 'draft');
+    }
+
+    public function unlockScorecard($actorUserID, $scorecardResponseID)
+    {
+        $sql = sprintf(
+            'UPDATE nesp_scorecard_response
+             SET unlocked_at = NOW(),
+                 unlocked_by_user_id = %s,
+                 lock_reason = "Craig/admin reopened for correction",
+                 date_modified = NOW()
+             WHERE scorecard_response_id = %s
+               AND locked_at IS NOT NULL',
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID),
+            $this->_db->makeQueryInteger($scorecardResponseID)
+        );
+        $this->_db->query($sql);
+        $this->logAuditEvent(
+            $actorUserID,
+            'scorecard_unlocked',
+            'scorecard_response',
+            $scorecardResponseID,
+            array()
+        );
+
+        return true;
+    }
+
+    private function persistScorecard($userID, $candidateID, $jobOrderID, $answers, $recommendation, $statusKey)
+    {
         $detail = $this->getAssignedCandidateDetail($userID, $candidateID, $jobOrderID);
         if (empty($detail) || ((int) $detail['can_submit_scorecard']) !== 1)
+        {
+            return false;
+        }
+
+        if (!empty($detail['scorecard'])
+            && $detail['scorecard']['locked_at'] !== null
+            && $detail['scorecard']['unlocked_at'] === null)
         {
             return false;
         }
@@ -690,25 +1089,60 @@ class NESPWorkflow
             $interviewID = $this->_db->makeQueryInteger($detail['interviews'][0]['interview_id']);
         }
 
-        $sql = sprintf(
-            'INSERT INTO nesp_scorecard_response
-                (scorecard_template_id, interview_id, candidate_id, joborder_id, interviewer_profile_id, answers_json, overall_recommendation, status_key, submitted_at, date_created, date_modified)
-             VALUES
-                (%s, %s, %s, %s, %s, %s, %s, "submitted", NOW(), NOW(), NOW())',
-            empty($template) ? 'NULL' : $this->_db->makeQueryInteger($template['scorecard_template_id']),
-            $interviewID,
-            $this->_db->makeQueryInteger($candidateID),
-            $this->_db->makeQueryInteger($jobOrderID),
-            $this->_db->makeQueryInteger($detail['interviewer_profile_id']),
-            $this->_db->makeQueryString($answersJSON),
-            $this->_db->makeQueryString($recommendation)
-        );
+        $submittedAt = $statusKey === 'submitted' ? 'NOW()' : 'NULL';
+        $lockedAt = $statusKey === 'submitted' ? 'NOW()' : 'NULL';
+        $lockReason = $statusKey === 'submitted' ? 'Submitted by assigned interviewer' : '';
+        if (!empty($detail['scorecard']) && $detail['scorecard']['status_key'] === 'draft')
+        {
+            $responseID = (int) $detail['scorecard']['scorecard_response_id'];
+            $sql = sprintf(
+                'UPDATE nesp_scorecard_response
+                 SET answers_json = %s,
+                     overall_recommendation = %s,
+                     status_key = %s,
+                     submitted_at = %s,
+                     locked_at = %s,
+                     unlocked_at = NULL,
+                     unlocked_by_user_id = NULL,
+                     lock_reason = %s,
+                     date_modified = NOW()
+                 WHERE scorecard_response_id = %s',
+                $this->_db->makeQueryString($answersJSON),
+                $this->_db->makeQueryString($recommendation),
+                $this->_db->makeQueryString($statusKey),
+                $submittedAt,
+                $lockedAt,
+                $this->_db->makeQueryString($lockReason),
+                $this->_db->makeQueryInteger($responseID)
+            );
+            $this->_db->query($sql);
+        }
+        else
+        {
+            $sql = sprintf(
+                'INSERT INTO nesp_scorecard_response
+                    (scorecard_template_id, interview_id, candidate_id, joborder_id, interviewer_profile_id, answers_json, overall_recommendation, status_key, submitted_at, locked_at, lock_reason, date_created, date_modified)
+                 VALUES
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())',
+                empty($template) ? 'NULL' : $this->_db->makeQueryInteger($template['scorecard_template_id']),
+                $interviewID,
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID),
+                $this->_db->makeQueryInteger($detail['interviewer_profile_id']),
+                $this->_db->makeQueryString($answersJSON),
+                $this->_db->makeQueryString($recommendation),
+                $this->_db->makeQueryString($statusKey),
+                $submittedAt,
+                $lockedAt,
+                $this->_db->makeQueryString($lockReason)
+            );
+            $this->_db->query($sql);
+            $responseID = $this->_db->getLastInsertID();
+        }
 
-        $this->_db->query($sql);
-        $responseID = $this->_db->getLastInsertID();
         $this->logAuditEvent(
             $userID,
-            'scorecard_submitted',
+            $statusKey === 'submitted' ? 'scorecard_submitted' : 'scorecard_draft_saved',
             'scorecard_response',
             $responseID,
             array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID)
@@ -730,6 +1164,9 @@ class NESPWorkflow
 
     public function getStaffingForecast()
     {
+        $sourceStatus = $this->getStaffingSourceStatus();
+        $importRows = $this->getNormalizedStaffingRows();
+        $metrics = self::calculateStaffingForecastMetrics($importRows, self::getDefaultStaffingForecastConfig());
         $history = $this->_db->getAllAssoc(
             'SELECT
                 schedule_history_id,
@@ -780,14 +1217,279 @@ class NESPWorkflow
         }
 
         return array(
+            'sourceStatus' => $sourceStatus,
             'history' => $history,
+            'normalizedRows' => array_slice($importRows, 0, 100),
+            'metrics' => $metrics,
             'months' => array_values($months),
+            'importIssues' => $this->getOpenStaffingImportIssues(50),
             'assumptions' => array(
-                'Historical schedule rows are opt-in fixtures unless Craig imports verified schedule history.',
+                'No real historical Drive schedule has been imported by this PR.',
+                'Historical schedule rows are opt-in fixtures unless Craig imports verified schedule history through a controlled task.',
                 'Pipeline target uses 125% of average weekly photographer slots to leave room for declines, conflicts, and weather movement.',
-                'Forecast output is planning guidance only and does not publish jobs, contact applicants, or change feature flags.'
+                'Forecast output is planning guidance only and does not publish jobs, contact applicants, edit job records, or change feature flags.'
             )
         );
+    }
+
+    public function getStaffingSourceStatus()
+    {
+        $summary = $this->_db->getAssoc(
+            'SELECT
+                COUNT(*) AS import_batches,
+                COALESCE(SUM(discovered_file_count), 0) AS files_discovered,
+                COALESCE(SUM(imported_file_count), 0) AS files_imported,
+                COALESCE(SUM(rows_imported), 0) AS rows_imported,
+                COALESCE(SUM(rows_requiring_review), 0) AS rows_requiring_review,
+                MAX(last_imported_at) AS last_import_date
+             FROM
+                nesp_staffing_import_batch
+             WHERE
+                undone_at IS NULL'
+        );
+
+        if (empty($summary))
+        {
+            $summary = array(
+                'import_batches' => 0,
+                'files_discovered' => 0,
+                'files_imported' => 0,
+                'rows_imported' => 0,
+                'rows_requiring_review' => 0,
+                'last_import_date' => null
+            );
+        }
+
+        $summary['status_label'] = ((int) $summary['rows_imported']) > 0
+            ? 'Files imported'
+            : 'No historical data imported';
+
+        return $summary;
+    }
+
+    public function getNormalizedStaffingRows()
+    {
+        return $this->_db->getAllAssoc(
+            'SELECT
+                import_row_id,
+                import_batch_id,
+                event_date,
+                event_start_time,
+                event_end_time,
+                state,
+                sport,
+                event_name,
+                role_key,
+                staff_name,
+                staff_count,
+                staff_hours,
+                raw_source_text,
+                issue_count,
+                status_key
+             FROM
+                nesp_staffing_import_row
+             WHERE
+                import_batch_id IN (
+                    SELECT import_batch_id
+                    FROM nesp_staffing_import_batch
+                    WHERE undone_at IS NULL
+                )
+             ORDER BY
+                event_date ASC,
+                event_start_time ASC,
+                import_row_id ASC'
+        );
+    }
+
+    public function getOpenStaffingImportIssues($limit)
+    {
+        $limit = max(1, min(200, (int) $limit));
+
+        return $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT
+                    issue.import_issue_id,
+                    issue.import_batch_id,
+                    issue.import_row_id,
+                    issue.issue_key,
+                    issue.severity_key,
+                    issue.message,
+                    issue.date_created
+                 FROM
+                    nesp_staffing_import_issue issue
+                 WHERE
+                    issue.status_key = "open"
+                 ORDER BY
+                    issue.date_created DESC,
+                    issue.import_issue_id DESC
+                 LIMIT %s',
+                $this->_db->makeQueryInteger($limit)
+            )
+        );
+    }
+
+    public function createDraftStaffingRecommendation($actorUserID, $title, $recommendation)
+    {
+        $recommendationJSON = json_encode($recommendation);
+        if ($recommendationJSON === false)
+        {
+            $recommendationJSON = '{}';
+        }
+
+        $sql = sprintf(
+            'INSERT INTO nesp_staffing_recommendation
+                (created_by_user_id, title, recommendation_json, status_key, date_created, date_modified)
+             VALUES
+                (%s, %s, %s, "draft", NOW(), NOW())',
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID),
+            $this->_db->makeQueryString($title),
+            $this->_db->makeQueryString($recommendationJSON)
+        );
+
+        $this->_db->query($sql);
+        $recommendationID = $this->_db->getLastInsertID();
+        $this->logAuditEvent(
+            $actorUserID,
+            'staffing_recommendation_draft_created',
+            'staffing_recommendation',
+            $recommendationID,
+            array('title' => $title)
+        );
+
+        return $recommendationID;
+    }
+
+    public function saveStaffingImport($actorUserID, $sourceType, $sourceIdentifier, $sourceLabel, $parseResult)
+    {
+        $checksum = isset($parseResult['checksum']) ? $parseResult['checksum'] : '';
+        $existing = $this->_db->getAssoc(
+            sprintf(
+                'SELECT import_batch_id
+                 FROM nesp_staffing_import_batch
+                 WHERE source_type = %s
+                   AND source_identifier = %s
+                   AND source_checksum = %s
+                   AND undone_at IS NULL
+                 LIMIT 1',
+                $this->_db->makeQueryString($sourceType),
+                $this->_db->makeQueryString($sourceIdentifier),
+                $this->_db->makeQueryString($checksum)
+            )
+        );
+
+        if (!empty($existing))
+        {
+            return array('import_batch_id' => (int) $existing['import_batch_id'], 'status' => 'duplicate_skipped');
+        }
+
+        $rows = isset($parseResult['rows']) ? $parseResult['rows'] : array();
+        $issues = isset($parseResult['issues']) ? $parseResult['issues'] : array();
+        $reviewRows = 0;
+        foreach ($rows as $row)
+        {
+            if ((int) $row['issue_count'] > 0)
+            {
+                $reviewRows++;
+            }
+        }
+
+        $sql = sprintf(
+            'INSERT INTO nesp_staffing_import_batch
+                (source_type, source_identifier, source_checksum, source_label, status_key, discovered_file_count, imported_file_count, rows_imported, rows_requiring_review, created_by_user_id, last_imported_at, date_created, date_modified)
+             VALUES
+                (%s, %s, %s, %s, "imported", 1, 1, %s, %s, %s, NOW(), NOW(), NOW())',
+            $this->_db->makeQueryString($sourceType),
+            $this->_db->makeQueryString($sourceIdentifier),
+            $this->_db->makeQueryString($checksum),
+            $this->_db->makeQueryString($sourceLabel),
+            $this->_db->makeQueryInteger(count($rows)),
+            $this->_db->makeQueryInteger($reviewRows),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+        );
+        $this->_db->query($sql);
+        $batchID = $this->_db->getLastInsertID();
+
+        $rowIDBySourceNumber = array();
+        foreach ($rows as $row)
+        {
+            $rowSQL = sprintf(
+                'INSERT INTO nesp_staffing_import_row
+                    (import_batch_id, source_row_hash, source_sheet_name, source_row_number, event_date, event_start_time, event_end_time, state, sport, event_name, role_key, staff_name, staff_count, staff_hours, raw_source_text, unresolved_json, issue_count, status_key, date_created)
+                 VALUES
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())',
+                $this->_db->makeQueryInteger($batchID),
+                $this->_db->makeQueryString($row['source_row_hash']),
+                $this->_db->makeQueryString($row['source_sheet_name']),
+                $this->_db->makeQueryInteger($row['source_row_number']),
+                $row['event_date'] === '' ? 'NULL' : $this->_db->makeQueryString($row['event_date']),
+                $row['event_start_time'] === null ? 'NULL' : $this->_db->makeQueryString($row['event_start_time']),
+                $row['event_end_time'] === null ? 'NULL' : $this->_db->makeQueryString($row['event_end_time']),
+                $this->_db->makeQueryString($row['state']),
+                $this->_db->makeQueryString($row['sport']),
+                $this->_db->makeQueryString($row['event_name']),
+                $this->_db->makeQueryString($row['role_key']),
+                $this->_db->makeQueryString($row['staff_name']),
+                $this->_db->makeQueryInteger($row['staff_count']),
+                $this->_db->makeQueryString($row['staff_hours']),
+                $this->_db->makeQueryString($row['raw_source_text']),
+                $this->_db->makeQueryString($row['unresolved_json']),
+                $this->_db->makeQueryInteger($row['issue_count']),
+                $this->_db->makeQueryString($row['status_key'])
+            );
+            $this->_db->query($rowSQL);
+            $rowIDBySourceNumber[$row['source_row_number']] = $this->_db->getLastInsertID();
+        }
+
+        foreach ($issues as $issue)
+        {
+            $rowID = isset($rowIDBySourceNumber[$issue['row_number']]) ? $rowIDBySourceNumber[$issue['row_number']] : null;
+            $issueSQL = sprintf(
+                'INSERT INTO nesp_staffing_import_issue
+                    (import_batch_id, import_row_id, issue_key, severity_key, message, status_key, date_created)
+                 VALUES
+                    (%s, %s, %s, "review", %s, "open", NOW())',
+                $this->_db->makeQueryInteger($batchID),
+                $rowID === null ? 'NULL' : $this->_db->makeQueryInteger($rowID),
+                $this->_db->makeQueryString($issue['issue_key']),
+                $this->_db->makeQueryString($issue['message'])
+            );
+            $this->_db->query($issueSQL);
+        }
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'staffing_import_saved',
+            'staffing_import_batch',
+            $batchID,
+            array('source_type' => $sourceType, 'rows_imported' => count($rows), 'rows_requiring_review' => $reviewRows)
+        );
+
+        return array('import_batch_id' => (int) $batchID, 'status' => 'imported');
+    }
+
+    public function undoStaffingImport($actorUserID, $importBatchID)
+    {
+        $sql = sprintf(
+            'UPDATE nesp_staffing_import_batch
+             SET undone_at = NOW(),
+                 undone_by_user_id = %s,
+                 status_key = "undone",
+                 date_modified = NOW()
+             WHERE import_batch_id = %s
+               AND undone_at IS NULL',
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID),
+            $this->_db->makeQueryInteger($importBatchID)
+        );
+        $this->_db->query($sql);
+        $this->logAuditEvent(
+            $actorUserID,
+            'staffing_import_undone',
+            'staffing_import_batch',
+            $importBatchID,
+            array()
+        );
+
+        return true;
     }
 
     public function getRecentAuditEvents($limit)
@@ -955,6 +1657,229 @@ class NESPWorkflow
         }
 
         return (int) $rs['total'];
+    }
+
+    private static function normalizeHeader($headerRow)
+    {
+        $headers = array();
+        foreach ($headerRow as $header)
+        {
+            $header = strtolower(trim($header));
+            $header = preg_replace('/[^a-z0-9]+/', '_', $header);
+            $headers[] = trim($header, '_');
+        }
+
+        return $headers;
+    }
+
+    private static function findStaffingHeaderRow($rows)
+    {
+        $limit = min(20, count($rows));
+        for ($i = 0; $i < $limit; $i++)
+        {
+            $header = self::normalizeHeader($rows[$i]);
+            $hasDate = in_array('date', $header) || in_array('event_date', $header) || in_array('picture_day', $header);
+            $hasStaff = in_array('staff', $header) || in_array('photographers', $header) || in_array('assigned_staff', $header);
+            $hasEvent = in_array('event', $header) || in_array('event_name', $header) || in_array('league', $header) || in_array('school', $header);
+            $hasDateColumn = false;
+            foreach ($rows[$i] as $cell)
+            {
+                if (self::parseStaffingDate($cell) !== '')
+                {
+                    $hasDateColumn = true;
+                    break;
+                }
+            }
+
+            if (($hasDate && $hasStaff) || ($hasEvent && $hasDateColumn))
+            {
+                return $i;
+            }
+        }
+
+        return 0;
+    }
+
+    private static function rowValueMap($headers, $row)
+    {
+        $mapped = array();
+        foreach ($headers as $index => $header)
+        {
+            if ($header === '')
+            {
+                continue;
+            }
+            $mapped[$header] = isset($row[$index]) ? trim($row[$index]) : '';
+        }
+
+        return $mapped;
+    }
+
+    private static function normalizeStaffingRow($mapped, $rowNumber, $rawText, $sourceLabel)
+    {
+        $issues = array();
+        $date = self::firstMappedValue($mapped, array('date', 'event_date', 'picture_day', 'week'));
+        $normalizedDate = self::parseStaffingDate($date);
+        if ($normalizedDate === '')
+        {
+            $issues[] = array(
+                'row_number' => $rowNumber,
+                'issue_key' => 'missing_or_malformed_date',
+                'message' => 'Date could not be normalized without manual review.'
+            );
+        }
+
+        $staff = self::firstMappedValue($mapped, array('staff', 'photographers', 'photographer', 'assigned_staff', 'names', 'name'));
+        $role = self::normalizeStaffingRole(self::firstMappedValue($mapped, array('role', 'staff_role', 'position')));
+        $staffNames = self::splitStaffNames($staff);
+        if (empty($staffNames))
+        {
+            $staffNames = array('');
+            $issues[] = array(
+                'row_number' => $rowNumber,
+                'issue_key' => 'missing_staff',
+                'message' => 'No staff name or count was found.'
+            );
+        }
+
+        $startTime = self::parseStaffingTime(self::firstMappedValue($mapped, array('start', 'start_time', 'time')));
+        $endTime = self::parseStaffingTime(self::firstMappedValue($mapped, array('end', 'end_time')));
+        $staffHours = self::calculateStaffHours($startTime, $endTime, count($staffNames));
+        $row = array(
+            'source_sheet_name' => self::firstMappedValue($mapped, array('sheet', 'tab')),
+            'source_row_number' => $rowNumber,
+            'event_date' => $normalizedDate,
+            'event_start_time' => $startTime,
+            'event_end_time' => $endTime,
+            'state' => strtoupper(self::firstMappedValue($mapped, array('state', 'st'))),
+            'sport' => self::firstMappedValue($mapped, array('sport', 'league_sport')),
+            'event_name' => self::firstMappedValue($mapped, array('event', 'event_name', 'league', 'school', 'organization')),
+            'role_key' => $role,
+            'staff_name' => implode('; ', $staffNames),
+            'staff_count' => count($staffNames),
+            'staff_hours' => $staffHours,
+            'raw_source_text' => $rawText,
+            'unresolved_json' => json_encode(array('source_label' => $sourceLabel)),
+            'issue_count' => count($issues),
+            'status_key' => count($issues) > 0 ? 'needs_review' : 'normalized'
+        );
+        $row['source_row_hash'] = hash('sha256', $rawText . '|' . $row['event_date'] . '|' . $row['event_name'] . '|' . $row['staff_name']);
+
+        return array('row' => $row, 'issues' => $issues);
+    }
+
+    private static function firstMappedValue($mapped, $keys)
+    {
+        foreach ($keys as $key)
+        {
+            if (isset($mapped[$key]) && trim($mapped[$key]) !== '')
+            {
+                return trim($mapped[$key]);
+            }
+        }
+
+        return '';
+    }
+
+    private static function parseStaffingDate($value)
+    {
+        $value = trim($value);
+        if ($value === '')
+        {
+            return '';
+        }
+
+        $timestamp = strtotime($value);
+        if ($timestamp === false)
+        {
+            return '';
+        }
+
+        return date('Y-m-d', $timestamp);
+    }
+
+    private static function parseStaffingTime($value)
+    {
+        $value = trim($value);
+        if ($value === '')
+        {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+        if ($timestamp === false)
+        {
+            return null;
+        }
+
+        return date('H:i:s', $timestamp);
+    }
+
+    private static function normalizeStaffingRole($role)
+    {
+        $role = strtolower(trim($role));
+        if ($role === '')
+        {
+            return 'photographer';
+        }
+        if (strpos($role, 'assist') !== false)
+        {
+            return 'assistant';
+        }
+        if (strpos($role, 'table') !== false || strpos($role, 'greeter') !== false)
+        {
+            return 'table_staff';
+        }
+
+        return 'photographer';
+    }
+
+    private static function splitStaffNames($staff)
+    {
+        $staff = trim($staff);
+        if ($staff === '')
+        {
+            return array();
+        }
+
+        $parts = preg_split('/[;,]+|\s+\+\s+|\s+\/\s+/', $staff);
+        $names = array();
+        foreach ($parts as $part)
+        {
+            $part = trim($part);
+            if ($part !== '')
+            {
+                $names[] = $part;
+            }
+        }
+
+        return $names;
+    }
+
+    private static function calculateStaffHours($startTime, $endTime, $staffCount)
+    {
+        if ($startTime === null || $endTime === null)
+        {
+            return 0.0;
+        }
+
+        $start = strtotime('2000-01-01 ' . $startTime);
+        $end = strtotime('2000-01-01 ' . $endTime);
+        if ($start === false || $end === false || $end <= $start)
+        {
+            return 0.0;
+        }
+
+        return round((($end - $start) / 3600) * max(1, (int) $staffCount), 2);
+    }
+
+    private static function incrementMetric(&$bucket, $key, $amount)
+    {
+        if (!isset($bucket[$key]))
+        {
+            $bucket[$key] = 0;
+        }
+        $bucket[$key] += $amount;
     }
 }
 

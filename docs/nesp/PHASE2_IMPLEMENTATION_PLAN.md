@@ -18,6 +18,8 @@ All Phase 2 feature flags default to disabled:
 - `NESP_VAPI_ENABLED`
 - `NESP_ZOOM_ENABLED`
 - `NESP_AI_REVIEW_ENABLED`
+- `NESP_STAFFING_FORECAST_ENABLED`
+- `NESP_STAFFING_DRIVE_IMPORT_ENABLED`
 
 The dashboard, interviewer workflow, scorecard forms, and staffing forecast do not send email or SMS, initiate Vapi calls, create Zoom meetings, run AI review, deploy to Render, publish postings, create real interviewer accounts, or modify production feature flags.
 
@@ -39,7 +41,7 @@ The dashboard, interviewer workflow, scorecard forms, and staffing forecast do n
 5. Add admin settings:
    - Writable feature flags with CSRF and audit logging
    - Inactive interviewer-profile staging without creating real accounts
-6. Add staffing forecast tables and screen based on imported or fixture historical photographer schedules.
+6. Add staffing forecast tables, import lineage, import issue review, draft recommendations, and forecast screen based on imported or fixture historical photographer schedules.
 7. Add fake fixtures for local/test review only.
 8. Add unit and schema tests.
 
@@ -55,6 +57,7 @@ The dashboard, interviewer workflow, scorecard forms, and staffing forecast do n
 - Branch is not `master`.
 - `db/nesp_phase2_additive.sql` adds only Phase 2 structures/default-off flags.
 - `db/nesp_phase2_rollback.sql` removes Phase 2 additions without touching legacy OpenCATS records.
+- `db/nesp_phase2_preflight.sql` reports schema/version/collision counts before controlled deployment.
 - NESP dashboard renders task queues with one primary next action per candidate card.
 - Settings write routes require POST and a valid CSRF token.
 - Assigned-candidate detail rejects users without explicit grants.

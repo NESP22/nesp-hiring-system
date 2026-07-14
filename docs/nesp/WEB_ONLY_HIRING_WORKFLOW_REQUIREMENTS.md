@@ -196,6 +196,8 @@ New workflow features must default to disabled until Craig approves:
 - `NESP_VAPI_ENABLED`
 - `NESP_ZOOM_ENABLED`
 - `NESP_AI_REVIEW_ENABLED`
+- `NESP_STAFFING_FORECAST_ENABLED`
+- `NESP_STAFFING_DRIVE_IMPORT_ENABLED`
 
 Outbound email must remain disabled unless Craig separately approves the sender
 domain, templates, test plan, opt-out/compliance handling, and production

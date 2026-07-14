@@ -7,6 +7,15 @@
 DELETE FROM `nesp_staffing_schedule_history`
 WHERE `source_label` = 'synthetic Craig schedule fixture';
 
+DELETE FROM `nesp_staffing_import_issue`
+WHERE `import_batch_id` = 920001;
+
+DELETE FROM `nesp_staffing_import_row`
+WHERE `import_batch_id` = 920001;
+
+DELETE FROM `nesp_staffing_import_batch`
+WHERE `import_batch_id` = 920001;
+
 DELETE FROM `nesp_scorecard_response`
 WHERE `candidate_id` IN (920001, 920002, 920003, 920004);
 
@@ -107,3 +116,23 @@ VALUES
     (2024, 'fall fixture', '2024-09-09', 7, 16, 82.0, 'synthetic Craig schedule fixture', 'Fall ramp fixture week.', NOW(), NOW()),
     (2024, 'fall fixture', '2024-09-16', 9, 21, 112.0, 'synthetic Craig schedule fixture', 'Fall peak fixture week.', NOW(), NOW()),
     (2024, 'fall fixture', '2024-09-23', 11, 27, 143.5, 'synthetic Craig schedule fixture', 'Fall peak fixture week.', NOW(), NOW());
+
+INSERT INTO `nesp_staffing_import_batch`
+    (`import_batch_id`, `source_type`, `source_identifier`, `source_checksum`, `source_label`, `status_key`, `discovered_file_count`, `imported_file_count`, `rows_imported`, `rows_requiring_review`, `created_by_user_id`, `last_imported_at`, `date_created`, `date_modified`)
+VALUES
+    (920001, 'fixture_csv', 'src/OpenCATS/Tests/Fixtures/nesp/staffing_dates_in_rows.csv', SHA2('nesp fixture staffing import', 256), 'Synthetic local staffing import fixture', 'imported', 1, 1, 4, 1, 1, NOW(), NOW(), NOW());
+
+INSERT INTO `nesp_staffing_import_row`
+    (`import_batch_id`, `source_row_hash`, `source_sheet_name`, `source_row_number`, `event_date`, `event_start_time`, `event_end_time`, `state`, `sport`, `event_name`, `role_key`, `staff_name`, `staff_count`, `staff_hours`, `raw_source_text`, `unresolved_json`, `issue_count`, `status_key`, `date_created`)
+VALUES
+    (920001, SHA2('fixture-row-1', 256), 'fixture', 2, '2024-04-20', '08:00:00', '12:00:00', 'MA', 'Soccer', 'Fixture League A', 'photographer', 'Alex Fixture; Sam Fixture', 2, 8.00, 'synthetic row 1', '{}', 0, 'normalized', NOW()),
+    (920001, SHA2('fixture-row-2', 256), 'fixture', 3, '2024-04-21', '09:00:00', '13:00:00', 'NH', 'Baseball', 'Fixture League B', 'assistant', 'Jordan Fixture', 1, 4.00, 'synthetic row 2', '{}', 0, 'normalized', NOW()),
+    (920001, SHA2('fixture-row-3', 256), 'fixture', 4, '2025-05-10', '07:30:00', '12:30:00', 'MA', 'Lacrosse', 'Fixture League C', 'table_staff', 'Taylor Fixture; Casey Fixture', 2, 10.00, 'synthetic row 3', '{}', 0, 'normalized', NOW()),
+    (920001, SHA2('fixture-row-4', 256), 'fixture', 5, NULL, '08:00:00', '11:00:00', 'RI', 'Softball', 'Fixture Needs Review', 'photographer', 'Review Fixture', 1, 3.00, 'synthetic malformed date row', '{"date":"malformed"}', 1, 'needs_review', NOW());
+
+INSERT INTO `nesp_staffing_import_issue`
+    (`import_batch_id`, `import_row_id`, `issue_key`, `severity_key`, `message`, `status_key`, `date_created`)
+SELECT 920001, `import_row_id`, 'missing_or_malformed_date', 'review', 'Synthetic fixture row has a malformed date for import issue review.', 'open', NOW()
+FROM `nesp_staffing_import_row`
+WHERE `import_batch_id` = 920001
+  AND `source_row_number` = 5;

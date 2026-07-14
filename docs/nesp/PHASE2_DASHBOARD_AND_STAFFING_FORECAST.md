@@ -30,14 +30,14 @@ Scorecard submission uses the same grant check and writes to `nesp_scorecard_res
 
 ## Staffing Forecast
 
-Forecasts use `nesp_staffing_schedule_history` rows. The included fixture file uses synthetic photographer schedule history and is not Craig-verified production history.
+Forecasts use normalized `nesp_staffing_import_row` rows when imported and legacy `nesp_staffing_schedule_history` rows for review context. The included fixture files use synthetic photographer schedule history and are not Craig-verified production history.
 
 The current calculation groups historical rows by month and estimates:
 
 - average weekly event count
 - average weekly photographer slots
 - average weekly photographer hours
-- a planning pipeline target at 125% of average slots
+- recommended pool, backup pool, and hiring gap
 - low/medium confidence based on available history rows
 
 The forecast is read-only planning guidance. It does not create job postings, send messages, change applicant stages, or enable feature flags.

@@ -6,7 +6,7 @@
         <div id="contents">
             <div class="nesp-page-title">
                 <h2>NESP Feature Flags</h2>
-                <p>Phase 1 exposes feature state for review. These controls are read-only until Craig approves later activation work.</p>
+                <p>Phase 2 feature state is disabled by default until Craig approves later activation work.</p>
             </div>
 
             <table class="nesp-table">

@@ -47,6 +47,8 @@ Phase 2 supersedes the original Phase 1 flag names with these disabled flags:
 - `NESP_VAPI_ENABLED`
 - `NESP_ZOOM_ENABLED`
 - `NESP_AI_REVIEW_ENABLED`
+- `NESP_STAFFING_FORECAST_ENABLED`
+- `NESP_STAFFING_DRIVE_IMPORT_ENABLED`
 
 The integration-status rows for Vapi, Zoom, AI review, and applicant email are
 also seeded as `disabled`.

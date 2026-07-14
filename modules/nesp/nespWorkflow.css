@@ -223,6 +223,23 @@
     margin-top: 8px;
 }
 
+.nesp-button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.nesp-inline-form {
+    margin-top: 10px;
+}
+
+.nesp-help-text {
+    margin: 0 0 10px;
+    color: #536579;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
 .nesp-empty {
     border: 1px dashed #c9d3df;
     background: #f7f9fc;

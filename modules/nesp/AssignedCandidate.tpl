@@ -48,9 +48,21 @@
 
             <div class="nesp-panel">
                 <h3>Scorecard</h3>
-                <?php if (!empty($this->candidate['scorecard']) && $this->candidate['scorecard']['status_key'] === 'submitted'): ?>
-                    <div class="nesp-empty">Scorecard submitted: <?php $this->_($this->candidate['scorecard']['overall_recommendation']); ?></div>
+                <?php if (!empty($this->candidate['scorecard']) && $this->candidate['scorecard']['locked_at'] !== null && $this->candidate['scorecard']['unlocked_at'] === null): ?>
+                    <div class="nesp-empty">Scorecard locked after submission: <?php $this->_($this->candidate['scorecard']['overall_recommendation']); ?></div>
+                    <?php if ($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA): ?>
+                        <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=unlockScorecard" class="nesp-inline-form">
+                            <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="scorecardResponseID" value="<?php echo((int) $this->candidate['scorecard']['scorecard_response_id']); ?>" />
+                            <input type="hidden" name="candidateID" value="<?php echo((int) $this->candidate['candidate_id']); ?>" />
+                            <input type="hidden" name="jobOrderID" value="<?php echo((int) $this->candidate['joborder_id']); ?>" />
+                            <button type="submit" class="nesp-secondary-button">Unlock for Correction</button>
+                        </form>
+                    <?php endif; ?>
                 <?php elseif ((int) $this->candidate['can_submit_scorecard'] === 1): ?>
+                    <?php if (!empty($this->candidate['scorecard']) && $this->candidate['scorecard']['status_key'] === 'draft'): ?>
+                        <div class="nesp-empty">Draft saved. Submission will lock the scorecard until Craig/admin reopens it.</div>
+                    <?php endif; ?>
                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=submitScorecard" class="nesp-scorecard-form">
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                         <input type="hidden" name="candidateID" value="<?php echo((int) $this->candidate['candidate_id']); ?>" />
@@ -81,7 +93,10 @@
                                 <option value="needs_craig_review">Needs Craig review</option>
                             </select>
                         </label>
-                        <button type="submit" class="nesp-primary-button">Submit Scorecard</button>
+                        <div class="nesp-button-row">
+                            <button type="submit" name="scorecardAction" value="saveDraft" class="nesp-secondary-button">Save Draft</button>
+                            <button type="submit" name="scorecardAction" value="submit" class="nesp-primary-button">Submit Scorecard</button>
+                        </div>
                     </form>
                 <?php else: ?>
                     <div class="nesp-empty">This assignment does not allow scorecard submission.</div>

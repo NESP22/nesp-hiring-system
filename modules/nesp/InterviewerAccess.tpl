@@ -6,7 +6,7 @@
         <div id="contents">
             <div class="nesp-page-title">
                 <h2>NESP Interviewer Access</h2>
-                <p>Scoped interviewer permissions are available in the database foundation. No real interviewer accounts are created in Phase 1.</p>
+                <p>Scoped interviewer permissions are available in the database foundation. No real interviewer accounts are created by this draft PR.</p>
             </div>
 
             <div class="nesp-card-grid">
@@ -29,7 +29,7 @@
             </div>
 
             <div class="nesp-panel">
-                <h3>Phase 1 Access Model</h3>
+                <h3>Scoped Access Model</h3>
                 <ul class="nesp-list">
                     <li>Interviewers will use individual OpenCATS accounts after scoped access is implemented and tested.</li>
                     <li>Candidate visibility is based on explicit candidate and job grants, not broad OpenCATS recruiter permissions.</li>

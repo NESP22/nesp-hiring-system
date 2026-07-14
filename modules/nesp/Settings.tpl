@@ -105,6 +105,43 @@
                     <?php endif; ?>
                 </table>
             </div>
+
+            <div class="nesp-panel">
+                <h3>Scorecards</h3>
+                <table class="nesp-table">
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Role</th>
+                        <th>Interviewer</th>
+                        <th>Status</th>
+                        <th>Recommendation</th>
+                        <th>Submitted</th>
+                        <th>Lock</th>
+                    </tr>
+                    <?php foreach ($this->scorecards as $scorecard): ?>
+                    <tr>
+                        <td><a href="<?php echo(CATSUtility::getIndexName()); ?>?m=candidates&amp;a=show&amp;candidateID=<?php echo((int) $scorecard['candidate_id']); ?>"><?php $this->_($scorecard['candidate_name']); ?></a></td>
+                        <td><?php $this->_($scorecard['role_title']); ?></td>
+                        <td><?php $this->_($scorecard['interviewer_name']); ?></td>
+                        <td><?php $this->_($scorecard['status_key']); ?></td>
+                        <td><?php $this->_($scorecard['overall_recommendation']); ?></td>
+                        <td><?php $this->_($scorecard['submitted_at']); ?></td>
+                        <td>
+                            <?php if ($scorecard['locked_at'] !== null && $scorecard['unlocked_at'] === null): ?>
+                                Locked
+                            <?php else: ?>
+                                Open
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (!count($this->scorecards)): ?>
+                    <tr>
+                        <td colspan="7">No scorecards have been saved.</td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
+            </div>
         </div>
     </div>
 <?php TemplateUtility::printFooter(); ?>

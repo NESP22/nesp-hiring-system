@@ -38,8 +38,8 @@
                     <strong><?php $this->_(count($this->queues['waitingInterviewer'])); ?></strong>
                 </div>
                 <div class="nesp-card">
-                    <span class="nesp-card-label">Upcoming Interviews</span>
-                    <strong><?php $this->_(count($this->upcomingInterviews)); ?></strong>
+                    <span class="nesp-card-label">Interviews This Week</span>
+                    <strong><?php $this->_($this->summary['interviewsThisWeek']); ?></strong>
                 </div>
             </div>
 

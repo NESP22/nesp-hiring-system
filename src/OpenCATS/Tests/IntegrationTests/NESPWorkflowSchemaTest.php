@@ -21,7 +21,11 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_audit_event',
             'nesp_session_security_event',
             'nesp_staffing_schedule_history',
-            'nesp_staffing_forecast'
+            'nesp_staffing_import_batch',
+            'nesp_staffing_import_row',
+            'nesp_staffing_import_issue',
+            'nesp_staffing_forecast',
+            'nesp_staffing_recommendation'
         );
 
         foreach ($expectedTables as $table)
@@ -32,14 +36,14 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
 
     public function testNESPWorkflowSeedDataIsSafeByDefault()
     {
-        $this->assertSame(6, $this->countRows('nesp_feature_flag'));
+        $this->assertSame(8, $this->countRows('nesp_feature_flag'));
         $this->assertSame(0, $this->countRowsWhere('nesp_feature_flag', 'is_enabled = 1'));
         $this->assertSame(17, $this->countRows('nesp_workflow_stage'));
         $this->assertSame(4, $this->countRowsWhere('nesp_integration_status', "status_key = 'disabled'"));
         $this->assertSame(0, $this->countRows('nesp_interviewer_profile'));
         $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
         $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
-        $this->assertSame(6, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
+        $this->assertSame(8, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
     }
 
     public function testNESPPhase2ColumnsArePresent()
@@ -50,6 +54,9 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_candidate_workflow', 'due_at'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'can_add_notes'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'can_submit_scorecard'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_scorecard_response', 'locked_at'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_scorecard_response', 'unlocked_at'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_scorecard_response', 'unlocked_by_user_id'));
     }
 
     private function countMatchingTables($table)
