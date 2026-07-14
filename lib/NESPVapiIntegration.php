@@ -167,13 +167,29 @@ class NESPVapiIntegration
             'customer' => array(
                 'number' => self::normalizePhoneForDial($destinationPhone)
             ),
-            'metadata' => array(
-                'nesp_call_request_key' => $callRequestKey,
-                'candidate_id' => isset($candidate['candidate_id']) ? (int) $candidate['candidate_id'] : 0,
-                'joborder_id' => isset($job['joborder_id']) ? (int) $job['joborder_id'] : 0,
-                'role' => $roleScript['role'],
-                'consent_required' => true,
-                'audio_recording' => 'off'
+            'assistantOverrides' => array(
+                'artifactPlan' => array(
+                    'recordingEnabled' => false,
+                    'transcriptPlan' => array(
+                        'enabled' => true
+                    )
+                ),
+                'variableValues' => array(
+                    'nesp_call_request_key' => $callRequestKey,
+                    'candidate_id' => isset($candidate['candidate_id']) ? (int) $candidate['candidate_id'] : 0,
+                    'joborder_id' => isset($job['joborder_id']) ? (int) $job['joborder_id'] : 0,
+                    'role' => $roleScript['role'],
+                    'consent_required' => true,
+                    'audio_recording' => 'off'
+                ),
+                'metadata' => array(
+                    'nesp_call_request_key' => $callRequestKey,
+                    'candidate_id' => isset($candidate['candidate_id']) ? (int) $candidate['candidate_id'] : 0,
+                    'joborder_id' => isset($job['joborder_id']) ? (int) $job['joborder_id'] : 0,
+                    'role' => $roleScript['role'],
+                    'consent_required' => true,
+                    'audio_recording' => 'off'
+                )
             )
         );
     }
@@ -431,7 +447,24 @@ class NESPVapiIntegration
 
     public static function redactedPayloadForStorage($payload)
     {
-        $json = json_encode($payload);
+        $message = isset($payload['message']) && is_array($payload['message']) ? $payload['message'] : $payload;
+        $callID = self::extractProviderCallID($message);
+        $rawJSON = json_encode($payload);
+        if ($rawJSON === false)
+        {
+            $rawJSON = '';
+        }
+        $redacted = array(
+            'message_type' => isset($message['type']) ? (string) $message['type'] : '',
+            'provider_call_id_present' => $callID !== '',
+            'status' => isset($message['status']) ? (string) $message['status'] : '',
+            'ended_reason' => isset($message['endedReason']) ? (string) $message['endedReason'] : '',
+            'has_transcript' => self::extractTranscript($message) !== '',
+            'has_structured_result' => self::extractStructuredResultJSON($message) !== '{}',
+            'payload_sha256' => hash('sha256', $rawJSON)
+        );
+
+        $json = json_encode($redacted);
         if ($json === false)
         {
             return '{}';

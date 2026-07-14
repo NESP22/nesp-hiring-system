@@ -282,6 +282,32 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('', $update['transcript_text']);
     }
 
+    public function testVapiWebhookRedactedPayloadDoesNotStoreTranscript()
+    {
+        $payload = array(
+            'message' => array(
+                'type' => 'end-of-call-report',
+                'endedReason' => 'hangup',
+                'call' => array('id' => 'call_fixture'),
+                'artifact' => array(
+                    'transcript' => 'Assistant: consent prompt. User: yes. User: private applicant answer.'
+                ),
+                'analysis' => array(
+                    'structuredData' => array(
+                        'experience_summary' => 'private applicant details'
+                    )
+                )
+            )
+        );
+
+        $redacted = NESPVapiIntegration::redactedPayloadForStorage($payload);
+
+        $this->assertStringNotContainsString('private applicant answer', $redacted);
+        $this->assertStringNotContainsString('private applicant details', $redacted);
+        $this->assertStringContainsString('has_transcript', $redacted);
+        $this->assertStringContainsString('has_structured_result', $redacted);
+    }
+
     public function testVapiOutboundPayloadUsesDedicatedConfiguredResources()
     {
         putenv('VAPI_HIRING_ASSISTANT_ID=assistant_fixture');
@@ -297,8 +323,12 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('assistant_fixture', $payload['assistantId']);
         $this->assertSame('phone_fixture', $payload['phoneNumberId']);
         $this->assertSame('+15551112222', $payload['customer']['number']);
-        $this->assertSame('Freelance Photographer', $payload['metadata']['role']);
-        $this->assertSame('off', $payload['metadata']['audio_recording']);
+        $this->assertArrayNotHasKey('metadata', $payload);
+        $this->assertFalse($payload['assistantOverrides']['artifactPlan']['recordingEnabled']);
+        $this->assertTrue($payload['assistantOverrides']['artifactPlan']['transcriptPlan']['enabled']);
+        $this->assertSame('Freelance Photographer', $payload['assistantOverrides']['variableValues']['role']);
+        $this->assertSame('off', $payload['assistantOverrides']['variableValues']['audio_recording']);
+        $this->assertSame('request_fixture', $payload['assistantOverrides']['metadata']['nesp_call_request_key']);
 
         putenv('VAPI_HIRING_ASSISTANT_ID');
         putenv('VAPI_PHONE_NUMBER_ID');

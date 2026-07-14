@@ -2386,6 +2386,11 @@ class NESPWorkflow
         {
             return array('ok' => false, 'error' => 'invalid_screen_status');
         }
+        if (!$this->claimPhoneScreenForStart($phoneScreenID))
+        {
+            $this->logAuditEvent($actorUserID, 'vapi_phone_screen_duplicate_start_blocked', 'vapi_phone_screen', $phoneScreenID, array());
+            return array('ok' => false, 'error' => 'duplicate_start_blocked');
+        }
 
         $candidate = array('candidate_id' => (int) $screen['candidate_id']);
         $job = array('joborder_id' => (int) $screen['joborder_id'], 'title' => $screen['role_title']);
@@ -2400,6 +2405,12 @@ class NESPWorkflow
         }
 
         $providerCallID = isset($response['body']['id']) ? (string) $response['body']['id'] : '';
+        if ($providerCallID === '')
+        {
+            $this->updatePhoneScreenStatus($phoneScreenID, 'provider_error', '', 'provider_missing_call_id');
+            $this->logAuditEvent($actorUserID, 'vapi_phone_screen_provider_error', 'vapi_phone_screen', $phoneScreenID, array('error' => 'provider_missing_call_id'));
+            return array('ok' => false, 'error' => 'provider_missing_call_id');
+        }
         $this->updatePhoneScreenStatus($phoneScreenID, 'call_requested', $providerCallID, '');
         $this->logAuditEvent($actorUserID, 'vapi_phone_screen_call_started', 'vapi_phone_screen', $phoneScreenID, array('provider_call_id_present' => $providerCallID !== ''));
         return array('ok' => true, 'provider_call_id' => $providerCallID);
@@ -2472,7 +2483,7 @@ class NESPWorkflow
             'vapi_phone_screen_review_saved',
             'vapi_phone_screen',
             $phoneScreenID,
-            array('review_note' => $reviewNote)
+            array('review_note_sha256' => hash('sha256', $reviewNote), 'review_note_length' => strlen($reviewNote))
         );
         return true;
     }
@@ -2569,6 +2580,21 @@ class NESPWorkflow
             $this->_db->makeQueryInteger($phoneScreenID)
         );
         $this->_db->query($sql);
+    }
+
+    private function claimPhoneScreenForStart($phoneScreenID)
+    {
+        $sql = sprintf(
+            'UPDATE nesp_vapi_phone_screen
+             SET status_key = "call_requested",
+                 date_modified = NOW()
+             WHERE vapi_phone_screen_id = %s
+               AND status_key IN ("ready_for_call", "provider_error", "no_answer", "cancelled")
+               AND provider_call_id IS NULL',
+            $this->_db->makeQueryInteger($phoneScreenID)
+        );
+        $this->_db->query($sql);
+        return $this->_db->getAffectedRows() === 1;
     }
 
     private function applyPhoneScreenWebhookUpdate($phoneScreenID, $validation, $update)
