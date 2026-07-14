@@ -438,6 +438,26 @@ class NESPWorkflowTest extends TestCase
         $this->assertTrue(NESPVapiIntegration::slotConflictsWithAppointments('2026-07-14 14:00:00', $appointments, $settings));
     }
 
+    public function testSubmittedSlotMustBeGeneratedAvailabilityOption()
+    {
+        $availableSlots = array(
+            array('value' => '2026-07-14 14:00:00', 'label' => 'Tue, Jul 14, 2026 10:00 AM ET')
+        );
+
+        $this->assertTrue(NESPVapiIntegration::slotValueIsInAvailableSlots('2026-07-14 14:00:00', $availableSlots));
+        $this->assertFalse(NESPVapiIntegration::slotValueIsInAvailableSlots('2026-07-14 03:00:00', $availableSlots));
+    }
+
+    public function testCancelAndHumanFollowUpClearStaleAppointmentState()
+    {
+        $source = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $this->assertStringContainsString('scheduled_start_at_utc = NULL', $source);
+        $this->assertStringContainsString('scheduled_end_at_utc = NULL', $source);
+        $this->assertStringContainsString('scheduled_start_et = NULL', $source);
+        $this->assertStringContainsString('human_follow_up_requested', $source);
+    }
+
     public function testRescheduleCanUseDifferentOpenSlot()
     {
         $settings = NESPVapiIntegration::getDefaultPhoneScreenAvailabilitySettings();

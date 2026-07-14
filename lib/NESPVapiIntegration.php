@@ -187,6 +187,20 @@ class NESPVapiIntegration
         return false;
     }
 
+    public static function slotValueIsInAvailableSlots($slotStartUTC, $availableSlots)
+    {
+        $slotStartUTC = (string) $slotStartUTC;
+        foreach ($availableSlots as $slot)
+        {
+            if (isset($slot['value']) && hash_equals((string) $slot['value'], $slotStartUTC))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function getRoleScript($jobOrderID, $roleTitle = '')
     {
         $jobOrderID = (int) $jobOrderID;

@@ -2923,6 +2923,9 @@ class NESPWorkflow
             'UPDATE nesp_vapi_phone_screen
              SET status_key = "cancelled",
                  scheduling_token_revoked_at = UTC_TIMESTAMP(),
+                 scheduled_start_at_utc = NULL,
+                 scheduled_end_at_utc = NULL,
+                 scheduled_start_et = NULL,
                  cancelled_at = NOW(),
                  date_modified = NOW()
              WHERE vapi_phone_screen_id = %s
@@ -2989,6 +2992,11 @@ class NESPWorkflow
         {
             return array('ok' => false, 'state' => 'not_schedulable');
         }
+        if (!NESPVapiIntegration::slotValueIsInAvailableSlots($slotStartUTC, $screen['available_slots']))
+        {
+            $this->logSchedulingActivity($screen['vapi_phone_screen_id'], $tokenHash, 'unoffered_slot_rejected', array('slot_start_utc' => $slotStartUTC));
+            return array('ok' => false, 'state' => 'slot_unavailable');
+        }
         if (!$this->isSlotAvailable($slotStartUTC, $screen['vapi_phone_screen_id']))
         {
             $this->logSchedulingActivity($screen['vapi_phone_screen_id'], $tokenHash, 'duplicate_booking_blocked', array('slot_start_utc' => $slotStartUTC));
@@ -3029,6 +3037,11 @@ class NESPWorkflow
                 $this->_db->makeQueryString($tokenHash)
             )
         );
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            $this->logSchedulingActivity($screen['vapi_phone_screen_id'], $tokenHash, 'appointment_schedule_lost_race', array('slot_start_utc' => $startUTC->format('Y-m-d H:i:s')));
+            return array('ok' => false, 'state' => 'slot_unavailable');
+        }
         $this->logSchedulingActivity($screen['vapi_phone_screen_id'], $tokenHash, 'appointment_scheduled', array('slot_start_utc' => $startUTC->format('Y-m-d H:i:s'), 'timezone' => $settings['timezone']));
         $this->logAuditEvent(null, 'vapi_phone_screen_candidate_scheduled', 'vapi_phone_screen', $screen['vapi_phone_screen_id'], array('scheduled_start_et' => $startLocal->format('Y-m-d H:i:s'), 'timezone' => $settings['timezone']));
         return array('ok' => true, 'state' => 'scheduled');
