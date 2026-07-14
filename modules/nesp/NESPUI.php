@@ -133,6 +133,7 @@ class NESPUI extends UserInterface
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', $this->subTabFromView($viewKey));
         $this->_template->assign('viewKey', $viewKey);
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('summary', $this->_workflow->getDashboardSummary());
         $this->_template->assign('queueDefinitions', NESPWorkflow::getQueueDefinitions());
         $this->_template->assign('queues', $queues);
@@ -148,6 +149,8 @@ class NESPUI extends UserInterface
     {
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Settings');
+        $this->_template->assign('viewKey', 'settings');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('featureFlags', $this->_workflow->getFeatureFlags());
         $this->_template->assign('interviewerProfiles', $this->_workflow->getInterviewerProfiles());
         $this->_template->assign('assignmentRules', $this->_workflow->getInterviewerRoleRules());
@@ -352,6 +355,8 @@ class NESPUI extends UserInterface
     {
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Staffing Forecast');
+        $this->_template->assign('viewKey', 'staffingForecast');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('forecast', $this->_workflow->getStaffingForecast());
         $this->_template->display('./modules/nesp/StaffingForecast.tpl');
     }

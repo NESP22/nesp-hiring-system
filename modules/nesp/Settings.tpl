@@ -13,6 +13,23 @@
                 Turning on a flag here changes only database feature state. It does not deploy, run migrations, create Zoom meetings, initiate Vapi calls, send messages, or run AI review.
             </div>
 
+            <div class="nesp-dashboard-nav">
+                <?php foreach ($this->dashboardNavigation as $navItem): ?>
+                    <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
+                        <?php continue; ?>
+                    <?php endif; ?>
+                    <?php
+                        $navURL = CATSUtility::getIndexName() . '?m=nesp';
+                        if ($navItem['action'] !== 'dashboard')
+                        {
+                            $navURL .= '&amp;a=' . $navItem['action'];
+                        }
+                        $isActive = $this->viewKey === $navItem['key'];
+                    ?>
+                    <a class="<?php echo($isActive ? 'active' : ''); ?>" href="<?php echo($navURL); ?>"><?php $this->_($navItem['label']); ?></a>
+                <?php endforeach; ?>
+            </div>
+
             <div class="nesp-two-column">
                 <div class="nesp-panel">
                     <h3>Feature Flags</h3>

@@ -13,6 +13,23 @@
                 This screen does not contact applicants, publish postings, edit jobs, import Drive files automatically, or change feature flags.
             </div>
 
+            <div class="nesp-dashboard-nav">
+                <?php foreach ($this->dashboardNavigation as $navItem): ?>
+                    <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
+                        <?php continue; ?>
+                    <?php endif; ?>
+                    <?php
+                        $navURL = CATSUtility::getIndexName() . '?m=nesp';
+                        if ($navItem['action'] !== 'dashboard')
+                        {
+                            $navURL .= '&amp;a=' . $navItem['action'];
+                        }
+                        $isActive = $this->viewKey === $navItem['key'];
+                    ?>
+                    <a class="<?php echo($isActive ? 'active' : ''); ?>" href="<?php echo($navURL); ?>"><?php $this->_($navItem['label']); ?></a>
+                <?php endforeach; ?>
+            </div>
+
             <div class="nesp-card-grid nesp-card-grid-compact">
                 <div class="nesp-card">
                     <span class="nesp-card-label">Source Status</span>

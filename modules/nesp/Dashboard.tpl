@@ -14,14 +14,20 @@
             </div>
 
             <div class="nesp-dashboard-nav">
-                <a class="<?php echo($this->viewKey === 'dashboard' ? 'active' : ''); ?>" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp">Needs Craig</a>
-                <a class="<?php echo($this->viewKey === 'waiting' ? 'active' : ''); ?>" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=waiting">Waiting</a>
-                <a class="<?php echo($this->viewKey === 'interviews' ? 'active' : ''); ?>" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=interviews">Interviews</a>
-                <a class="<?php echo($this->viewKey === 'completed' ? 'active' : ''); ?>" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=completed">Completed</a>
-                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=staffingForecast">Staffing Forecast</a>
-                <?php if ($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA): ?>
-                    <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=settings">Settings</a>
-                <?php endif; ?>
+                <?php foreach ($this->dashboardNavigation as $navItem): ?>
+                    <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
+                        <?php continue; ?>
+                    <?php endif; ?>
+                    <?php
+                        $navURL = CATSUtility::getIndexName() . '?m=nesp';
+                        if ($navItem['action'] !== 'dashboard')
+                        {
+                            $navURL .= '&amp;a=' . $navItem['action'];
+                        }
+                        $isActive = $this->viewKey === $navItem['key'] || ($this->viewKey === 'dashboard' && $navItem['key'] === 'needsCraig');
+                    ?>
+                    <a class="<?php echo($isActive ? 'active' : ''); ?>" href="<?php echo($navURL); ?>"><?php $this->_($navItem['label']); ?></a>
+                <?php endforeach; ?>
             </div>
 
             <div class="nesp-card-grid nesp-card-grid-compact">
