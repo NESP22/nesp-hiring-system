@@ -6,7 +6,7 @@
         <div id="contents">
             <div class="nesp-page-title">
                 <h2>Review Phone Screen</h2>
-                <p>Human review only. No phone-screen result changes candidate status automatically.</p>
+                <p>Human review only. Candidates schedule their own phone screen; no result changes candidate status automatically.</p>
             </div>
 
             <div class="nesp-safety-banner">
@@ -24,7 +24,9 @@
                         <dt>Destination</dt>
                         <dd><?php $this->_($this->screen['destination_phone_last4'] === '' ? 'Not stored' : '***-***-' . $this->screen['destination_phone_last4']); ?></dd>
                         <dt>Status</dt>
-                        <dd><?php $this->_($this->screen['status_key']); ?></dd>
+                        <dd><?php $this->_($this->screen['status_label']); ?></dd>
+                        <dt>Scheduled</dt>
+                        <dd><?php $this->_($this->screen['scheduled_display'] === '' ? 'Not scheduled' : $this->screen['scheduled_display']); ?></dd>
                         <dt>Consent</dt>
                         <dd><?php $this->_($this->screen['consent_status']); ?></dd>
                         <dt>Caller label</dt>
@@ -35,38 +37,62 @@
                         <dd><?php $this->_($this->screen['provider_end_reason']); ?></dd>
                     </dl>
 
-                    <?php if (in_array($this->screen['status_key'], array('ready_for_call', 'provider_error', 'no_answer', 'cancelled'))): ?>
-                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=startPhoneScreen" class="nesp-inline-form">
+                    <?php if (in_array($this->screen['status_key'], array('scheduling_link_ready', 'waiting_for_candidate_to_schedule', 'phone_screen_scheduled', 'reschedule_requested')) && $this->screen['has_active_scheduling_link']): ?>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=revokePhoneScreenSchedulingLink" class="nesp-inline-form">
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                         <input type="hidden" name="phoneScreenID" value="<?php echo((int) $this->screen['vapi_phone_screen_id']); ?>" />
-                        <button type="submit" class="nesp-primary-button">Start Call</button>
+                        <button type="submit" class="nesp-secondary-button">Revoke Scheduling Link</button>
                     </form>
                     <?php endif; ?>
 
-                    <?php if (in_array($this->screen['status_key'], array('ready_for_call', 'call_requested', 'ringing'))): ?>
+                    <?php if (in_array($this->screen['status_key'], array('scheduling_link_ready', 'waiting_for_candidate_to_schedule', 'phone_screen_scheduled', 'call_due', 'call_started', 'ringing'))): ?>
                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=cancelPhoneScreen" class="nesp-inline-form">
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                         <input type="hidden" name="phoneScreenID" value="<?php echo((int) $this->screen['vapi_phone_screen_id']); ?>" />
-                        <button type="submit" class="nesp-secondary-button">Cancel Pending Call</button>
+                        <button type="submit" class="nesp-secondary-button">Cancel Phone Screen</button>
+                    </form>
+                    <?php endif; ?>
+
+                    <?php if (in_array($this->screen['status_key'], array('no_answer', 'cancelled', 'reschedule_requested'))): ?>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=allowPhoneScreenReschedule" class="nesp-inline-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <input type="hidden" name="phoneScreenID" value="<?php echo((int) $this->screen['vapi_phone_screen_id']); ?>" />
+                        <button type="submit" class="nesp-primary-button">Allow Candidate to Reschedule</button>
                     </form>
                     <?php endif; ?>
                 </div>
 
                 <div class="nesp-panel">
-                    <h3>Structured Result</h3>
-                    <?php if (count($this->screen['structured_result'])): ?>
-                    <table class="nesp-table">
-                        <?php foreach ($this->screen['structured_result'] as $key => $value): ?>
-                        <tr>
-                            <th><?php $this->_($key); ?></th>
-                            <td><?php $this->_(is_scalar($value) ? (string) $value : json_encode($value)); ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </table>
+                    <h3>Invitation Copy</h3>
+                    <?php if (trim($this->screen['invitation_copy_text']) !== ''): ?>
+                        <textarea class="nesp-copy-box" rows="8" readonly="readonly"><?php $this->_($this->screen['invitation_copy_text']); ?></textarea>
+                        <?php if ($this->screen['status_key'] === 'scheduling_link_ready'): ?>
+                        <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=markPhoneScreenInvitationCopied" class="nesp-inline-form">
+                            <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="phoneScreenID" value="<?php echo((int) $this->screen['vapi_phone_screen_id']); ?>" />
+                            <button type="submit" class="nesp-primary-button">Mark Invitation Copied</button>
+                        </form>
+                        <?php endif; ?>
                     <?php else: ?>
-                        <div class="nesp-empty">No structured result has arrived.</div>
+                        <div class="nesp-empty">No scheduling invitation is available.</div>
                     <?php endif; ?>
                 </div>
+            </div>
+
+            <div class="nesp-panel">
+                <h3>Structured Result</h3>
+                <?php if (count($this->screen['structured_result'])): ?>
+                <table class="nesp-table">
+                    <?php foreach ($this->screen['structured_result'] as $key => $value): ?>
+                    <tr>
+                        <th><?php $this->_($key); ?></th>
+                        <td><?php $this->_(is_scalar($value) ? (string) $value : json_encode($value)); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </table>
+                <?php else: ?>
+                    <div class="nesp-empty">No structured result has arrived.</div>
+                <?php endif; ?>
             </div>
 
             <div class="nesp-panel">

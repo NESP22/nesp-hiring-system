@@ -1382,6 +1382,28 @@ INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `statu
 INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('ai_review', 'AI Candidate Review', 'disabled', 'Disabled in Phase 2. No model calls can run.', NOW(), NOW());
 INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('email', 'Applicant Email', 'disabled', 'Disabled in Phase 2. No outbound applicant email can be sent.', NOW(), NOW());
 
+/* Table structure for table `nesp_recruiting_campaign_control` */
+
+CREATE TABLE `nesp_recruiting_campaign_control` (
+  `recruiting_campaign_control_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `platform_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `display_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `campaign_status` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `renewal_date` DATE,
+  `manual_spend` DECIMAL(10,2) NOT NULL DEFAULT '0.00',
+  `owner_approval_required` TINYINT(1) NOT NULL DEFAULT '1',
+  `notes` TEXT COLLATE utf8mb4_unicode_ci,
+  `updated_by_user_id` INT(11),
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`recruiting_campaign_control_id`),
+  UNIQUE KEY `IDX_platform_key` (`platform_key`),
+  KEY `IDX_campaign_status` (`campaign_status`),
+  KEY `IDX_renewal_date` (`renewal_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Data for the table `nesp_recruiting_campaign_control` */
+
 /* Table structure for table `nesp_vapi_phone_screen` */
 
 CREATE TABLE `nesp_vapi_phone_screen` (
@@ -1408,6 +1430,25 @@ CREATE TABLE `nesp_vapi_phone_screen` (
   `approved_by_user_id` INT(11),
   `caller_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NESP Hiring',
   `assistant_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NESP Hiring Phone Screen',
+  `scheduling_token_hash` CHAR(64) COLLATE utf8mb4_unicode_ci,
+  `scheduling_token_expires_at` DATETIME,
+  `scheduling_token_revoked_at` DATETIME,
+  `scheduling_token_used_at` DATETIME,
+  `scheduling_link_created_at` DATETIME,
+  `scheduling_link_url` VARCHAR(512) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `invitation_copy_text` TEXT COLLATE utf8mb4_unicode_ci,
+  `scheduling_invitation_copied_at` DATETIME,
+  `scheduled_start_at_utc` DATETIME,
+  `scheduled_end_at_utc` DATETIME,
+  `scheduled_start_et` DATETIME,
+  `scheduled_timezone` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'America/New_York',
+  `candidate_scheduling_note` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `reschedule_count` INT(11) NOT NULL DEFAULT 0,
+  `call_claimed_at` DATETIME,
+  `call_attempted_at` DATETIME,
+  `call_attempt_count` INT(11) NOT NULL DEFAULT 0,
+  `scheduler_claim_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `last_scheduler_error` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `started_at` DATETIME,
   `completed_at` DATETIME,
   `cancelled_at` DATETIME,
@@ -1416,11 +1457,14 @@ CREATE TABLE `nesp_vapi_phone_screen` (
   PRIMARY KEY (`vapi_phone_screen_id`),
   UNIQUE KEY `IDX_call_request_key` (`call_request_key`),
   UNIQUE KEY `IDX_provider_call_id` (`provider_call_id`),
+  UNIQUE KEY `IDX_scheduling_token_hash` (`scheduling_token_hash`),
   KEY `IDX_candidate_id` (`candidate_id`),
   KEY `IDX_joborder_id` (`joborder_id`),
   KEY `IDX_status_key` (`status_key`),
   KEY `IDX_consent_status` (`consent_status`),
-  KEY `IDX_last_webhook_event_id` (`last_webhook_event_id`)
+  KEY `IDX_last_webhook_event_id` (`last_webhook_event_id`),
+  KEY `IDX_scheduled_start_at_utc` (`scheduled_start_at_utc`),
+  KEY `IDX_scheduler_due` (`status_key`, `scheduled_start_at_utc`, `call_attempt_count`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /* Data for the table `nesp_vapi_phone_screen` */
@@ -1445,6 +1489,86 @@ CREATE TABLE `nesp_vapi_webhook_event` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /* Data for the table `nesp_vapi_webhook_event` */
+
+/* Table structure for table `nesp_vapi_phone_screen_setting` */
+
+CREATE TABLE `nesp_vapi_phone_screen_setting` (
+  `setting_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `setting_value` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Data for the table `nesp_vapi_phone_screen_setting` */
+
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('timezone', 'America/New_York', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('slot_minutes', '15', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('call_duration_minutes', '10', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('buffer_minutes', '5', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('min_booking_notice_minutes', '120', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('link_expiration_hours', '168', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('earliest_call_time', '09:00', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('latest_call_time', '18:00', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('max_screens_per_hour', '4', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('max_screens_per_day', '12', NOW(), NOW());
+INSERT INTO `nesp_vapi_phone_screen_setting` (`setting_key`, `setting_value`, `date_created`, `date_modified`) VALUES ('booking_horizon_days', '14', NOW(), NOW());
+
+/* Table structure for table `nesp_vapi_availability_block` */
+
+CREATE TABLE `nesp_vapi_availability_block` (
+  `availability_block_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `weekday` TINYINT NOT NULL,
+  `start_time` TIME NOT NULL,
+  `end_time` TIME NOT NULL,
+  `is_available` TINYINT(1) NOT NULL DEFAULT 1,
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`availability_block_id`),
+  KEY `IDX_weekday` (`weekday`, `is_available`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Data for the table `nesp_vapi_availability_block` */
+
+INSERT INTO `nesp_vapi_availability_block` (`weekday`, `start_time`, `end_time`, `is_available`, `date_created`, `date_modified`) VALUES (1, '09:00:00', '18:00:00', 1, NOW(), NOW());
+INSERT INTO `nesp_vapi_availability_block` (`weekday`, `start_time`, `end_time`, `is_available`, `date_created`, `date_modified`) VALUES (2, '09:00:00', '18:00:00', 1, NOW(), NOW());
+INSERT INTO `nesp_vapi_availability_block` (`weekday`, `start_time`, `end_time`, `is_available`, `date_created`, `date_modified`) VALUES (3, '09:00:00', '18:00:00', 1, NOW(), NOW());
+INSERT INTO `nesp_vapi_availability_block` (`weekday`, `start_time`, `end_time`, `is_available`, `date_created`, `date_modified`) VALUES (4, '09:00:00', '18:00:00', 1, NOW(), NOW());
+INSERT INTO `nesp_vapi_availability_block` (`weekday`, `start_time`, `end_time`, `is_available`, `date_created`, `date_modified`) VALUES (5, '09:00:00', '18:00:00', 1, NOW(), NOW());
+INSERT INTO `nesp_vapi_availability_block` (`weekday`, `start_time`, `end_time`, `is_available`, `date_created`, `date_modified`) VALUES (6, '09:00:00', '13:00:00', 1, NOW(), NOW());
+
+/* Table structure for table `nesp_vapi_blackout_date` */
+
+CREATE TABLE `nesp_vapi_blackout_date` (
+  `blackout_date_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `blackout_date` DATE NOT NULL,
+  `label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`blackout_date_id`),
+  UNIQUE KEY `IDX_blackout_date` (`blackout_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Data for the table `nesp_vapi_blackout_date` */
+
+/* Table structure for table `nesp_vapi_scheduling_activity` */
+
+CREATE TABLE `nesp_vapi_scheduling_activity` (
+  `scheduling_activity_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `vapi_phone_screen_id` INT(11),
+  `scheduling_token_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `activity_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `ip_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `user_agent_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `metadata_json` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`scheduling_activity_id`),
+  KEY `IDX_token_activity` (`scheduling_token_hash`, `date_created`),
+  KEY `IDX_phone_screen_activity` (`vapi_phone_screen_id`, `date_created`),
+  KEY `IDX_ip_activity` (`ip_hash`, `date_created`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Data for the table `nesp_vapi_scheduling_activity` */
 
 /* Table structure for table `nesp_zoom_interview` */
 

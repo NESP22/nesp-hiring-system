@@ -5,17 +5,17 @@
         <?php TemplateUtility::printQuickSearch(); ?>
         <div id="contents">
             <div class="nesp-page-title">
-                <h2>Review and Confirm Call</h2>
-                <p>Craig/admin confirmation is required before a phone-screen request can be prepared.</p>
+                <h2>Invite to Schedule Phone Screen</h2>
+                <p>Craig/admin confirmation creates a secure scheduling link. It does not place a call.</p>
             </div>
 
             <div class="nesp-safety-banner">
-                This screen prepares a request only. Starting the provider call is blocked unless `NESP_VAPI_ENABLED` is on and configuration is healthy.
+                The candidate chooses an available Eastern Time appointment. Vapi can call only from the hosted scheduler at the selected time.
             </div>
 
             <div class="nesp-two-column">
                 <div class="nesp-panel">
-                    <h3>Call Details</h3>
+                        <h3>Scheduling Details</h3>
                     <dl class="nesp-detail-list">
                         <dt>Candidate</dt>
                         <dd><?php $this->_($this->preview['candidate_name']); ?></dd>
@@ -31,6 +31,8 @@
                         <dd>Off</dd>
                         <dt>Transcription</dt>
                         <dd>After consent only</dd>
+                        <dt>Expected length</dt>
+                        <dd>Approximately 7–10 minutes</dd>
                     </dl>
 
                     <?php if ($this->preview['has_destination_phone']): ?>
@@ -38,7 +40,7 @@
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                         <input type="hidden" name="candidateID" value="<?php echo((int) $this->preview['candidate_id']); ?>" />
                         <input type="hidden" name="jobOrderID" value="<?php echo((int) $this->preview['joborder_id']); ?>" />
-                        <button type="submit" class="nesp-primary-button">Prepare Phone Screen</button>
+                        <button type="submit" class="nesp-primary-button">Generate Scheduling Link</button>
                         <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=phoneScreens">Cancel</a>
                     </form>
                     <?php else: ?>

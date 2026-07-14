@@ -3,6 +3,7 @@ use PHPUnit\Framework\TestCase;
 
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
+include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
 
 class NESPWorkflowTest extends TestCase
 {
@@ -54,7 +55,9 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('submitScorecard'));
         $this->assertSame('NESP_STAFFING_FORECAST_ENABLED', NESPWorkflow::getFeatureFlagForAction('staffingForecast'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreens'));
-        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('startPhoneScreen'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreenAvailability'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('markPhoneScreenInvitationCopied'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('allowPhoneScreenReschedule'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('unexpectedAction'));
     }
 
@@ -68,9 +71,35 @@ class NESPWorkflowTest extends TestCase
         );
 
         $this->assertSame(
-            array('Needs Craig', 'Waiting', 'Interviews', 'Phone Screens', 'Completed', 'Staffing Forecast', 'Settings'),
+            array('Needs Craig', 'Waiting', 'Interviews', 'Phone Screens', 'Job Ads', 'Completed', 'Staffing Forecast', 'Settings'),
             $labels
         );
+    }
+
+    public function testRecruitingSourceParametersAreSafeAndTracked()
+    {
+        $this->assertSame('Indeed', NESPRecruitingAds::getSourceLabel('indeed'));
+        $this->assertSame('NESP Ad: Facebook', NESPRecruitingAds::sourceFromRequest(array('utm_source' => 'facebook')));
+        $this->assertSame('', NESPRecruitingAds::sourceFromRequest(array('nesp_source' => 'not a platform')));
+
+        $link = NESPRecruitingAds::trackedApplicationURL(41002, 'craigslist');
+        $this->assertStringContainsString('ID=41002', $link);
+        $this->assertStringContainsString('nesp_source=craigslist', $link);
+    }
+
+    public function testRecruitingAdTemplatesFlagMissingUnapprovedRoles()
+    {
+        $templates = NESPRecruitingAds::getRequestedRoleAdTemplates();
+        $byRole = array();
+        foreach ($templates as $template)
+        {
+            $byRole[$template['role_key']] = $template;
+        }
+
+        $this->assertSame('Prepared draft', $byRole['weekend_sports_photographer']['status']);
+        $this->assertStringContainsString('nesp_source=nesp_website', $byRole['weekend_sports_photographer']['application_link']);
+        $this->assertSame('Missing Craig-approved fields', $byRole['school_photographer']['status']);
+        $this->assertSame('Missing Craig-approved fields', $byRole['sales_representative']['status']);
     }
 
     public function testQueueDefinitionsCoverRequestedDashboardSections()
@@ -325,6 +354,7 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('+15551112222', $payload['customer']['number']);
         $this->assertArrayNotHasKey('metadata', $payload);
         $this->assertFalse($payload['assistantOverrides']['artifactPlan']['recordingEnabled']);
+        $this->assertFalse($payload['assistantOverrides']['artifactPlan']['videoRecordingEnabled']);
         $this->assertTrue($payload['assistantOverrides']['artifactPlan']['transcriptPlan']['enabled']);
         $this->assertSame('Freelance Photographer', $payload['assistantOverrides']['variableValues']['role']);
         $this->assertSame('off', $payload['assistantOverrides']['variableValues']['audio_recording']);
@@ -332,5 +362,109 @@ class NESPWorkflowTest extends TestCase
 
         putenv('VAPI_HIRING_ASSISTANT_ID');
         putenv('VAPI_PHONE_NUMBER_ID');
+    }
+
+    public function testSchedulingTokenStateAcceptsValidToken()
+    {
+        $token = 'fixture-token';
+        $row = array(
+            'scheduling_token_hash' => NESPVapiIntegration::schedulingTokenHash($token),
+            'scheduling_token_expires_at' => '2026-07-15 12:00:00',
+            'scheduling_token_revoked_at' => null
+        );
+
+        $this->assertSame('valid', NESPVapiIntegration::evaluateSchedulingTokenState($token, $row, strtotime('2026-07-14 12:00:00')));
+    }
+
+    public function testSchedulingTokenStateRejectsInvalidToken()
+    {
+        $row = array(
+            'scheduling_token_hash' => NESPVapiIntegration::schedulingTokenHash('expected-token'),
+            'scheduling_token_expires_at' => '2026-07-15 12:00:00',
+            'scheduling_token_revoked_at' => null
+        );
+
+        $this->assertSame('invalid', NESPVapiIntegration::evaluateSchedulingTokenState('wrong-token', $row, strtotime('2026-07-14 12:00:00')));
+    }
+
+    public function testSchedulingTokenStateRejectsExpiredToken()
+    {
+        $token = 'fixture-token';
+        $row = array(
+            'scheduling_token_hash' => NESPVapiIntegration::schedulingTokenHash($token),
+            'scheduling_token_expires_at' => '2026-07-14 10:00:00',
+            'scheduling_token_revoked_at' => null
+        );
+
+        $this->assertSame('expired', NESPVapiIntegration::evaluateSchedulingTokenState($token, $row, strtotime('2026-07-14 12:00:00')));
+    }
+
+    public function testSchedulingTokenStateRejectsRevokedToken()
+    {
+        $token = 'fixture-token';
+        $row = array(
+            'scheduling_token_hash' => NESPVapiIntegration::schedulingTokenHash($token),
+            'scheduling_token_expires_at' => '2026-07-15 12:00:00',
+            'scheduling_token_revoked_at' => '2026-07-14 09:00:00'
+        );
+
+        $this->assertSame('revoked', NESPVapiIntegration::evaluateSchedulingTokenState($token, $row, strtotime('2026-07-14 12:00:00')));
+    }
+
+    public function testSchedulingInvitationCopyIsCopyOnlyAndSafe()
+    {
+        $copy = NESPVapiIntegration::buildSchedulingInvitationCopy('Avery', 'Staff Photographer', 'https://example.test/schedule?t=abc');
+
+        $this->assertStringContainsString('Hi Avery', $copy);
+        $this->assertStringContainsString('Staff Photographer', $copy);
+        $this->assertStringContainsString('brief 7–10 minute automated phone screen', $copy);
+        $this->assertStringContainsString('Audio will not be recorded', $copy);
+        $this->assertStringContainsString('Every hiring decision is made by a person', $copy);
+    }
+
+    public function testVapiQueuedStatusMapsToCallStartedWorkflowState()
+    {
+        $this->assertSame('call_started', NESPVapiIntegration::mapWebhookStatus('status-update', 'queued'));
+        $this->assertSame('call_started', NESPVapiIntegration::mapWebhookStatus('status-update', 'scheduled'));
+    }
+
+    public function testDuplicateBookingIsRejected()
+    {
+        $settings = NESPVapiIntegration::getDefaultPhoneScreenAvailabilitySettings();
+        $appointments = array(
+            array('scheduled_start_at_utc' => '2026-07-14 14:00:00')
+        );
+
+        $this->assertTrue(NESPVapiIntegration::slotConflictsWithAppointments('2026-07-14 14:00:00', $appointments, $settings));
+    }
+
+    public function testSubmittedSlotMustBeGeneratedAvailabilityOption()
+    {
+        $availableSlots = array(
+            array('value' => '2026-07-14 14:00:00', 'label' => 'Tue, Jul 14, 2026 10:00 AM ET')
+        );
+
+        $this->assertTrue(NESPVapiIntegration::slotValueIsInAvailableSlots('2026-07-14 14:00:00', $availableSlots));
+        $this->assertFalse(NESPVapiIntegration::slotValueIsInAvailableSlots('2026-07-14 03:00:00', $availableSlots));
+    }
+
+    public function testCancelAndHumanFollowUpClearStaleAppointmentState()
+    {
+        $source = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $this->assertStringContainsString('scheduled_start_at_utc = NULL', $source);
+        $this->assertStringContainsString('scheduled_end_at_utc = NULL', $source);
+        $this->assertStringContainsString('scheduled_start_et = NULL', $source);
+        $this->assertStringContainsString('human_follow_up_requested', $source);
+    }
+
+    public function testRescheduleCanUseDifferentOpenSlot()
+    {
+        $settings = NESPVapiIntegration::getDefaultPhoneScreenAvailabilitySettings();
+        $appointments = array(
+            array('scheduled_start_at_utc' => '2026-07-14 14:00:00')
+        );
+
+        $this->assertFalse(NESPVapiIntegration::slotConflictsWithAppointments('2026-07-14 15:00:00', $appointments, $settings));
     }
 }

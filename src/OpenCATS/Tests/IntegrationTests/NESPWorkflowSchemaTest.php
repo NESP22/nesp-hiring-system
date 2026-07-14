@@ -18,7 +18,12 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_scorecard_template',
             'nesp_scorecard_response',
             'nesp_integration_status',
+            'nesp_recruiting_campaign_control',
             'nesp_vapi_phone_screen',
+            'nesp_vapi_phone_screen_setting',
+            'nesp_vapi_availability_block',
+            'nesp_vapi_blackout_date',
+            'nesp_vapi_scheduling_activity',
             'nesp_vapi_webhook_event',
             'nesp_zoom_interview',
             'nesp_ai_candidate_review',
@@ -49,8 +54,16 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countRows('nesp_interviewer_availability'));
         $this->assertSame(0, $this->countRows('nesp_interview_slot'));
         $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
+        $this->assertSame(0, $this->countRows('nesp_recruiting_campaign_control'));
         $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
         $this->assertSame(8, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'timezone' AND setting_value = 'America/New_York'"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'slot_minutes' AND setting_value = '15'"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'call_duration_minutes' AND setting_value = '10'"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'buffer_minutes' AND setting_value = '5'"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'min_booking_notice_minutes' AND setting_value = '120'"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_vapi_availability_block', "weekday = 1 AND start_time = '09:00:00' AND end_time = '18:00:00'"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_vapi_availability_block', "weekday = 6 AND start_time = '09:00:00' AND end_time = '13:00:00'"));
     }
 
     public function testNESPPhase2ColumnsArePresent()
@@ -76,8 +89,22 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'transcript_text'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'structured_result_json'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'provider_end_reason'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'scheduling_token_hash'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'scheduling_token_expires_at'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'scheduling_link_url'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'invitation_copy_text'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'scheduled_start_at_utc'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'scheduled_start_et'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'call_attempt_count'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen_setting', 'setting_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_availability_block', 'weekday'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_blackout_date', 'blackout_date'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_scheduling_activity', 'activity_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_webhook_event', 'provider_event_id'));
         $this->assertSame(1, $this->countUniqueIndexes('nesp_vapi_webhook_event', 'IDX_provider_event_id'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_recruiting_campaign_control', 'platform_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_recruiting_campaign_control', 'manual_spend'));
+        $this->assertSame(1, $this->countUniqueIndexes('nesp_recruiting_campaign_control', 'IDX_platform_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_batch', 'undone_at'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_row', 'source_row_hash'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_issue', 'status_key'));

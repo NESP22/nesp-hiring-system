@@ -10,6 +10,12 @@ class NESPVapiIntegration
 {
     const WEBHOOK_MAX_BYTES = 262144;
     const WEBHOOK_ALLOWED_SKEW_SECONDS = 300;
+    const DEFAULT_SCHEDULING_TIMEZONE = 'America/New_York';
+    const DEFAULT_CALL_DURATION_MINUTES = 10;
+    const DEFAULT_SLOT_MINUTES = 15;
+    const DEFAULT_BUFFER_MINUTES = 5;
+    const DEFAULT_MIN_BOOKING_NOTICE_MINUTES = 120;
+    const DEFAULT_LINK_EXPIRATION_HOURS = 168;
 
     public static function getConsentOpeningScript()
     {
@@ -35,6 +41,164 @@ class NESPVapiIntegration
             'call.cancelled',
             'structured-result'
         );
+    }
+
+    public static function getPhoneScreenStatusLabels()
+    {
+        return array(
+            'not_invited' => 'Not Invited',
+            'scheduling_link_ready' => 'Scheduling Link Ready',
+            'waiting_for_candidate_to_schedule' => 'Waiting for Candidate to Schedule',
+            'phone_screen_scheduled' => 'Phone Screen Scheduled',
+            'reschedule_requested' => 'Reschedule Requested',
+            'cancelled' => 'Cancelled',
+            'call_due' => 'Call Due',
+            'call_started' => 'Call Started',
+            'completed' => 'Completed',
+            'no_answer' => 'No Answer',
+            'human_follow_up_requested' => 'Human Follow-Up Requested',
+            'provider_error' => 'Provider Error'
+        );
+    }
+
+    public static function getDefaultPhoneScreenAvailabilitySettings()
+    {
+        return array(
+            'timezone' => self::DEFAULT_SCHEDULING_TIMEZONE,
+            'slot_minutes' => self::DEFAULT_SLOT_MINUTES,
+            'call_duration_minutes' => self::DEFAULT_CALL_DURATION_MINUTES,
+            'buffer_minutes' => self::DEFAULT_BUFFER_MINUTES,
+            'min_booking_notice_minutes' => self::DEFAULT_MIN_BOOKING_NOTICE_MINUTES,
+            'link_expiration_hours' => self::DEFAULT_LINK_EXPIRATION_HOURS,
+            'earliest_call_time' => '09:00',
+            'latest_call_time' => '18:00',
+            'max_screens_per_hour' => 4,
+            'max_screens_per_day' => 12,
+            'booking_horizon_days' => 14
+        );
+    }
+
+    public static function getDefaultPhoneScreenAvailabilityBlocks()
+    {
+        return array(
+            array('weekday' => 1, 'start_time' => '09:00', 'end_time' => '18:00', 'is_available' => 1),
+            array('weekday' => 2, 'start_time' => '09:00', 'end_time' => '18:00', 'is_available' => 1),
+            array('weekday' => 3, 'start_time' => '09:00', 'end_time' => '18:00', 'is_available' => 1),
+            array('weekday' => 4, 'start_time' => '09:00', 'end_time' => '18:00', 'is_available' => 1),
+            array('weekday' => 5, 'start_time' => '09:00', 'end_time' => '18:00', 'is_available' => 1),
+            array('weekday' => 6, 'start_time' => '09:00', 'end_time' => '13:00', 'is_available' => 1),
+            array('weekday' => 0, 'start_time' => '00:00', 'end_time' => '00:00', 'is_available' => 0)
+        );
+    }
+
+    public static function generateSchedulingToken()
+    {
+        if (function_exists('random_bytes'))
+        {
+            return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        }
+
+        return hash('sha256', uniqid('', true) . mt_rand());
+    }
+
+    public static function schedulingTokenHash($token)
+    {
+        return hash('sha256', (string) $token);
+    }
+
+    public static function getSchedulingLink($token)
+    {
+        $baseURL = rtrim(self::getEnvValue('NESP_PUBLIC_BASE_URL'), '/');
+        if ($baseURL === '')
+        {
+            $baseURL = 'https://careers.nesportsphoto.com';
+        }
+
+        return $baseURL . '/modules/nesp/phoneScreenSchedule.php?t=' . rawurlencode($token);
+    }
+
+    public static function buildSchedulingInvitationCopy($firstName, $roleTitle, $link)
+    {
+        $firstName = trim($firstName);
+        $roleTitle = trim($roleTitle);
+        if ($firstName === '')
+        {
+            $firstName = '[First Name]';
+        }
+        if ($roleTitle === '')
+        {
+            $roleTitle = '[Role]';
+        }
+
+        return 'Hi ' . $firstName . ', thank you for applying for the ' . $roleTitle . ' position with New England Sports Photo. Please choose a convenient time for a brief 7–10 minute automated phone screen using this secure link: ' . $link . '. The call will come from our NESP Hiring number. Audio will not be recorded; the conversation will be transcribed only after you consent. Every hiring decision is made by a person.';
+    }
+
+    public static function evaluateSchedulingTokenState($token, $row, $nowTimestamp)
+    {
+        if (trim((string) $token) === '' || empty($row))
+        {
+            return 'invalid';
+        }
+        if (!hash_equals((string) $row['scheduling_token_hash'], self::schedulingTokenHash($token)))
+        {
+            return 'invalid';
+        }
+        if (!empty($row['scheduling_token_revoked_at']))
+        {
+            return 'revoked';
+        }
+        if (!empty($row['scheduling_token_expires_at']) && strtotime($row['scheduling_token_expires_at']) < (int) $nowTimestamp)
+        {
+            return 'expired';
+        }
+        return 'valid';
+    }
+
+    public static function slotConflictsWithAppointments($slotStartUTC, $appointments, $settings)
+    {
+        $slotStart = strtotime($slotStartUTC);
+        if ($slotStart === false)
+        {
+            return true;
+        }
+
+        $duration = max(1, (int) $settings['call_duration_minutes']);
+        $buffer = max(0, (int) $settings['buffer_minutes']);
+        $slotEnd = $slotStart + (($duration + $buffer) * 60);
+
+        foreach ($appointments as $appointment)
+        {
+            if (empty($appointment['scheduled_start_at_utc']))
+            {
+                continue;
+            }
+            $existingStart = strtotime($appointment['scheduled_start_at_utc']);
+            if ($existingStart === false)
+            {
+                continue;
+            }
+            $existingEnd = $existingStart + (($duration + $buffer) * 60);
+            if ($slotStart < $existingEnd && $slotEnd > $existingStart)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function slotValueIsInAvailableSlots($slotStartUTC, $availableSlots)
+    {
+        $slotStartUTC = (string) $slotStartUTC;
+        foreach ($availableSlots as $slot)
+        {
+            if (isset($slot['value']) && hash_equals((string) $slot['value'], $slotStartUTC))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function getRoleScript($jobOrderID, $roleTitle = '')
@@ -170,6 +334,7 @@ class NESPVapiIntegration
             'assistantOverrides' => array(
                 'artifactPlan' => array(
                     'recordingEnabled' => false,
+                    'videoRecordingEnabled' => false,
                     'transcriptPlan' => array(
                         'enabled' => true
                     )
@@ -364,7 +529,7 @@ class NESPVapiIntegration
             }
             if ($providerStatus === 'queued' || $providerStatus === 'scheduled')
             {
-                return 'call_requested';
+                return 'call_started';
             }
         }
         if ($eventType === 'end-of-call-report')

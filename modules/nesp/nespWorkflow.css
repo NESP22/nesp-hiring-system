@@ -216,6 +216,28 @@
     background: #4f6578;
 }
 
+.nesp-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.nesp-form-grid button {
+    align-self: end;
+}
+
+.nesp-copy-box {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #b9c5d3;
+    background: #f8fafc;
+    color: #1b2733;
+    padding: 10px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
 .nesp-secondary-action,
 .nesp-secondary-actions a {
     color: #315f93;
@@ -373,6 +395,20 @@
     overflow-wrap: anywhere;
     font-size: 12px;
     line-height: 1.55;
+}
+
+.nesp-workflow textarea[readonly],
+.nesp-workflow .nesp-table textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+.nesp-workflow code {
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 @media (max-width: 700px) {
