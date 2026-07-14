@@ -12,6 +12,11 @@
             <div class="nesp-safety-banner">
                 This screen does not contact applicants, publish postings, edit jobs, import Drive files automatically, or change feature flags.
             </div>
+            <?php if ((int) $this->forecast['sourceStatus']['rows_imported'] === 0 && !count($this->forecast['history'])): ?>
+            <div class="nesp-empty">
+                No historical schedules imported yet.
+            </div>
+            <?php endif; ?>
 
             <div class="nesp-dashboard-nav">
                 <?php foreach ($this->dashboardNavigation as $navItem): ?>
@@ -93,7 +98,12 @@
                     <?php if ($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA): ?>
                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createStaffingRecommendation" class="nesp-inline-form">
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
-                        <button type="submit" class="nesp-secondary-button">Create Hiring Recommendation</button>
+                        <?php if ((int) $this->forecast['sourceStatus']['rows_imported'] === 0): ?>
+                            <button type="button" class="nesp-secondary-button" disabled="disabled">Create Hiring Recommendation</button>
+                            <span class="nesp-help-text">Import verified staffing history before creating a draft recommendation.</span>
+                        <?php else: ?>
+                            <button type="submit" class="nesp-secondary-button">Create Hiring Recommendation</button>
+                        <?php endif; ?>
                     </form>
                     <?php endif; ?>
                 </div>
