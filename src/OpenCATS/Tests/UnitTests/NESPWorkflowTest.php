@@ -390,8 +390,15 @@ class NESPWorkflowTest extends TestCase
 
         $this->assertStringContainsString('Hi Avery', $copy);
         $this->assertStringContainsString('Staff Photographer', $copy);
+        $this->assertStringContainsString('brief 7–10 minute automated phone screen', $copy);
         $this->assertStringContainsString('Audio will not be recorded', $copy);
         $this->assertStringContainsString('Every hiring decision is made by a person', $copy);
+    }
+
+    public function testVapiQueuedStatusMapsToCallStartedWorkflowState()
+    {
+        $this->assertSame('call_started', NESPVapiIntegration::mapWebhookStatus('status-update', 'queued'));
+        $this->assertSame('call_started', NESPVapiIntegration::mapWebhookStatus('status-update', 'scheduled'));
     }
 
     public function testDuplicateBookingIsRejected()

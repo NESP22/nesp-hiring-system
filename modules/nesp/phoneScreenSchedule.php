@@ -90,7 +90,7 @@ $body = '<div class="notice">This is an automated NESP Hiring phone screen. Audi
     . '<div class="panel"><h2>Schedule your phone screen</h2>'
     . '<dl>'
     . '<dt>Position</dt><dd>' . nesp_schedule_escape($screen['role_title']) . '</dd>'
-    . '<dt>Expected call length</dt><dd>Approximately 7-10 minutes</dd>'
+    . '<dt>Expected call length</dt><dd>Approximately 7–10 minutes</dd>'
     . '<dt>Caller ID label</dt><dd>NESP Hiring</dd>'
     . '<dt>Time zone</dt><dd>All times are shown in Eastern Time</dd>'
     . '<dt>Current appointment</dt><dd>' . nesp_schedule_escape($currentAppointment) . '</dd>'

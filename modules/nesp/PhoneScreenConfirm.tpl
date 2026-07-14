@@ -32,7 +32,7 @@
                         <dt>Transcription</dt>
                         <dd>After consent only</dd>
                         <dt>Expected length</dt>
-                        <dd>Approximately 7-10 minutes</dd>
+                        <dd>Approximately 7–10 minutes</dd>
                     </dl>
 
                     <?php if ($this->preview['has_destination_phone']): ?>

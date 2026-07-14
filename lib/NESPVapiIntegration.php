@@ -130,7 +130,7 @@ class NESPVapiIntegration
             $roleTitle = '[Role]';
         }
 
-        return 'Hi ' . $firstName . ', thank you for applying for the ' . $roleTitle . ' position with New England Sports Photo. Please choose a convenient time for a brief 7-10 minute automated phone screen using this secure link: ' . $link . '. The call will come from our NESP Hiring number. Audio will not be recorded; the conversation will be transcribed only after you consent. Every hiring decision is made by a person.';
+        return 'Hi ' . $firstName . ', thank you for applying for the ' . $roleTitle . ' position with New England Sports Photo. Please choose a convenient time for a brief 7–10 minute automated phone screen using this secure link: ' . $link . '. The call will come from our NESP Hiring number. Audio will not be recorded; the conversation will be transcribed only after you consent. Every hiring decision is made by a person.';
     }
 
     public static function evaluateSchedulingTokenState($token, $row, $nowTimestamp)
@@ -515,7 +515,7 @@ class NESPVapiIntegration
             }
             if ($providerStatus === 'queued' || $providerStatus === 'scheduled')
             {
-                return 'call_requested';
+                return 'call_started';
             }
         }
         if ($eventType === 'end-of-call-report')

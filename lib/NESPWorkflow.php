@@ -2690,8 +2690,11 @@ class NESPWorkflow
                      scheduled_start_at_utc = NULL,
                      scheduled_end_at_utc = NULL,
                      scheduled_start_et = NULL,
+                     provider_call_id = NULL,
+                     provider_end_reason = "",
                      call_claimed_at = NULL,
                      call_attempted_at = NULL,
+                     call_attempt_count = 0,
                      scheduler_claim_key = "",
                      last_scheduler_error = "",
                      date_modified = NOW()

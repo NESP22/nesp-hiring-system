@@ -27,7 +27,7 @@ Current safety defaults:
    - audio recording `Off`
    - transcription `After consent only`
    - consent notice and role-specific script
-   - expected length approximately 7-10 minutes
+   - expected length approximately 7–10 minutes
 4. Generate the scheduling link.
 5. Copy the invitation text manually. The system does not send email or SMS.
 6. Candidate opens the secure link, chooses an available Eastern Time appointment, reschedules, cancels, or requests human follow-up.
@@ -39,7 +39,7 @@ Current safety defaults:
 ## Copy-Only Invitation
 
 ```text
-Hi [First Name], thank you for applying for the [Role] position with New England Sports Photo. Please choose a convenient time for a brief 7-10 minute automated phone screen using this secure link: [LINK]. The call will come from our NESP Hiring number. Audio will not be recorded; the conversation will be transcribed only after you consent. Every hiring decision is made by a person.
+Hi [First Name], thank you for applying for the [Role] position with New England Sports Photo. Please choose a convenient time for a brief 7–10 minute automated phone screen using this secure link: [LINK]. The call will come from our NESP Hiring number. Audio will not be recorded; the conversation will be transcribed only after you consent. Every hiring decision is made by a person.
 ```
 
 ## Candidate Scheduling Page
@@ -110,7 +110,7 @@ If consent is unclear or refused, the assistant must stop screening, offer human
 
 ## Role Scripts
 
-Scripts are one question at a time, designed for 7-10 minutes, and contain no scoring or decision language.
+Scripts are one question at a time, designed for 7–10 minutes, and contain no scoring or decision language.
 
 - Job 41001: Customer Service, $22-$25/hour, Methuen in-office, weekday daytime availability, phone/email support, experience, issue-resolution example, candidate questions.
 - Job 41002: Staff Photographer, $22-$25/hour, early weekends, license/transportation, travel, children/families, NESP equipment/workflow, candidate questions.
