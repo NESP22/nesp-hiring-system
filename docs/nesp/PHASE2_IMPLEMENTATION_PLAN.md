@@ -64,3 +64,41 @@ The dashboard, interviewer workflow, scorecard forms, and staffing forecast do n
 - Scorecard submission writes only through scoped grants.
 - Staffing forecast reads NESP staffing history rows and does not publish or message anyone.
 - Fake fixture SQL is clearly labeled test/local only.
+
+## Production Rollout Record - 2026-07-14
+
+- PR: `https://github.com/NESP22/nesp-hiring-system/pull/3`.
+- Approved PR head: `609adca6816b42020d64311fe1d5f1b4e24dffba`.
+- Merge method: GitHub merge commit with expected-head protection.
+- Merge commit / resulting `master`: `d2be22c37da6ab23f5c3a9c35732742a3d2c43e2`.
+- Render service: `nesp-hiring-web`.
+- Deployed commit: `d2be22c37da6ab23f5c3a9c35732742a3d2c43e2`.
+- Recovery branch: `backup/pre-phase2-workflow` at `141324b27876e9638571079e7d95ca6f6c57225c`.
+- Fresh encrypted backup: `20260714T140425Z`, `nesp-hiring-backup-20260714T140425Z.tar.gz.cms`.
+- Backup SHA-256: `72de58712e878ed40900946b1afc2f3ae2d30a24941d9b15ba1b11692df0306b`.
+- Additive migration: `db/nesp_phase2_additive.sql`.
+- Additive migration SHA-256: `58e2cbfeda4756a5886111e4c6592fbb442002c95d77aecbac47d80c4c1f7cd1`.
+- Migration result: exit status `0`.
+- NESP schema version after migration: `0`.
+- Before and after counts: candidates `0`, total jobs `5`, active/public jobs `4`, candidate-job associations `0`.
+- Expected additive Phase 2 tables present: `10`.
+- Expected named indexes present. `IDX_nesp_import_source` is the non-unique three-column index defined by the approved migration.
+- Fake fixture SQL was not applied. Fixture candidate and fixture interviewer counts remained `0`.
+- Public checks after deploy/migration returned HTTP `200` for the careers homepage, careers listing, four job pages, four application forms, OpenCATS login, and `render-health.txt`.
+- Anonymous NESP route guessing returned the OpenCATS login page.
+- Authenticated production dashboard UI verification remains pending Craig/admin login; Codex did not use, print, or infer credentials.
+
+## Production Feature Flags After Rollout
+
+- `NESP_WORKFLOW_ENABLED=1`.
+- `NESP_INTERVIEWER_POOL_ENABLED=0`.
+- `NESP_PRESCREEN_ENABLED=0`.
+- `NESP_VAPI_ENABLED=0`.
+- `NESP_ZOOM_ENABLED=0`.
+- `NESP_AI_REVIEW_ENABLED=0`.
+- `NESP_STAFFING_FORECAST_ENABLED=0`.
+- `NESP_STAFFING_DRIVE_IMPORT_ENABLED=0`.
+
+`NESP_WORKFLOW_ENABLED` was enabled through a controlled database-backed rollout action. Audit event `1` recorded actor user ID `1`, old value `0`, new value `1`, and rollout commit `d2be22c37da6ab23f5c3a9c35732742a3d2c43e2`.
+
+Mail remained disabled during rollout: `OPENCATS_MAIL_ENABLED=0`, `MAIL_MAILER` unset, and no SMTP provider variables detected.

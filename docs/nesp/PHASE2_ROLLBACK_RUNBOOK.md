@@ -53,3 +53,28 @@ After rollback:
 - `SHOW TABLES LIKE 'nesp_session_security_event';` returns no rows.
 - Legacy OpenCATS login and candidate pages still load.
 - No Vapi, Zoom, AI, email, SMS, or external job-posting action was initiated.
+
+## Production Rollout Recovery Points - 2026-07-14
+
+- Pre-Phase-2 production commit: `141324b27876e9638571079e7d95ca6f6c57225c`.
+- Recovery branch: `backup/pre-phase2-workflow` at `141324b27876e9638571079e7d95ca6f6c57225c`.
+- Fresh encrypted backup: `/Users/craig/Documents/NESP-Hiring-Backups/daily/20260714T140425Z/nesp-hiring-backup-20260714T140425Z.tar.gz.cms`.
+- Backup SHA-256: `72de58712e878ed40900946b1afc2f3ae2d30a24941d9b15ba1b11692df0306b`.
+- Merge/deployed commit: `d2be22c37da6ab23f5c3a9c35732742a3d2c43e2`.
+- Additive migration applied: `db/nesp_phase2_additive.sql`.
+- Additive migration SHA-256: `58e2cbfeda4756a5886111e4c6592fbb442002c95d77aecbac47d80c4c1f7cd1`.
+- Migration timestamp: 2026-07-14 rollout window.
+- Counts before and after migration: candidates `0`, total jobs `5`, active/public jobs `4`, candidate-job associations `0`.
+- Mail state during rollout: `OPENCATS_MAIL_ENABLED=0`, `MAIL_MAILER` unset, no SMTP provider variables detected.
+
+## Immediate Rollback Actions
+
+Use this order for an immediate rollback from the 2026-07-14 Phase 2 foundation rollout:
+
+1. Disable the visible dashboard flag:
+   `UPDATE nesp_feature_flag SET is_enabled = 0, date_modified = NOW() WHERE flag_key = 'NESP_WORKFLOW_ENABLED';`
+2. Redeploy the recovery branch `backup/pre-phase2-workflow`.
+3. Run `db/nesp_phase2_rollback.sql` only after backup verification.
+4. Restore the encrypted backup only if application rollback plus SQL rollback does not return the system to the expected healthy baseline.
+
+Keep `NESP_INTERVIEWER_POOL_ENABLED`, `NESP_PRESCREEN_ENABLED`, `NESP_VAPI_ENABLED`, `NESP_ZOOM_ENABLED`, `NESP_AI_REVIEW_ENABLED`, `NESP_STAFFING_FORECAST_ENABLED`, and `NESP_STAFFING_DRIVE_IMPORT_ENABLED` disabled throughout rollback.
