@@ -46,9 +46,11 @@ Settings show:
 
 ## Staffing Forecast
 
-The staffing forecast page is planning-only. It shows fixture/sanitized forecast structure until Craig approves real historical schedule import.
+The staffing forecast page is planning-only. In production it currently shows an empty shell with `No historical schedules imported yet.` until Craig approves real historical schedule import.
 
 It does not publish jobs, edit job records, create applicants, send messages, or enable integrations.
+
+The `Create Hiring Recommendation` action is disabled while no verified history exists.
 
 ## What Craig Will Not See Yet
 

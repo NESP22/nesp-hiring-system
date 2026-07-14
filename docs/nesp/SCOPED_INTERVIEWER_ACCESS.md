@@ -40,6 +40,16 @@ An interviewer can view a candidate only when:
 - POST routes require CSRF.
 - Feature-gated routes fail closed when flags are off.
 
+## Current Production State
+
+- `NESP_INTERVIEWER_POOL_ENABLED = 1`.
+- Interviewer profiles: `0`.
+- Candidate grants: `0`.
+- No real interviewer account has been created.
+- Anonymous direct URL checks return the OpenCATS login page.
+
+The flag can be rolled back immediately by setting `NESP_INTERVIEWER_POOL_ENABLED = 0`. This hides interviewer dashboards and assigned-candidate routes without deleting stored profiles, grants, drafts, scorecards, or audit rows.
+
 ## Test Coverage
 
 - Unit coverage validates feature-gate routing.

@@ -21,7 +21,7 @@ All Phase 2 feature flags default to disabled:
 - `NESP_STAFFING_FORECAST_ENABLED`
 - `NESP_STAFFING_DRIVE_IMPORT_ENABLED`
 
-The dashboard, interviewer workflow, scorecard forms, and staffing forecast do not send email or SMS, initiate Vapi calls, create Zoom meetings, run AI review, deploy to Render, publish postings, create real interviewer accounts, or modify production feature flags.
+The dashboard, interviewer workflow, scorecard forms, and staffing forecast do not send email or SMS, initiate Vapi calls, create Zoom meetings, run AI review, publish postings, create real interviewer accounts, or automatically change applicant status.
 
 ## Build Scope
 
@@ -91,14 +91,20 @@ The dashboard, interviewer workflow, scorecard forms, and staffing forecast do n
 ## Production Feature Flags After Rollout
 
 - `NESP_WORKFLOW_ENABLED=1`.
-- `NESP_INTERVIEWER_POOL_ENABLED=0`.
+- `NESP_INTERVIEWER_POOL_ENABLED=1`.
 - `NESP_PRESCREEN_ENABLED=0`.
 - `NESP_VAPI_ENABLED=0`.
 - `NESP_ZOOM_ENABLED=0`.
 - `NESP_AI_REVIEW_ENABLED=0`.
-- `NESP_STAFFING_FORECAST_ENABLED=0`.
+- `NESP_STAFFING_FORECAST_ENABLED=1`.
 - `NESP_STAFFING_DRIVE_IMPORT_ENABLED=0`.
 
 `NESP_WORKFLOW_ENABLED` was enabled through a controlled database-backed rollout action. Audit event `1` recorded actor user ID `1`, old value `0`, new value `1`, and rollout commit `d2be22c37da6ab23f5c3a9c35732742a3d2c43e2`.
 
+`NESP_INTERVIEWER_POOL_ENABLED` was enabled through a controlled database-backed rollout action. Audit event `2` recorded actor user ID `1`, old value `0`, new value `1`, database timestamp `2026-07-14 15:32:11`, and rollout commit `3d0ca58de5b59019865173d0521a17c66e1d50eb`.
+
+`NESP_STAFFING_FORECAST_ENABLED` was enabled through a controlled database-backed rollout action. Audit event `3` recorded actor user ID `1`, old value `0`, new value `1`, database timestamp `2026-07-14 15:32:29`, and rollout commit `3d0ca58de5b59019865173d0521a17c66e1d50eb`.
+
 Mail remained disabled during rollout: `OPENCATS_MAIL_ENABLED=0`, `MAIL_MAILER` unset, and no SMTP provider variables detected.
+
+No real interviewer accounts were created. No candidate, candidate-job association, workflow, interviewer-profile, grant, staffing import, staffing history, forecast, or recommendation rows were added during the safe foundation enablement.

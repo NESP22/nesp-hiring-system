@@ -44,4 +44,10 @@ Stop a rollout immediately if any of these happen:
 
 ## Current Pass
 
-No production rollback was needed in this work session because no production merge, deployment, migration, feature flag, applicant record, account, email, SMS, Vapi, Zoom, AI, or Drive change occurred.
+No production rollback was needed after enabling the safe foundation flags. `NESP_INTERVIEWER_POOL_ENABLED` and `NESP_STAFFING_FORECAST_ENABLED` are live, but no production applicant records, candidate assignments, interviewer accounts, interviewer profiles, staffing imports, email, SMS, Vapi, Zoom, AI, or Drive changes occurred.
+
+Immediate feature rollback:
+
+- Set `NESP_INTERVIEWER_POOL_ENABLED = 0` to hide interviewer dashboards and scoped assigned-candidate routes.
+- Set `NESP_STAFFING_FORECAST_ENABLED = 0` to hide the staffing forecast shell.
+- Leave `NESP_STAFFING_DRIVE_IMPORT_ENABLED = 0`, `NESP_PRESCREEN_ENABLED = 0`, `NESP_VAPI_ENABLED = 0`, `NESP_ZOOM_ENABLED = 0`, and `NESP_AI_REVIEW_ENABLED = 0`.

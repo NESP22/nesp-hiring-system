@@ -35,8 +35,15 @@ This is the one-page daily guide for Craig. The Phase 2 dashboard is designed to
 4. Confirm tomorrow's interviews have an owner and clear status.
 5. Do not enable integrations unless a separate controlled rollout task approves it.
 
+## Staffing Forecast Check
+
+1. Open `Staffing Forecast`.
+2. Confirm the top message says `No historical schedules imported yet.` until Craig approves a real schedule import.
+3. Treat all zero or not-enough-history metrics as expected while Drive import remains off.
+4. Do not use forecast numbers for hiring decisions until verified historical schedules are imported in a separate controlled task.
+
 ## Safety Notes
 
 - The dashboard does not hire, reject, rank, or message applicants automatically.
-- Feature flags remain off until Craig explicitly turns on the matching feature.
-- Vapi, Zoom, AI review, prescreening, outbound email, SMS, staffing forecast, and Drive import remain disabled by default.
+- The interviewer-pool foundation and staffing-forecast shell are live, but no real interviewer accounts or staffing history have been added.
+- Vapi, Zoom, AI review, prescreening, outbound email, SMS, and Drive import remain disabled.

@@ -33,12 +33,16 @@ The interviewer pool lets Craig stage future interviewers, assign them to specif
 
 Recommendations are advisory only. They do not hire, reject, rank, or change candidate status automatically.
 
-## Disabled By Default
+## Production Flag State
 
-- `NESP_INTERVIEWER_POOL_ENABLED = 0`
+- `NESP_INTERVIEWER_POOL_ENABLED = 1`
 - `NESP_ZOOM_ENABLED = 0`
 - `NESP_AI_REVIEW_ENABLED = 0`
 - Outbound email and SMS remain disabled.
+
+The interviewer-pool foundation was enabled on 2026-07-14 by a controlled database-backed rollout action. Audit event `2` records actor user ID `1`, old value `0`, new value `1`, and rollout commit `3d0ca58de5b59019865173d0521a17c66e1d50eb`.
+
+No real interviewer accounts, interviewer profiles, or candidate grants were created during enablement.
 
 ## Production Setup Still Required
 

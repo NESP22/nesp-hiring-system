@@ -4,7 +4,7 @@
 
 - Dedicated branch: `codex/phase2-hosted-hiring-workflow`.
 - PR #3 was merged during the controlled 2026-07-14 rollout.
-- Phase 2 workflow, interviewer-pool, and staffing-forecast routes are gated by disabled feature flags.
+- Phase 2 workflow, interviewer-pool, and staffing-forecast routes are gated by feature flags.
 - Dashboard and staffing forecast routes require administrator access.
 - Dashboard queues are query-backed.
 - Empty states and sensible queue limits are present.
@@ -47,8 +47,8 @@
 - Verified production database backup: `20260714T140425Z`, SHA-256 `72de58712e878ed40900946b1afc2f3ae2d30a24941d9b15ba1b11692df0306b`.
 - Controlled Render deployment: completed for `d2be22c37da6ab23f5c3a9c35732742a3d2c43e2`.
 - Controlled additive migration: completed with status `0`.
-- Craig approved enabling only `NESP_WORKFLOW_ENABLED`.
-- Explicit Craig approval before real interviewer access, applicant self-booking, or Zoom creation is enabled.
+- Craig approved enabling the dashboard foundation, interviewer-pool foundation, and staffing-forecast shell.
+- Explicit Craig approval before real interviewer accounts, real interviewer access, applicant self-booking, or Zoom creation is enabled.
 - Read-only Google Drive credentials for real schedule discovery/import.
 
 ## Production Rollout Verification - 2026-07-14
@@ -66,6 +66,22 @@
 - Anonymous users and direct route guessing are sent to the OpenCATS login page.
 - Authenticated production dashboard UI verification is pending Craig/admin login. Codex did not use or expose credentials.
 - Mail stayed disabled: `OPENCATS_MAIL_ENABLED=0`, `MAIL_MAILER` unset, no SMTP provider variables detected.
+
+## Foundation Enablement Verification - 2026-07-14
+
+- Safe code hardening commit: `3d0ca58de5b59019865173d0521a17c66e1d50eb`.
+- GitHub Actions: passed for `3d0ca58de5b59019865173d0521a17c66e1d50eb`.
+- Render deployment: live for `3d0ca58de5b59019865173d0521a17c66e1d50eb` at 2026-07-14 08:26 Pacific.
+- `NESP_INTERVIEWER_POOL_ENABLED` changed from `0` to `1`; audit event `2`, actor user ID `1`, database timestamp `2026-07-14 15:32:11`.
+- `NESP_STAFFING_FORECAST_ENABLED` changed from `0` to `1`; audit event `3`, actor user ID `1`, database timestamp `2026-07-14 15:32:29`.
+- Still disabled: `NESP_PRESCREEN_ENABLED`, `NESP_VAPI_ENABLED`, `NESP_ZOOM_ENABLED`, `NESP_AI_REVIEW_ENABLED`, and `NESP_STAFFING_DRIVE_IMPORT_ENABLED`.
+- Production counts after enablement: candidates `0`, total jobs `5`, active/public jobs `4`, candidate-job associations `0`.
+- Production interviewer records after enablement: interviewer profiles `0`, interviewer candidate grants `0`.
+- Production workflow records after enablement: `0`.
+- Production staffing data after enablement: import batches `0`, import rows `0`, schedule history rows `0`, forecasts `0`, recommendations `0`.
+- Public regression after enablement: careers homepage, careers listing, four job pages, four application forms, OpenCATS login, and `render-health.txt` returned HTTP `200`.
+- Anonymous route checks for dashboard, settings, interviewer, assigned-candidate, staffing forecast, and recommendation routes returned the OpenCATS login page.
+- No real interviewer account was created, no applicant record changed, no historical schedule imported, and no Google Drive file accessed or modified.
 
 ## Deferred
 

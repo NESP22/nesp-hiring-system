@@ -65,5 +65,7 @@ Each card is designed to be skimmed quickly:
 - Implemented: internal dashboard queues and card fields.
 - Implemented: upcoming interview list and completed-work list.
 - Implemented: scoped interviewer scorecard workflow.
-- Fixture-only: preview candidates and staffing data.
+- Live foundation: Craig dashboard, interviewer-pool foundation, and staffing-forecast shell.
+- Production data: no candidates, no interviewer profiles, no grants, no staffing imports, no forecasts, and no recommendations.
+- Fixture-only: preview candidates and staffing data remain local/test only.
 - Deferred: public applicant scheduling pages and applicant self-service status pages.
