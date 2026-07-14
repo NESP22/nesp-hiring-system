@@ -12,21 +12,25 @@ Do not place the controlled test call until all are true:
 - Craig explicitly confirms the test destination phone
 - fake test candidate is clearly labeled
 
-## One Controlled Test Call
+## One Controlled Scheduled Test Call
 
 1. Confirm no real applicant data is used.
 2. Create or select one fake test candidate.
-3. Set `NESP_VAPI_ENABLED=1`.
-4. Start exactly one call to Craig's approved phone.
-5. Verify caller ID is `NESP Hiring`.
-6. Verify assistant is `NESP Hiring Phone Screen`.
-7. Verify consent is requested before screening questions.
-8. Verify audio recording remains off.
-9. Verify transcript appears only after affirmative consent.
-10. Verify structured results arrive.
-11. Verify Craig dashboard review is populated.
-12. Verify no automatic stage change, email, SMS, ranking, rejection, approval, hire, or assignment occurs.
-13. Archive/delete the fake test record after review.
+3. Craig generates the scheduling link.
+4. Craig copies the invitation manually; do not send email or SMS.
+5. Schedule the fake candidate through the public token page.
+6. Set `NESP_VAPI_ENABLED=1` only for the scheduled call window.
+7. Run the hosted Render due-call scheduler once.
+8. Verify exactly one outbound call attempt is made at the selected time.
+9. Verify caller ID is `NESP Hiring`.
+10. Verify assistant is `NESP Hiring Phone Screen`.
+11. Verify consent is requested before screening questions.
+12. Verify audio recording remains off.
+13. Verify transcript appears only after affirmative consent.
+14. Verify structured results arrive.
+15. Verify Craig dashboard review is populated.
+16. Verify no automatic stage change, email, SMS, ranking, rejection, approval, hire, or assignment occurs.
+17. Archive/delete the fake test record after review.
 
 If any check fails, immediately set `NESP_VAPI_ENABLED=0`.
 

@@ -124,6 +124,41 @@ class NESPUI extends UserInterface
                 $this->phoneScreens();
                 break;
 
+            case 'phoneScreenAvailability':
+                $this->adminOnly();
+                $this->phoneScreenAvailability();
+                break;
+
+            case 'savePhoneScreenAvailability':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->savePhoneScreenAvailability();
+                break;
+
+            case 'createPhoneScreenAvailabilityBlock':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->createPhoneScreenAvailabilityBlock();
+                break;
+
+            case 'deletePhoneScreenAvailabilityBlock':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->deletePhoneScreenAvailabilityBlock();
+                break;
+
+            case 'createPhoneScreenBlackout':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->createPhoneScreenBlackout();
+                break;
+
+            case 'deletePhoneScreenBlackout':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->deletePhoneScreenBlackout();
+                break;
+
             case 'confirmPhoneScreen':
                 $this->adminOnly();
                 $this->confirmPhoneScreen();
@@ -140,16 +175,28 @@ class NESPUI extends UserInterface
                 $this->requestPhoneScreen();
                 break;
 
-            case 'startPhoneScreen':
+            case 'markPhoneScreenInvitationCopied':
                 $this->adminOnly();
                 $this->requirePostCSRF();
-                $this->startPhoneScreen();
+                $this->markPhoneScreenInvitationCopied();
                 break;
 
             case 'cancelPhoneScreen':
                 $this->adminOnly();
                 $this->requirePostCSRF();
                 $this->cancelPhoneScreen();
+                break;
+
+            case 'revokePhoneScreenSchedulingLink':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->revokePhoneScreenSchedulingLink();
+                break;
+
+            case 'allowPhoneScreenReschedule':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->allowPhoneScreenReschedule();
                 break;
 
             case 'savePhoneScreenReview':
@@ -410,7 +457,62 @@ class NESPUI extends UserInterface
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('vapiConfiguration', $this->_workflow->getVapiConfigurationStatus());
         $this->_template->assign('phoneScreens', $this->_workflow->getVapiPhoneScreenSummaries(75));
+        $this->_template->assign('phoneScreenQueues', $this->_workflow->getVapiPhoneScreenQueues());
         $this->_template->display('./modules/nesp/PhoneScreens.tpl');
+    }
+
+    private function phoneScreenAvailability()
+    {
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Phone Screens');
+        $this->_template->assign('viewKey', 'phoneScreens');
+        $this->_template->assign('settings', $this->_workflow->getPhoneScreenAvailabilitySettings());
+        $this->_template->assign('availabilityBlocks', $this->_workflow->getPhoneScreenAvailabilityBlocks());
+        $this->_template->assign('blackoutDates', $this->_workflow->getPhoneScreenBlackoutDates());
+        $this->_template->display('./modules/nesp/PhoneScreenAvailability.tpl');
+    }
+
+    private function savePhoneScreenAvailability()
+    {
+        $this->_workflow->savePhoneScreenAvailabilitySettings($_POST, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
+    }
+
+    private function createPhoneScreenAvailabilityBlock()
+    {
+        $weekday = isset($_POST['weekday']) ? (int) $_POST['weekday'] : 0;
+        $startTime = isset($_POST['startTime']) ? $_POST['startTime'] : '';
+        $endTime = isset($_POST['endTime']) ? $_POST['endTime'] : '';
+        if ($this->_workflow->createPhoneScreenAvailabilityBlock($weekday, $startTime, $endTime, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid day and time block.');
+        }
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
+    }
+
+    private function deletePhoneScreenAvailabilityBlock()
+    {
+        $availabilityBlockID = isset($_POST['availabilityBlockID']) ? (int) $_POST['availabilityBlockID'] : 0;
+        $this->_workflow->deletePhoneScreenAvailabilityBlock($availabilityBlockID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
+    }
+
+    private function createPhoneScreenBlackout()
+    {
+        $blackoutDate = isset($_POST['blackoutDate']) ? $_POST['blackoutDate'] : '';
+        $label = isset($_POST['label']) ? $_POST['label'] : '';
+        if ($this->_workflow->createPhoneScreenBlackout($blackoutDate, $label, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid blackout date.');
+        }
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
+    }
+
+    private function deletePhoneScreenBlackout()
+    {
+        $blackoutDateID = isset($_POST['blackoutDateID']) ? (int) $_POST['blackoutDateID'] : 0;
+        $this->_workflow->deletePhoneScreenBlackout($blackoutDateID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
     }
 
     private function confirmPhoneScreen()
@@ -457,15 +559,25 @@ class NESPUI extends UserInterface
         CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . (int) $phoneScreenID);
     }
 
-    private function startPhoneScreen()
+    private function markPhoneScreenInvitationCopied()
     {
         $phoneScreenID = isset($_POST['phoneScreenID']) ? (int) $_POST['phoneScreenID'] : 0;
-        $result = $this->_workflow->startPhoneScreenCall($phoneScreenID, $this->_userID);
-        if (empty($result['ok']))
-        {
-            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'The phone screen could not start: ' . $result['error']);
-        }
+        $this->_workflow->markPhoneScreenInvitationCopied($phoneScreenID, $this->_userID);
 
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . $phoneScreenID);
+    }
+
+    private function revokePhoneScreenSchedulingLink()
+    {
+        $phoneScreenID = isset($_POST['phoneScreenID']) ? (int) $_POST['phoneScreenID'] : 0;
+        $this->_workflow->revokePhoneScreenSchedulingLink($phoneScreenID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . $phoneScreenID);
+    }
+
+    private function allowPhoneScreenReschedule()
+    {
+        $phoneScreenID = isset($_POST['phoneScreenID']) ? (int) $_POST['phoneScreenID'] : 0;
+        $this->_workflow->allowPhoneScreenReschedule($phoneScreenID, $this->_userID);
         CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . $phoneScreenID);
     }
 

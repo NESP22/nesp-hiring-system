@@ -6,7 +6,7 @@
         <div id="contents">
             <div class="nesp-page-title">
                 <h2>Vapi Phone Screens</h2>
-                <p>Craig/admin-only review of phone-screen requests, call state, consent, and structured results.</p>
+                <p>Craig/admin-only review of scheduling links, upcoming calls, consent, and structured results.</p>
             </div>
 
             <div class="nesp-safety-banner">
@@ -25,6 +25,7 @@
                     ?>
                     <a class="<?php echo($isActive ? 'active' : ''); ?>" href="<?php echo($navURL); ?>"><?php $this->_($navItem['label']); ?></a>
                 <?php endforeach; ?>
+                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=phoneScreenAvailability">Availability</a>
             </div>
 
             <div class="nesp-panel">
@@ -40,6 +41,57 @@
             </div>
 
             <div class="nesp-panel">
+                <h3>Scheduling Queues</h3>
+                <?php
+                    $queueLabels = array(
+                        'ready' => 'Scheduling Links Ready',
+                        'waiting' => 'Waiting to Schedule',
+                        'today' => 'Phone Screens Today',
+                        'upcoming' => 'Upcoming Phone Screens',
+                        'reschedule' => 'No Answer / Reschedule Needed',
+                        'completed' => 'Completed Phone Screens'
+                    );
+                ?>
+                <div class="nesp-card-grid nesp-card-grid-tight">
+                    <?php foreach ($queueLabels as $queueKey => $queueLabel): ?>
+                    <div class="nesp-card">
+                        <span class="nesp-card-label"><?php $this->_($queueLabel); ?></span>
+                        <strong><?php echo(count($this->phoneScreenQueues[$queueKey])); ?></strong>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <?php foreach ($queueLabels as $queueKey => $queueLabel): ?>
+            <div class="nesp-panel">
+                <h3><?php $this->_($queueLabel); ?></h3>
+                <table class="nesp-table">
+                    <tr>
+                        <th>Candidate</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Scheduled</th>
+                        <th>Action</th>
+                    </tr>
+                    <?php foreach ($this->phoneScreenQueues[$queueKey] as $screen): ?>
+                    <tr>
+                        <td><?php $this->_($screen['candidate_name']); ?></td>
+                        <td><?php $this->_($screen['role_title']); ?></td>
+                        <td><?php $this->_($screen['status_label']); ?></td>
+                        <td><?php $this->_($screen['scheduled_display'] === '' ? 'Not scheduled' : $screen['scheduled_display']); ?></td>
+                        <td><a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=reviewPhoneScreen&amp;phoneScreenID=<?php echo((int) $screen['vapi_phone_screen_id']); ?>">Review</a></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (!count($this->phoneScreenQueues[$queueKey])): ?>
+                    <tr>
+                        <td colspan="5">No items in this queue.</td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
+            </div>
+            <?php endforeach; ?>
+
+            <div class="nesp-panel">
                 <h3>Recent Phone Screens</h3>
                 <table class="nesp-table">
                     <tr>
@@ -47,6 +99,7 @@
                         <th>Role</th>
                         <th>Destination</th>
                         <th>Status</th>
+                        <th>Scheduled</th>
                         <th>Consent</th>
                         <th>Last Change</th>
                         <th>Action</th>
@@ -56,7 +109,8 @@
                         <td><?php $this->_($screen['candidate_name']); ?></td>
                         <td><?php $this->_($screen['role_title']); ?></td>
                         <td><?php $this->_($screen['destination_phone_last4'] === '' ? 'Not stored' : '***-***-' . $screen['destination_phone_last4']); ?></td>
-                        <td><?php $this->_($screen['status_key']); ?></td>
+                        <td><?php $this->_($screen['status_label']); ?></td>
+                        <td><?php $this->_($screen['scheduled_display'] === '' ? 'Not scheduled' : $screen['scheduled_display']); ?></td>
                         <td><?php $this->_($screen['consent_status']); ?></td>
                         <td><?php $this->_($screen['date_modified']); ?></td>
                         <td><a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=reviewPhoneScreen&amp;phoneScreenID=<?php echo((int) $screen['vapi_phone_screen_id']); ?>">Review</a></td>
@@ -64,7 +118,7 @@
                     <?php endforeach; ?>
                     <?php if (!count($this->phoneScreens)): ?>
                     <tr>
-                        <td colspan="7">No phone-screen requests have been prepared.</td>
+                        <td colspan="8">No phone-screen requests have been prepared.</td>
                     </tr>
                     <?php endif; ?>
                 </table>
