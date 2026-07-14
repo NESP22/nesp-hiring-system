@@ -71,6 +71,12 @@ class NESPUI extends UserInterface
                 $this->createInterviewer();
                 break;
 
+            case 'updateInterviewerSettings':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->updateInterviewerSettings();
+                break;
+
             case 'createInterviewerRoleRule':
                 $this->adminOnly();
                 $this->requirePostCSRF();
@@ -84,9 +90,27 @@ class NESPUI extends UserInterface
                 break;
 
             case 'createInterviewerAvailability':
-                $this->adminOnly();
                 $this->requirePostCSRF();
                 $this->createInterviewerAvailability();
+                break;
+
+            case 'myAvailability':
+                $this->myAvailability();
+                break;
+
+            case 'setInterviewerAvailabilityStatus':
+                $this->requirePostCSRF();
+                $this->setInterviewerAvailabilityStatus();
+                break;
+
+            case 'createInterviewerAvailabilityOverride':
+                $this->requirePostCSRF();
+                $this->createInterviewerAvailabilityOverride();
+                break;
+
+            case 'createInterviewerBlackout':
+                $this->requirePostCSRF();
+                $this->createInterviewerBlackout();
                 break;
 
             case 'interviewerAccess':
@@ -172,10 +196,15 @@ class NESPUI extends UserInterface
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('featureFlags', $this->_workflow->getFeatureFlags());
         $this->_template->assign('interviewerProfiles', $this->_workflow->getInterviewerProfiles());
+        $this->_template->assign('jobRoleOptions', NESPWorkflow::getInterviewerJobRoleOptions());
+        $this->_template->assign('accountStates', NESPWorkflow::getInterviewerAccountStates());
+        $this->_template->assign('seedProfiles', NESPWorkflow::getApprovedRealInterviewerSeedProfiles());
         $this->_template->assign('assignmentRules', $this->_workflow->getInterviewerRoleRules());
         $this->_template->assign('assignmentRuleExamples', NESPWorkflow::getDefaultAssignmentRuleExamples());
         $this->_template->assign('availabilityTemplate', NESPWorkflow::getDefaultAvailabilityTemplate());
         $this->_template->assign('interviewerAvailability', $this->_workflow->getInterviewerAvailability());
+        $this->_template->assign('availabilityOverrides', $this->_workflow->getInterviewerAvailabilityOverrides());
+        $this->_template->assign('interviewerBlackouts', $this->_workflow->getInterviewerBlackouts());
         $this->_template->assign('scorecards', $this->_workflow->getScorecardSummaries(50));
         $this->_template->assign('summary', $this->_workflow->getInterviewerAccessSummary());
         $this->_template->display('./modules/nesp/Settings.tpl');
@@ -203,10 +232,61 @@ class NESPUI extends UserInterface
         $displayName = isset($_POST['displayName']) ? $_POST['displayName'] : '';
         $email = isset($_POST['email']) ? $_POST['email'] : '';
         $roleKey = isset($_POST['roleKey']) ? $_POST['roleKey'] : 'interviewer';
+        $approvedJobs = isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array();
+        $options = array(
+            'account_state_key' => isset($_POST['accountStateKey']) ? $_POST['accountStateKey'] : 'profile_created',
+            'approved_joborder_ids' => $approvedJobs,
+            'timezone' => isset($_POST['timezone']) ? $_POST['timezone'] : 'America/New_York',
+            'max_interviews_per_day' => isset($_POST['maxInterviewsPerDay']) ? $_POST['maxInterviewsPerDay'] : 3,
+            'max_interviews_per_week' => isset($_POST['maxInterviewsPerWeek']) ? $_POST['maxInterviewsPerWeek'] : 12,
+            'default_interview_minutes' => isset($_POST['defaultInterviewMinutes']) ? $_POST['defaultInterviewMinutes'] : 30,
+            'buffer_minutes' => isset($_POST['bufferMinutes']) ? $_POST['bufferMinutes'] : 15,
+            'earliest_time' => isset($_POST['earliestTime']) ? $_POST['earliestTime'] : '09:00',
+            'latest_time' => isset($_POST['latestTime']) ? $_POST['latestTime'] : '17:00',
+            'craig_must_attend' => isset($_POST['craigMustAttend']) ? 1 : 0,
+            'may_recommend' => isset($_POST['mayRecommend']) ? 1 : 0,
+            'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
+            'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : ''
+        );
 
-        if ($this->_workflow->createInactiveInterviewerProfile($displayName, $email, $roleKey, $this->_userID) === false)
+        if ($this->_workflow->createInactiveInterviewerProfile($displayName, $email, $roleKey, $this->_userID, $options) === false)
         {
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Interviewer display name is required.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
+    private function updateInterviewerSettings()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        $settings = array(
+            'display_name' => isset($_POST['displayName']) ? $_POST['displayName'] : '',
+            'email' => isset($_POST['email']) ? $_POST['email'] : '',
+            'role_key' => isset($_POST['roleKey']) ? $_POST['roleKey'] : 'interviewer',
+            'is_active' => isset($_POST['isActive']) ? 1 : 0,
+            'user_id' => isset($_POST['linkedUserID']) ? (int) $_POST['linkedUserID'] : 0,
+            'account_state_key' => isset($_POST['accountStateKey']) ? $_POST['accountStateKey'] : 'profile_created',
+            'availability_status_key' => isset($_POST['availabilityStatusKey']) ? $_POST['availabilityStatusKey'] : 'open',
+            'availability_closed_until' => isset($_POST['availabilityClosedUntil']) ? $_POST['availabilityClosedUntil'] : '',
+            'availability_close_reason' => isset($_POST['availabilityCloseReason']) ? $_POST['availabilityCloseReason'] : '',
+            'timezone' => isset($_POST['timezone']) ? $_POST['timezone'] : 'America/New_York',
+            'max_interviews_per_day' => isset($_POST['maxInterviewsPerDay']) ? $_POST['maxInterviewsPerDay'] : 3,
+            'max_interviews_per_week' => isset($_POST['maxInterviewsPerWeek']) ? $_POST['maxInterviewsPerWeek'] : 12,
+            'default_interview_minutes' => isset($_POST['defaultInterviewMinutes']) ? $_POST['defaultInterviewMinutes'] : 30,
+            'buffer_minutes' => isset($_POST['bufferMinutes']) ? $_POST['bufferMinutes'] : 15,
+            'earliest_time' => isset($_POST['earliestTime']) ? $_POST['earliestTime'] : '09:00',
+            'latest_time' => isset($_POST['latestTime']) ? $_POST['latestTime'] : '17:00',
+            'craig_must_attend' => isset($_POST['craigMustAttend']) ? 1 : 0,
+            'may_recommend' => isset($_POST['mayRecommend']) ? 1 : 0,
+            'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
+            'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
+            'approved_joborder_ids' => isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array()
+        );
+
+        if ($this->_workflow->updateInterviewerSettings($interviewerProfileID, $settings, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to update interviewer settings.');
         }
 
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
@@ -229,6 +309,104 @@ class NESPUI extends UserInterface
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
     }
 
+    private function myAvailability()
+    {
+        $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+        if (empty($profile))
+        {
+            CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'No active interviewer profile is linked to your account.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Interviews');
+        $this->_template->assign('profile', $profile);
+        $this->_template->assign('availability', $this->_workflow->getAvailabilityForProfile($profile['interviewer_profile_id']));
+        $this->_template->assign('availabilityTemplate', NESPWorkflow::getDefaultAvailabilityTemplate());
+        $this->_template->display('./modules/nesp/MyAvailability.tpl');
+    }
+
+    private function setInterviewerAvailabilityStatus()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can edit only your own availability.');
+            }
+        }
+
+        $statusKey = isset($_POST['availabilityStatusKey']) ? $_POST['availabilityStatusKey'] : 'open';
+        $reason = isset($_POST['availabilityCloseReason']) ? $_POST['availabilityCloseReason'] : '';
+        $closedUntil = isset($_POST['availabilityClosedUntil']) ? $_POST['availabilityClosedUntil'] : '';
+        if ($this->_workflow->setInterviewerAvailabilityStatus($interviewerProfileID, $statusKey, $reason, $closedUntil, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to update availability status.');
+        }
+
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
+    }
+
+    private function createInterviewerAvailabilityOverride()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can edit only your own availability.');
+            }
+        }
+
+        $result = $this->_workflow->createInterviewerAvailabilityOverride(
+            $interviewerProfileID,
+            isset($_POST['overrideDate']) ? $_POST['overrideDate'] : '',
+            isset($_POST['overrideTypeKey']) ? $_POST['overrideTypeKey'] : 'available',
+            isset($_POST['startTime']) ? $_POST['startTime'] : '',
+            isset($_POST['endTime']) ? $_POST['endTime'] : '',
+            isset($_POST['timezone']) ? $_POST['timezone'] : 'America/New_York',
+            isset($_POST['privateReason']) ? $_POST['privateReason'] : '',
+            $this->_userID
+        );
+        if ($result === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to save date override.');
+        }
+
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
+    }
+
+    private function createInterviewerBlackout()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can edit only your own availability.');
+            }
+        }
+
+        $result = $this->_workflow->createInterviewerBlackout(
+            $interviewerProfileID,
+            isset($_POST['startsAt']) ? $_POST['startsAt'] : '',
+            isset($_POST['endsAt']) ? $_POST['endsAt'] : '',
+            isset($_POST['isAllDay']) ? 1 : 0,
+            isset($_POST['timezone']) ? $_POST['timezone'] : 'America/New_York',
+            isset($_POST['privateReason']) ? $_POST['privateReason'] : '',
+            $this->_userID
+        );
+        if ($result === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to save blackout.');
+        }
+
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
+    }
+
     private function createCandidateGrant()
     {
         $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
@@ -246,12 +424,20 @@ class NESPUI extends UserInterface
     private function createInterviewerAvailability()
     {
         $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can edit only your own availability.');
+            }
+        }
         $weekdayKey = isset($_POST['weekdayKey']) ? $_POST['weekdayKey'] : '';
         $startTime = isset($_POST['startTime']) ? $_POST['startTime'] : '';
         $endTime = isset($_POST['endTime']) ? $_POST['endTime'] : '';
         $timezone = isset($_POST['timezone']) ? $_POST['timezone'] : '';
         $slotMinutes = isset($_POST['slotMinutes']) ? (int) $_POST['slotMinutes'] : 30;
-        $bufferMinutes = isset($_POST['bufferMinutes']) ? (int) $_POST['bufferMinutes'] : 10;
+        $bufferMinutes = isset($_POST['bufferMinutes']) ? (int) $_POST['bufferMinutes'] : 15;
         $notes = isset($_POST['notes']) ? $_POST['notes'] : '';
 
         if ($this->_workflow->createInterviewerAvailability($interviewerProfileID, $weekdayKey, $startTime, $endTime, $timezone, $slotMinutes, $bufferMinutes, $notes, $this->_userID) === false)
@@ -259,7 +445,7 @@ class NESPUI extends UserInterface
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Choose an interviewer, weekday, and valid start/end time.');
         }
 
-        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
     }
 
     private function interviewerAccess()

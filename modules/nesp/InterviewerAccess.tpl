@@ -6,7 +6,7 @@
         <div id="contents">
             <div class="nesp-page-title">
                 <h2>NESP Interviewer Access</h2>
-                <p>Scoped interviewer permissions are available in the database foundation. No real interviewer accounts are created by this draft PR.</p>
+                <p>Scoped interviewer permissions are enforced by profile state, approved job roles, explicit candidate grants, and server-side authorization.</p>
             </div>
 
             <div class="nesp-card-grid">
@@ -33,6 +33,7 @@
                 <ul class="nesp-list">
                     <li>Interviewers will use individual OpenCATS accounts after scoped access is implemented and tested.</li>
                     <li>Candidate visibility is based on explicit candidate and job grants, not broad OpenCATS recruiter permissions.</li>
+                    <li>Candidate grants require an active, open interviewer profile approved for that exact job.</li>
                     <li>Scorecards and notes are tied to assigned interviews and stored in MariaDB.</li>
                     <li>System administration, integration secrets, and feature flags remain administrator-only.</li>
                 </ul>

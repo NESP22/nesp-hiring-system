@@ -12,7 +12,10 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_interviewer_profile',
             'nesp_interviewer_candidate_grant',
             'nesp_interviewer_role_rule',
+            'nesp_interviewer_job_role',
             'nesp_interviewer_availability',
+            'nesp_interviewer_availability_override',
+            'nesp_interviewer_blackout',
             'nesp_interview_slot',
             'nesp_interview',
             'nesp_scorecard_template',
@@ -45,7 +48,10 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(4, $this->countRowsWhere('nesp_integration_status', "status_key = 'disabled'"));
         $this->assertSame(0, $this->countRows('nesp_interviewer_profile'));
         $this->assertSame(0, $this->countRows('nesp_interviewer_role_rule'));
+        $this->assertSame(0, $this->countRows('nesp_interviewer_job_role'));
         $this->assertSame(0, $this->countRows('nesp_interviewer_availability'));
+        $this->assertSame(0, $this->countRows('nesp_interviewer_availability_override'));
+        $this->assertSame(0, $this->countRows('nesp_interviewer_blackout'));
         $this->assertSame(0, $this->countRows('nesp_interview_slot'));
         $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
         $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
@@ -60,6 +66,14 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_candidate_workflow', 'due_at'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'can_add_notes'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'can_submit_scorecard'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'account_state_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'availability_status_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'max_interviews_per_day'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'max_interviews_per_week'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'email_warning'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_job_role', 'joborder_id'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_availability_override', 'override_type_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_blackout', 'private_reason'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_scorecard_response', 'locked_at'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_scorecard_response', 'unlocked_at'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_scorecard_response', 'unlocked_by_user_id'));
