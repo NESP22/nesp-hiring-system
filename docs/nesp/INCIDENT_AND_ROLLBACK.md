@@ -51,3 +51,24 @@ Immediate feature rollback:
 - Set `NESP_INTERVIEWER_POOL_ENABLED = 0` to hide interviewer dashboards and scoped assigned-candidate routes.
 - Set `NESP_STAFFING_FORECAST_ENABLED = 0` to hide the staffing forecast shell.
 - Leave `NESP_STAFFING_DRIVE_IMPORT_ENABLED = 0`, `NESP_PRESCREEN_ENABLED = 0`, `NESP_VAPI_ENABLED = 0`, `NESP_ZOOM_ENABLED = 0`, and `NESP_AI_REVIEW_ENABLED = 0`.
+
+## Vapi Immediate Rollback
+
+Use this section for the hiring phone-screen integration only.
+
+1. Set `NESP_VAPI_ENABLED=0`.
+2. Disable or remove the hiring assistant server URL if the webhook is compromised.
+3. Rotate `VAPI_WEBHOOK_SECRET`.
+4. Preserve `nesp_audit_event` and `nesp_vapi_webhook_event` for incident review.
+5. If schema rollback is required, run `db/nesp_vapi_phone_screen_rollback.sql` only after preserving any audit evidence needed.
+
+Rollback SQL:
+
+```sql
+UPDATE nesp_feature_flag
+SET is_enabled = 0,
+    date_modified = NOW()
+WHERE flag_key = 'NESP_VAPI_ENABLED';
+```
+
+Do not delete or alter the existing Customer Service Vapi phone number or assistants during hiring rollback.

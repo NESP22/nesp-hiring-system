@@ -344,6 +344,37 @@
     line-height: 1.6;
 }
 
+.nesp-detail-list {
+    display: grid;
+    grid-template-columns: minmax(120px, 180px) 1fr;
+    gap: 8px 14px;
+    margin: 0 0 14px;
+    font-size: 13px;
+}
+
+.nesp-detail-list dt {
+    color: #4a5968;
+    font-weight: bold;
+}
+
+.nesp-detail-list dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.nesp-script-preview {
+    margin: 0;
+    padding: 12px;
+    background: #f8fafc;
+    border: 1px solid #d7dee8;
+    color: #1b2733;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
 @media (max-width: 700px) {
     .nesp-workflow #contents {
         padding: 14px 10px 28px;
@@ -368,5 +399,10 @@
     .nesp-table th,
     .nesp-table td {
         padding: 7px 6px;
+    }
+
+    .nesp-detail-list {
+        grid-template-columns: 1fr;
+        gap: 3px;
     }
 }

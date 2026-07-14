@@ -2277,19 +2277,58 @@ class CATSSchema
 
                 CREATE TABLE IF NOT EXISTS `nesp_vapi_phone_screen` (
                   `vapi_phone_screen_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `call_request_key` CHAR(64) COLLATE utf8mb4_unicode_ci,
                   `candidate_id` INT(11) NOT NULL,
                   `joborder_id` INT(11) NOT NULL,
+                  `destination_phone_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `destination_phone_last4` CHAR(4) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
                   `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_requested',
                   `provider_call_id` VARCHAR(128) COLLATE utf8mb4_unicode_ci,
+                  `consent_status` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_requested',
+                  `consent_requested_at` DATETIME,
+                  `consent_response_raw` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `consent_accepted_at` DATETIME,
+                  `transcript_text` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+                  `structured_result_json` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
                   `result_summary` TEXT COLLATE utf8mb4_unicode_ci,
                   `transcript_storage_path` VARCHAR(255) COLLATE utf8mb4_unicode_ci,
+                  `provider_end_reason` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `last_webhook_event_id` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `last_webhook_at` DATETIME,
+                  `requested_by_user_id` INT(11),
                   `approved_by_user_id` INT(11),
+                  `caller_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NESP Hiring',
+                  `assistant_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NESP Hiring Phone Screen',
+                  `started_at` DATETIME,
+                  `completed_at` DATETIME,
+                  `cancelled_at` DATETIME,
                   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   PRIMARY KEY (`vapi_phone_screen_id`),
+                  UNIQUE KEY `IDX_call_request_key` (`call_request_key`),
+                  UNIQUE KEY `IDX_provider_call_id` (`provider_call_id`),
                   KEY `IDX_candidate_id` (`candidate_id`),
                   KEY `IDX_joborder_id` (`joborder_id`),
-                  KEY `IDX_status_key` (`status_key`)
+                  KEY `IDX_status_key` (`status_key`),
+                  KEY `IDX_consent_status` (`consent_status`),
+                  KEY `IDX_last_webhook_event_id` (`last_webhook_event_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_vapi_webhook_event` (
+                  `vapi_webhook_event_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `provider_event_id` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `provider_call_id` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `event_type` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `event_timestamp` DATETIME,
+                  `payload_sha256` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `redacted_payload_json` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+                  `processed_at` DATETIME,
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`vapi_webhook_event_id`),
+                  UNIQUE KEY `IDX_provider_event_id` (`provider_event_id`),
+                  KEY `IDX_provider_call_id` (`provider_call_id`),
+                  KEY `IDX_event_type` (`event_type`),
+                  KEY `IDX_event_timestamp` (`event_timestamp`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
                 CREATE TABLE IF NOT EXISTS `nesp_zoom_interview` (
