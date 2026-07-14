@@ -129,6 +129,11 @@ class NESPUI extends UserInterface
 
     private function dashboard($viewKey = 'dashboard')
     {
+        if (!in_array($viewKey, array('dashboard', 'waiting', 'interviews', 'completed')))
+        {
+            $viewKey = 'dashboard';
+        }
+
         $queues = $this->_workflow->getDashboardQueues();
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', $this->subTabFromView($viewKey));
