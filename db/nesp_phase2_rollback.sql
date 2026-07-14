@@ -36,6 +36,9 @@ DROP TABLE IF EXISTS `nesp_staffing_import_issue`;
 DROP TABLE IF EXISTS `nesp_staffing_import_row`;
 DROP TABLE IF EXISTS `nesp_staffing_import_batch`;
 DROP TABLE IF EXISTS `nesp_staffing_schedule_history`;
+DROP TABLE IF EXISTS `nesp_interview_slot`;
+DROP TABLE IF EXISTS `nesp_interviewer_availability`;
+DROP TABLE IF EXISTS `nesp_interviewer_role_rule`;
 DROP TABLE IF EXISTS `nesp_session_security_event`;
 
 ALTER TABLE `nesp_scorecard_response`

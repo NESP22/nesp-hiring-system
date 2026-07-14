@@ -7,6 +7,9 @@
 - Dashboard queues are query-backed.
 - Empty states and sensible queue limits are present.
 - Scoped interviewer assigned-candidate views are grant-gated.
+- Interviewer role routing rules suggest owners by role text or exact job ID.
+- Interviewer availability and internal interview slots are stored with Zoom disabled.
+- Dashboard follow-through counts show assigned work, open interviews, scorecards due, overdue work, and availability blocks.
 - Scorecards support draft save, submit, lock, and Craig/admin unlock.
 - Staffing source status, import lineage, import issues, formulas, hiring gap, and draft recommendations are implemented.
 - Additive, rollback, fake fixture, and preflight SQL files are present.
@@ -14,7 +17,7 @@
 ## Tested Locally
 
 - `git diff --check`.
-- Unit coverage was added for feature flags, dashboard queue definitions, CSV normalization, and forecast formulas.
+- Unit coverage was added for feature flags, dashboard queue definitions, routing suggestions, availability defaults, CSV normalization, and forecast formulas.
 - Integration coverage was updated for Phase 2 tables and columns.
 
 ## Fixture-Only
@@ -30,10 +33,13 @@
 - Controlled Render deployment.
 - Controlled additive migration.
 - Explicit Craig approval before any feature flag is enabled.
+- Explicit Craig approval before real interviewer access, applicant self-booking, or Zoom creation is enabled.
 - Read-only Google Drive credentials for real schedule discovery/import.
 
 ## Deferred
 
 - Real Google Drive import execution.
 - Real historical schedule normalization.
+- Real applicant self-booking pages.
+- Real Zoom meeting creation.
 - Screenshot capture if no browser/PHP runtime is available locally.

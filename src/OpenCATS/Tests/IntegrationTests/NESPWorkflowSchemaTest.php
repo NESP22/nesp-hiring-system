@@ -11,6 +11,9 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_candidate_workflow',
             'nesp_interviewer_profile',
             'nesp_interviewer_candidate_grant',
+            'nesp_interviewer_role_rule',
+            'nesp_interviewer_availability',
+            'nesp_interview_slot',
             'nesp_interview',
             'nesp_scorecard_template',
             'nesp_scorecard_response',
@@ -41,6 +44,9 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(17, $this->countRows('nesp_workflow_stage'));
         $this->assertSame(4, $this->countRowsWhere('nesp_integration_status', "status_key = 'disabled'"));
         $this->assertSame(0, $this->countRows('nesp_interviewer_profile'));
+        $this->assertSame(0, $this->countRows('nesp_interviewer_role_rule'));
+        $this->assertSame(0, $this->countRows('nesp_interviewer_availability'));
+        $this->assertSame(0, $this->countRows('nesp_interview_slot'));
         $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
         $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
         $this->assertSame(8, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
@@ -57,6 +63,9 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_scorecard_response', 'locked_at'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_scorecard_response', 'unlocked_at'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_scorecard_response', 'unlocked_by_user_id'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_role_rule', 'assignment_mode'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_availability', 'slot_minutes'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interview_slot', 'zoom_status_key'));
     }
 
     private function countMatchingTables($table)

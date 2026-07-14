@@ -22,6 +22,15 @@ WHERE `candidate_id` IN (920001, 920002, 920003, 920004);
 DELETE FROM `nesp_interview`
 WHERE `candidate_id` IN (920001, 920002, 920003, 920004);
 
+DELETE FROM `nesp_interview_slot`
+WHERE `interviewer_profile_id` IN (920001, 920002);
+
+DELETE FROM `nesp_interviewer_availability`
+WHERE `interviewer_profile_id` IN (920001, 920002);
+
+DELETE FROM `nesp_interviewer_role_rule`
+WHERE `interviewer_profile_id` IN (920001, 920002);
+
 DELETE FROM `nesp_interviewer_candidate_grant`
 WHERE `candidate_id` IN (920001, 920002, 920003, 920004);
 
@@ -87,11 +96,25 @@ ON DUPLICATE KEY UPDATE `workflow_stage_id` = VALUES(`workflow_stage_id`), `summ
 INSERT INTO `nesp_interviewer_profile`
     (`interviewer_profile_id`, `user_id`, `display_name`, `email`, `role_key`, `is_active`, `can_view_resume`, `can_add_notes`, `can_submit_scorecard`, `date_created`, `date_modified`)
 VALUES
-    (920001, 1, 'Fixture Interviewer', 'fixture.interviewer@example.test', 'interviewer', 1, 1, 1, 1, NOW(), NOW())
+    (920001, 1, 'Fixture Photographer Lead', 'fixture.photographer.lead@example.test', 'lead_interviewer', 1, 1, 1, 1, NOW(), NOW()),
+    (920002, 1, 'Fixture Customer Service Reviewer', 'fixture.customer.service@example.test', 'interviewer', 1, 1, 1, 1, NOW(), NOW())
 ON DUPLICATE KEY UPDATE
     display_name = VALUES(display_name),
     is_active = 1,
     date_modified = NOW();
+
+INSERT INTO `nesp_interviewer_role_rule`
+    (`interviewer_profile_id`, `joborder_id`, `role_match_text`, `assignment_mode`, `priority`, `is_active`, `notes`, `created_by_user_id`, `date_created`, `date_modified`)
+VALUES
+    (920001, NULL, 'photographer', 'suggest_only', 10, 1, 'Synthetic rule for staff and freelance photographer routing.', 1, NOW(), NOW()),
+    (920002, NULL, 'customer service', 'suggest_only', 20, 1, 'Synthetic rule for customer service routing.', 1, NOW(), NOW());
+
+INSERT INTO `nesp_interviewer_availability`
+    (`interviewer_profile_id`, `weekday_key`, `start_time`, `end_time`, `timezone`, `slot_minutes`, `buffer_minutes`, `is_active`, `notes`, `created_by_user_id`, `date_created`, `date_modified`)
+VALUES
+    (920001, 'Tuesday', '17:00:00', '20:00:00', 'America/New_York', 30, 10, 1, 'Synthetic evening interview block.', 1, NOW(), NOW()),
+    (920001, 'Saturday', '10:00:00', '13:00:00', 'America/New_York', 30, 10, 1, 'Synthetic weekend interview block.', 1, NOW(), NOW()),
+    (920002, 'Wednesday', '09:00:00', '11:00:00', 'America/New_York', 30, 10, 1, 'Synthetic customer service interview block.', 1, NOW(), NOW());
 
 INSERT INTO `nesp_interviewer_candidate_grant`
     (`interviewer_profile_id`, `candidate_id`, `joborder_id`, `granted_by_user_id`, `access_level_key`, `can_view_resume`, `can_add_notes`, `can_submit_scorecard`, `date_granted`, `date_revoked`)
@@ -104,6 +127,14 @@ INSERT INTO `nesp_interview`
 VALUES
     (920003, 920001, 920001, DATE_ADD(NOW(), INTERVAL 2 DAY), DATE_ADD(DATE_ADD(NOW(), INTERVAL 2 DAY), INTERVAL 30 MINUTE), 'scheduled', NOW(), NOW()),
     (920004, 920001, 920001, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(DATE_SUB(NOW(), INTERVAL 1 DAY), INTERVAL 30 MINUTE), 'complete', NOW(), NOW());
+
+INSERT INTO `nesp_interview_slot`
+    (`interviewer_profile_id`, `availability_id`, `candidate_id`, `joborder_id`, `scheduled_start`, `scheduled_end`, `slot_status_key`, `source_key`, `zoom_status_key`, `booking_token_hash`, `notes`, `created_by_user_id`, `date_created`, `date_modified`)
+SELECT 920001, `availability_id`, NULL, NULL, DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 5 DAY), INTERVAL 10 HOUR), DATE_ADD(DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 5 DAY), INTERVAL 10 HOUR), INTERVAL 30 MINUTE), 'open', 'fixture', 'disabled', '', 'Synthetic open interview slot. No Zoom meeting exists.', 1, NOW(), NOW()
+FROM `nesp_interviewer_availability`
+WHERE `interviewer_profile_id` = 920001
+  AND `weekday_key` = 'Saturday'
+LIMIT 1;
 
 INSERT INTO `nesp_staffing_schedule_history`
     (`season_year`, `season_name`, `week_start`, `event_count`, `photographer_slots`, `photographer_hours`, `source_label`, `notes`, `date_created`, `date_modified`)

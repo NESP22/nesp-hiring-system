@@ -60,6 +60,24 @@ class NESPUI extends UserInterface
                 $this->createInterviewer();
                 break;
 
+            case 'createInterviewerRoleRule':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->createInterviewerRoleRule();
+                break;
+
+            case 'createCandidateGrant':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->createCandidateGrant();
+                break;
+
+            case 'createInterviewerAvailability':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->createInterviewerAvailability();
+                break;
+
             case 'interviewerAccess':
                 $this->adminOnly();
                 $this->interviewerAccess();
@@ -121,6 +139,8 @@ class NESPUI extends UserInterface
         $this->_template->assign('upcomingInterviews', $this->_workflow->getUpcomingInterviews(20));
         $this->_template->assign('integrationStatuses', $this->_workflow->getIntegrationStatuses());
         $this->_template->assign('workflowStages', $this->_workflow->getWorkflowStages());
+        $this->_template->assign('assignmentSuggestions', $this->_workflow->getAssignmentSuggestions(50));
+        $this->_template->assign('interviewerAccountability', $this->_workflow->getInterviewerAccountability());
         $this->_template->display('./modules/nesp/Dashboard.tpl');
     }
 
@@ -130,6 +150,10 @@ class NESPUI extends UserInterface
         $this->_template->assign('subActive', 'Settings');
         $this->_template->assign('featureFlags', $this->_workflow->getFeatureFlags());
         $this->_template->assign('interviewerProfiles', $this->_workflow->getInterviewerProfiles());
+        $this->_template->assign('assignmentRules', $this->_workflow->getInterviewerRoleRules());
+        $this->_template->assign('assignmentRuleExamples', NESPWorkflow::getDefaultAssignmentRuleExamples());
+        $this->_template->assign('availabilityTemplate', NESPWorkflow::getDefaultAvailabilityTemplate());
+        $this->_template->assign('interviewerAvailability', $this->_workflow->getInterviewerAvailability());
         $this->_template->assign('scorecards', $this->_workflow->getScorecardSummaries(50));
         $this->_template->assign('summary', $this->_workflow->getInterviewerAccessSummary());
         $this->_template->display('./modules/nesp/Settings.tpl');
@@ -166,12 +190,63 @@ class NESPUI extends UserInterface
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
     }
 
+    private function createInterviewerRoleRule()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+        $roleMatchText = isset($_POST['roleMatchText']) ? $_POST['roleMatchText'] : '';
+        $assignmentMode = isset($_POST['assignmentMode']) ? $_POST['assignmentMode'] : 'suggest_only';
+        $priority = isset($_POST['priority']) ? (int) $_POST['priority'] : 50;
+        $notes = isset($_POST['notes']) ? $_POST['notes'] : '';
+
+        if ($this->_workflow->createInterviewerRoleRule($interviewerProfileID, $jobOrderID, $roleMatchText, $assignmentMode, $priority, $notes, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Choose an interviewer and enter a role match or job ID.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
+    private function createCandidateGrant()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
+        $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+
+        if ($this->_workflow->createCandidateGrant($interviewerProfileID, $candidateID, $jobOrderID, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Choose an interviewer, candidate ID, and job ID.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
+    private function createInterviewerAvailability()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        $weekdayKey = isset($_POST['weekdayKey']) ? $_POST['weekdayKey'] : '';
+        $startTime = isset($_POST['startTime']) ? $_POST['startTime'] : '';
+        $endTime = isset($_POST['endTime']) ? $_POST['endTime'] : '';
+        $timezone = isset($_POST['timezone']) ? $_POST['timezone'] : '';
+        $slotMinutes = isset($_POST['slotMinutes']) ? (int) $_POST['slotMinutes'] : 30;
+        $bufferMinutes = isset($_POST['bufferMinutes']) ? (int) $_POST['bufferMinutes'] : 10;
+        $notes = isset($_POST['notes']) ? $_POST['notes'] : '';
+
+        if ($this->_workflow->createInterviewerAvailability($interviewerProfileID, $weekdayKey, $startTime, $endTime, $timezone, $slotMinutes, $bufferMinutes, $notes, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Choose an interviewer, weekday, and valid start/end time.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
     private function interviewerAccess()
     {
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Settings');
         $this->_template->assign('summary', $this->_workflow->getInterviewerAccessSummary());
         $this->_template->assign('interviewerProfiles', $this->_workflow->getInterviewerProfiles());
+        $this->_template->assign('interviewerAccountability', $this->_workflow->getInterviewerAccountability());
         $this->_template->display('./modules/nesp/InterviewerAccess.tpl');
     }
 

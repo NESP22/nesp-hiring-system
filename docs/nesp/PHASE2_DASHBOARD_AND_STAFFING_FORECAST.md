@@ -12,6 +12,8 @@ Primary views:
 - Completed: hired, hold, not selected, withdrawn, declined, and scorecard-complete records.
 - Staffing Forecast: seasonal photographer demand planning.
 - Settings: feature flags, inactive interviewer-profile staging, and audit-reviewed controls.
+- Interviewer routing: admin-created role rules suggest an interviewer by role text or exact job ID.
+- Scheduling foundation: interviewer availability and internal interview slots are stored with Zoom disabled.
 
 Each candidate card shows candidate name, applied role, current stage, waiting party, factual summary, last activity, one primary action, and small secondary links.
 
@@ -41,6 +43,11 @@ The current calculation groups historical rows by month and estimates:
 - low/medium confidence based on available history rows
 
 The forecast is read-only planning guidance. It does not create job postings, send messages, change applicant stages, or enable feature flags.
+
+The interviewer routing and scheduling foundation is also read-only until Craig
+approves a specific workflow action. Routing rules suggest an owner but do not
+grant candidate access automatically. Availability blocks and interview slots do
+not email applicants, send SMS, create Zoom meetings, or change statuses.
 
 ## Test Fixture Boundary
 

@@ -24,6 +24,9 @@ FROM information_schema.tables
 WHERE table_schema = DATABASE()
   AND table_name IN (
     'nesp_session_security_event',
+    'nesp_interviewer_role_rule',
+    'nesp_interviewer_availability',
+    'nesp_interview_slot',
     'nesp_staffing_schedule_history',
     'nesp_staffing_import_batch',
     'nesp_staffing_import_row',
@@ -37,6 +40,9 @@ FROM information_schema.tables
 WHERE table_schema = DATABASE()
   AND table_name IN (
     'nesp_session_security_event',
+    'nesp_interviewer_role_rule',
+    'nesp_interviewer_availability',
+    'nesp_interview_slot',
     'nesp_staffing_schedule_history',
     'nesp_staffing_import_batch',
     'nesp_staffing_import_row',

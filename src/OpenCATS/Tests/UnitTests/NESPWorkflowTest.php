@@ -81,6 +81,39 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('textarea', $questions[3]['type']);
     }
 
+    public function testAssignmentRuleExamplesAreSuggestOnly()
+    {
+        $examples = NESPWorkflow::getDefaultAssignmentRuleExamples();
+
+        $this->assertCount(3, $examples);
+        foreach ($examples as $example)
+        {
+            $this->assertSame('suggest_only', $example['assignment_mode']);
+        }
+    }
+
+    public function testAssignmentRuleMatchingUsesRoleText()
+    {
+        $rules = array(
+            array('role_match_text' => 'customer service', 'interviewer_name' => 'Craig Fixture', 'is_active' => 1),
+            array('role_match_text' => 'photographer', 'interviewer_name' => 'Suthir Fixture', 'is_active' => 1)
+        );
+
+        $match = NESPWorkflow::matchAssignmentRuleForRole('Freelance/Contract Youth Sports Photographer', $rules);
+
+        $this->assertSame('Suthir Fixture', $match['interviewer_name']);
+        $this->assertSame(array(), NESPWorkflow::matchAssignmentRuleForRole('Weekend Table Greeter', $rules));
+    }
+
+    public function testAvailabilityTemplateDoesNotEnableZoom()
+    {
+        $template = NESPWorkflow::getDefaultAvailabilityTemplate();
+
+        $this->assertSame('America/New_York', $template['timezone']);
+        $this->assertSame(30, $template['slot_minutes']);
+        $this->assertStringContainsString('Zoom creation remain disabled', $template['notes']);
+    }
+
     public function testStaffingCSVParserHandlesDatesInRows()
     {
         $csv = "Date,Start,End,State,Sport,Event,Role,Staff\n"

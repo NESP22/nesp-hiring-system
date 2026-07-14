@@ -44,7 +44,7 @@
 }
 
 .nesp-card-grid-compact {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .nesp-card-grid-tight {
@@ -83,6 +83,12 @@
     margin: 0 0 10px;
     color: #071e41;
     font-size: 17px;
+}
+
+.nesp-panel h4 {
+    margin: 0 0 8px;
+    color: #1b2733;
+    font-size: 14px;
 }
 
 .nesp-dashboard-nav {
@@ -238,6 +244,21 @@
     color: #536579;
     font-size: 12px;
     line-height: 1.45;
+}
+
+.nesp-reference-list {
+    margin-top: 12px;
+    border: 1px solid #d7dee8;
+    background: #f7f9fc;
+    padding: 10px;
+    color: #394b5f;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.nesp-reference-list ul {
+    margin: 6px 0 0 18px;
+    padding: 0;
 }
 
 .nesp-empty {

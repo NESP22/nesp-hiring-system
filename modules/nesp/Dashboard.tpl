@@ -41,7 +41,77 @@
                     <span class="nesp-card-label">Interviews This Week</span>
                     <strong><?php $this->_($this->summary['interviewsThisWeek']); ?></strong>
                 </div>
+                <div class="nesp-card">
+                    <span class="nesp-card-label">Overdue</span>
+                    <strong><?php $this->_($this->summary['overdueItems']); ?></strong>
+                </div>
+                <div class="nesp-card">
+                    <span class="nesp-card-label">Routing Rules</span>
+                    <strong><?php $this->_($this->summary['assignmentRules']); ?></strong>
+                </div>
+                <div class="nesp-card">
+                    <span class="nesp-card-label">Availability Blocks</span>
+                    <strong><?php $this->_($this->summary['availabilityBlocks']); ?></strong>
+                </div>
             </div>
+
+            <?php if ($this->viewKey === 'dashboard' || $this->viewKey === 'interviews'): ?>
+            <div class="nesp-two-column">
+                <div class="nesp-panel">
+                    <h3>Suggested Interviewer Routing</h3>
+                    <?php if (count($this->assignmentSuggestions)): ?>
+                        <table class="nesp-table">
+                            <tr>
+                                <th>Candidate</th>
+                                <th>Role</th>
+                                <th>Suggested Owner</th>
+                                <th>Rule</th>
+                                <th>Action</th>
+                            </tr>
+                            <?php foreach ($this->assignmentSuggestions as $suggestion): ?>
+                            <tr>
+                                <td><?php $this->_($suggestion['candidate_name']); ?></td>
+                                <td><?php $this->_($suggestion['role_title']); ?></td>
+                                <td><?php $this->_($suggestion['suggested_interviewer']); ?></td>
+                                <td><?php $this->_($suggestion['assignment_rule']); ?></td>
+                                <td><a class="nesp-secondary-action" href="<?php echo($suggestion['candidate_url']); ?>">Review</a></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </table>
+                    <?php else: ?>
+                        <div class="nesp-empty">No candidates are ready for interviewer routing yet.</div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="nesp-panel">
+                    <h3>Interviewer Follow-Through</h3>
+                    <?php if (count($this->interviewerAccountability)): ?>
+                        <table class="nesp-table">
+                            <tr>
+                                <th>Interviewer</th>
+                                <th>Assigned</th>
+                                <th>Open</th>
+                                <th>Scorecards</th>
+                                <th>Overdue</th>
+                                <th>Availability</th>
+                            </tr>
+                            <?php foreach ($this->interviewerAccountability as $row): ?>
+                            <tr>
+                                <td><?php $this->_($row['display_name']); ?></td>
+                                <td><?php $this->_($row['active_grants']); ?></td>
+                                <td><?php $this->_($row['open_interviews']); ?></td>
+                                <td><?php $this->_($row['scorecards_due']); ?></td>
+                                <td><strong><?php $this->_($row['overdue_items']); ?></strong></td>
+                                <td><?php $this->_($row['availability_blocks']); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </table>
+                    <?php else: ?>
+                        <div class="nesp-empty">No interviewer profiles exist yet.</div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <?php
                 $sections = array();

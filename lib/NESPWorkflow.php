@@ -164,6 +164,62 @@ class NESPWorkflow
         );
     }
 
+    public static function getDefaultAssignmentRuleExamples()
+    {
+        return array(
+            array(
+                'role_match_text' => 'photographer',
+                'assignment_mode' => 'suggest_only',
+                'notes' => 'Suggested routing for freelance and staff photographer applicants. Craig still approves any real interviewer grant.'
+            ),
+            array(
+                'role_match_text' => 'customer service',
+                'assignment_mode' => 'suggest_only',
+                'notes' => 'Use for customer-service applicants; no automatic email or status change.'
+            ),
+            array(
+                'role_match_text' => 'table greeter',
+                'assignment_mode' => 'suggest_only',
+                'notes' => 'Use for on-site table and field assistant applicants.'
+            )
+        );
+    }
+
+    public static function getDefaultAvailabilityTemplate()
+    {
+        return array(
+            'timezone' => 'America/New_York',
+            'slot_minutes' => 30,
+            'buffer_minutes' => 10,
+            'notes' => 'Internal availability only. Applicant self-booking and Zoom creation remain disabled until separately approved.'
+        );
+    }
+
+    public static function matchAssignmentRuleForRole($roleTitle, $rules)
+    {
+        $roleTitle = strtolower(trim($roleTitle));
+        if ($roleTitle === '')
+        {
+            return array();
+        }
+
+        foreach ($rules as $rule)
+        {
+            if (isset($rule['is_active']) && ((int) $rule['is_active']) !== 1)
+            {
+                continue;
+            }
+
+            $matchText = isset($rule['role_match_text']) ? strtolower(trim($rule['role_match_text'])) : '';
+            if ($matchText !== '' && strpos($roleTitle, $matchText) !== false)
+            {
+                return $rule;
+            }
+        }
+
+        return array();
+    }
+
     public static function getDefaultStaffingForecastConfig()
     {
         return array(
@@ -484,11 +540,24 @@ class NESPWorkflow
             "SHOW TABLES LIKE 'nesp_staffing_import_batch'"
         );
 
+        $assignmentRules = $this->_db->getAssoc(
+            "SHOW TABLES LIKE 'nesp_interviewer_role_rule'"
+        );
+
+        $availability = $this->_db->getAssoc(
+            "SHOW TABLES LIKE 'nesp_interviewer_availability'"
+        );
+
         $workflowSummary = $this->_db->getAssoc(
             "SHOW COLUMNS FROM nesp_candidate_workflow LIKE 'summary'"
         );
 
-        return !empty($featureFlags) && !empty($staffingHistory) && !empty($staffingImport) && !empty($workflowSummary);
+        return !empty($featureFlags)
+            && !empty($staffingHistory)
+            && !empty($staffingImport)
+            && !empty($assignmentRules)
+            && !empty($availability)
+            && !empty($workflowSummary);
     }
 
     public function getFeatureFlags()
@@ -589,6 +658,15 @@ class NESPWorkflow
             ),
             'pendingScorecards' => $this->countRows(
                 "SELECT COUNT(*) AS total FROM nesp_scorecard_response WHERE status_key = 'draft'"
+            ),
+            'assignmentRules' => $this->countRows(
+                'SELECT COUNT(*) AS total FROM nesp_interviewer_role_rule WHERE is_active = 1'
+            ),
+            'availabilityBlocks' => $this->countRows(
+                'SELECT COUNT(*) AS total FROM nesp_interviewer_availability WHERE is_active = 1'
+            ),
+            'openInterviewSlots' => $this->countRows(
+                "SELECT COUNT(*) AS total FROM nesp_interview_slot WHERE slot_status_key = 'open'"
             )
         );
     }
@@ -626,6 +704,21 @@ class NESPWorkflow
                  WHERE scheduled_start >= CURDATE()
                    AND scheduled_start < DATE_ADD(CURDATE(), INTERVAL 7 DAY)
                    AND status_key IN ("scheduled", "confirmed", "needs_notes")'
+            ),
+            'overdueItems' => $this->countRows(
+                'SELECT COUNT(*) AS total
+                 FROM nesp_candidate_workflow cw
+                 INNER JOIN nesp_workflow_stage ws
+                    ON ws.workflow_stage_id = cw.workflow_stage_id
+                 WHERE cw.due_at IS NOT NULL
+                   AND cw.due_at < NOW()
+                   AND ws.is_terminal = 0'
+            ),
+            'assignmentRules' => $this->countRows(
+                'SELECT COUNT(*) AS total FROM nesp_interviewer_role_rule WHERE is_active = 1'
+            ),
+            'availabilityBlocks' => $this->countRows(
+                'SELECT COUNT(*) AS total FROM nesp_interviewer_availability WHERE is_active = 1'
             )
         );
     }
@@ -801,6 +894,285 @@ class NESPWorkflow
                 ip.is_active DESC,
                 ip.display_name ASC'
         );
+    }
+
+    public function getInterviewerRoleRules()
+    {
+        return $this->_db->getAllAssoc(
+            'SELECT
+                rr.role_rule_id,
+                rr.interviewer_profile_id,
+                rr.joborder_id,
+                rr.role_match_text,
+                rr.assignment_mode,
+                rr.priority,
+                rr.is_active,
+                rr.notes,
+                rr.date_modified,
+                ip.display_name AS interviewer_name,
+                jo.title AS job_title
+             FROM
+                nesp_interviewer_role_rule rr
+             LEFT JOIN nesp_interviewer_profile ip
+                ON ip.interviewer_profile_id = rr.interviewer_profile_id
+             LEFT JOIN joborder jo
+                ON jo.joborder_id = rr.joborder_id
+             ORDER BY
+                rr.is_active DESC,
+                rr.priority ASC,
+                rr.role_match_text ASC'
+        );
+    }
+
+    public function createInterviewerRoleRule($interviewerProfileID, $jobOrderID, $roleMatchText, $assignmentMode, $priority, $notes, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $jobOrderID = (int) $jobOrderID;
+        $roleMatchText = trim($roleMatchText);
+        $assignmentMode = in_array($assignmentMode, array('suggest_only', 'manual_review')) ? $assignmentMode : 'suggest_only';
+        $priority = max(1, min(999, (int) $priority));
+        $notes = trim($notes);
+
+        if ($interviewerProfileID <= 0 || ($jobOrderID <= 0 && $roleMatchText === ''))
+        {
+            return false;
+        }
+
+        $sql = sprintf(
+            'INSERT INTO nesp_interviewer_role_rule
+                (interviewer_profile_id, joborder_id, role_match_text, assignment_mode, priority, is_active, notes, created_by_user_id, date_created, date_modified)
+             VALUES
+                (%s, %s, %s, %s, %s, 1, %s, %s, NOW(), NOW())',
+            $this->_db->makeQueryInteger($interviewerProfileID),
+            $jobOrderID <= 0 ? 'NULL' : $this->_db->makeQueryInteger($jobOrderID),
+            $this->_db->makeQueryString($roleMatchText),
+            $this->_db->makeQueryString($assignmentMode),
+            $this->_db->makeQueryInteger($priority),
+            $this->_db->makeQueryString($notes),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+        );
+        $this->_db->query($sql);
+        $ruleID = $this->_db->getLastInsertID();
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_role_rule_created',
+            'interviewer_role_rule',
+            $ruleID,
+            array('interviewer_profile_id' => $interviewerProfileID, 'assignment_mode' => $assignmentMode)
+        );
+
+        return $ruleID;
+    }
+
+    public function createCandidateGrant($interviewerProfileID, $candidateID, $jobOrderID, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+
+        if ($interviewerProfileID <= 0 || $candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return false;
+        }
+
+        $existing = $this->_db->getAssoc(
+            sprintf(
+                'SELECT grant_id
+                 FROM nesp_interviewer_candidate_grant
+                 WHERE interviewer_profile_id = %s
+                   AND candidate_id = %s
+                   AND joborder_id = %s
+                   AND date_revoked IS NULL
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($interviewerProfileID),
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID)
+            )
+        );
+        if (!empty($existing))
+        {
+            return (int) $existing['grant_id'];
+        }
+
+        $sql = sprintf(
+            'INSERT INTO nesp_interviewer_candidate_grant
+                (interviewer_profile_id, candidate_id, joborder_id, granted_by_user_id, access_level_key, can_view_resume, can_add_notes, can_submit_scorecard, date_granted, date_revoked)
+             VALUES
+                (%s, %s, %s, %s, "interview", 1, 1, 1, NOW(), NULL)',
+            $this->_db->makeQueryInteger($interviewerProfileID),
+            $this->_db->makeQueryInteger($candidateID),
+            $this->_db->makeQueryInteger($jobOrderID),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+        );
+        $this->_db->query($sql);
+        $grantID = $this->_db->getLastInsertID();
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_candidate_grant_created',
+            'interviewer_candidate_grant',
+            $grantID,
+            array('interviewer_profile_id' => $interviewerProfileID, 'candidate_id' => $candidateID, 'joborder_id' => $jobOrderID)
+        );
+
+        return $grantID;
+    }
+
+    public function getInterviewerAvailability()
+    {
+        return $this->_db->getAllAssoc(
+            'SELECT
+                ia.availability_id,
+                ia.interviewer_profile_id,
+                ip.display_name AS interviewer_name,
+                ia.weekday_key,
+                ia.start_time,
+                ia.end_time,
+                ia.timezone,
+                ia.slot_minutes,
+                ia.buffer_minutes,
+                ia.is_active,
+                ia.notes,
+                ia.date_modified
+             FROM
+                nesp_interviewer_availability ia
+             INNER JOIN nesp_interviewer_profile ip
+                ON ip.interviewer_profile_id = ia.interviewer_profile_id
+             ORDER BY
+                ia.is_active DESC,
+                ip.display_name ASC,
+                FIELD(ia.weekday_key, "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"),
+                ia.start_time ASC'
+        );
+    }
+
+    public function createInterviewerAvailability($interviewerProfileID, $weekdayKey, $startTime, $endTime, $timezone, $slotMinutes, $bufferMinutes, $notes, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $weekdayKey = trim($weekdayKey);
+        $defaultAvailability = self::getDefaultAvailabilityTemplate();
+        $timezone = trim($timezone) === '' ? $defaultAvailability['timezone'] : trim($timezone);
+        $slotMinutes = max(15, min(180, (int) $slotMinutes));
+        $bufferMinutes = max(0, min(60, (int) $bufferMinutes));
+        $notes = trim($notes);
+
+        if ($interviewerProfileID <= 0 || !in_array($weekdayKey, array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')))
+        {
+            return false;
+        }
+        if (!preg_match('/^\d{2}:\d{2}$/', $startTime) || !preg_match('/^\d{2}:\d{2}$/', $endTime) || strcmp($startTime, $endTime) >= 0)
+        {
+            return false;
+        }
+
+        $sql = sprintf(
+            'INSERT INTO nesp_interviewer_availability
+                (interviewer_profile_id, weekday_key, start_time, end_time, timezone, slot_minutes, buffer_minutes, is_active, notes, created_by_user_id, date_created, date_modified)
+             VALUES
+                (%s, %s, %s, %s, %s, %s, %s, 1, %s, %s, NOW(), NOW())',
+            $this->_db->makeQueryInteger($interviewerProfileID),
+            $this->_db->makeQueryString($weekdayKey),
+            $this->_db->makeQueryString($startTime),
+            $this->_db->makeQueryString($endTime),
+            $this->_db->makeQueryString($timezone),
+            $this->_db->makeQueryInteger($slotMinutes),
+            $this->_db->makeQueryInteger($bufferMinutes),
+            $this->_db->makeQueryString($notes),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+        );
+        $this->_db->query($sql);
+        $availabilityID = $this->_db->getLastInsertID();
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_availability_created',
+            'interviewer_availability',
+            $availabilityID,
+            array('interviewer_profile_id' => $interviewerProfileID, 'weekday_key' => $weekdayKey)
+        );
+
+        return $availabilityID;
+    }
+
+    public function getInterviewerAccountability()
+    {
+        return $this->_db->getAllAssoc(
+            'SELECT
+                ip.interviewer_profile_id,
+                ip.display_name,
+                ip.role_key,
+                ip.is_active,
+                COUNT(DISTINCT cg.grant_id) AS active_grants,
+                COUNT(DISTINCT CASE WHEN i.status_key IN ("scheduled", "confirmed", "needs_notes") THEN i.interview_id END) AS open_interviews,
+                COUNT(DISTINCT CASE WHEN sr.status_key = "draft" THEN sr.scorecard_response_id END) AS scorecards_due,
+                COUNT(DISTINCT CASE WHEN cw.due_at IS NOT NULL AND cw.due_at < NOW() THEN cw.candidate_workflow_id END) AS overdue_items,
+                COUNT(DISTINCT ia.availability_id) AS availability_blocks
+             FROM
+                nesp_interviewer_profile ip
+             LEFT JOIN nesp_interviewer_candidate_grant cg
+                ON cg.interviewer_profile_id = ip.interviewer_profile_id
+                AND cg.date_revoked IS NULL
+             LEFT JOIN nesp_interview i
+                ON i.interviewer_profile_id = ip.interviewer_profile_id
+             LEFT JOIN nesp_scorecard_response sr
+                ON sr.interviewer_profile_id = ip.interviewer_profile_id
+             LEFT JOIN nesp_candidate_workflow cw
+                ON cw.candidate_id = cg.candidate_id
+                AND cw.joborder_id = cg.joborder_id
+             LEFT JOIN nesp_interviewer_availability ia
+                ON ia.interviewer_profile_id = ip.interviewer_profile_id
+                AND ia.is_active = 1
+             GROUP BY
+                ip.interviewer_profile_id
+             ORDER BY
+                overdue_items DESC,
+                scorecards_due DESC,
+                open_interviews DESC,
+                ip.display_name ASC'
+        );
+    }
+
+    public function getAssignmentSuggestions($limit)
+    {
+        $limit = max(1, min(100, (int) $limit));
+        $rows = $this->getDashboardCandidateRows($limit);
+        $rules = $this->getInterviewerRoleRules();
+        $suggestions = array();
+
+        foreach ($rows as $row)
+        {
+            if (!in_array($row['stage_key'], array('interview_requested', 'needs_review', 'phone_screen_complete')))
+            {
+                continue;
+            }
+
+            $matchedRule = array();
+            foreach ($rules as $rule)
+            {
+                if ((int) $rule['is_active'] !== 1)
+                {
+                    continue;
+                }
+                if (!empty($rule['joborder_id']) && (int) $rule['joborder_id'] === (int) $row['joborder_id'])
+                {
+                    $matchedRule = $rule;
+                    break;
+                }
+            }
+            if (empty($matchedRule))
+            {
+                $matchedRule = self::matchAssignmentRuleForRole($row['role_title'], $rules);
+            }
+
+            $card = $this->normalizeDashboardCard($row);
+            $card['suggested_interviewer'] = empty($matchedRule) ? 'No rule yet' : $matchedRule['interviewer_name'];
+            $card['assignment_rule'] = empty($matchedRule) ? 'Create routing rule' : $matchedRule['role_match_text'];
+            $card['assignment_mode'] = empty($matchedRule) ? 'manual_review' : $matchedRule['assignment_mode'];
+            $suggestions[] = $card;
+        }
+
+        return array_slice($suggestions, 0, 12);
     }
 
     public function getScorecardSummaries($limit)

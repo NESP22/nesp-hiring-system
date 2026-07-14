@@ -124,6 +124,71 @@ CREATE TABLE IF NOT EXISTS `nesp_session_security_event` (
   KEY `IDX_date_created` (`date_created`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `nesp_interviewer_role_rule` (
+  `role_rule_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `interviewer_profile_id` INT(11) NOT NULL,
+  `joborder_id` INT(11),
+  `role_match_text` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `assignment_mode` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'suggest_only',
+  `priority` INT(11) NOT NULL DEFAULT '50',
+  `is_active` TINYINT(1) NOT NULL DEFAULT '1',
+  `notes` TEXT COLLATE utf8mb4_unicode_ci,
+  `created_by_user_id` INT(11),
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`role_rule_id`),
+  KEY `IDX_interviewer_profile_id` (`interviewer_profile_id`),
+  KEY `IDX_joborder_id` (`joborder_id`),
+  KEY `IDX_role_match_text` (`role_match_text`),
+  KEY `IDX_priority` (`priority`),
+  KEY `IDX_is_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `nesp_interviewer_availability` (
+  `availability_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `interviewer_profile_id` INT(11) NOT NULL,
+  `weekday_key` VARCHAR(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `start_time` TIME NOT NULL,
+  `end_time` TIME NOT NULL,
+  `timezone` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'America/New_York',
+  `slot_minutes` INT(11) NOT NULL DEFAULT '30',
+  `buffer_minutes` INT(11) NOT NULL DEFAULT '10',
+  `is_active` TINYINT(1) NOT NULL DEFAULT '1',
+  `notes` TEXT COLLATE utf8mb4_unicode_ci,
+  `created_by_user_id` INT(11),
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`availability_id`),
+  KEY `IDX_interviewer_profile_id` (`interviewer_profile_id`),
+  KEY `IDX_weekday_time` (`weekday_key`, `start_time`),
+  KEY `IDX_is_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `nesp_interview_slot` (
+  `interview_slot_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `interviewer_profile_id` INT(11) NOT NULL,
+  `availability_id` INT(11),
+  `candidate_id` INT(11),
+  `joborder_id` INT(11),
+  `scheduled_start` DATETIME NOT NULL,
+  `scheduled_end` DATETIME NOT NULL,
+  `slot_status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'open',
+  `source_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'manual',
+  `zoom_status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'disabled',
+  `booking_token_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `notes` TEXT COLLATE utf8mb4_unicode_ci,
+  `created_by_user_id` INT(11),
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`interview_slot_id`),
+  KEY `IDX_interviewer_profile_id` (`interviewer_profile_id`),
+  KEY `IDX_availability_id` (`availability_id`),
+  KEY `IDX_candidate_id` (`candidate_id`),
+  KEY `IDX_joborder_id` (`joborder_id`),
+  KEY `IDX_schedule_status` (`scheduled_start`, `slot_status_key`),
+  KEY `IDX_zoom_status_key` (`zoom_status_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `nesp_staffing_schedule_history` (
   `schedule_history_id` INT(11) NOT NULL AUTO_INCREMENT,
   `season_year` INT(4) NOT NULL,

@@ -52,6 +52,14 @@
                             <span class="nesp-card-label">Candidate Grants</span>
                             <strong><?php $this->_($this->summary['candidateGrants']); ?></strong>
                         </div>
+                        <div class="nesp-card">
+                            <span class="nesp-card-label">Routing Rules</span>
+                            <strong><?php $this->_($this->summary['assignmentRules']); ?></strong>
+                        </div>
+                        <div class="nesp-card">
+                            <span class="nesp-card-label">Open Slots</span>
+                            <strong><?php $this->_($this->summary['openInterviewSlots']); ?></strong>
+                        </div>
                     </div>
 
                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createInterviewer" class="nesp-form">
@@ -104,6 +112,204 @@
                     </tr>
                     <?php endif; ?>
                 </table>
+            </div>
+
+            <div class="nesp-two-column">
+                <div class="nesp-panel">
+                    <h3>Role Routing Rules</h3>
+                    <p class="nesp-help-text">Rules only suggest an interviewer. Craig still approves any real candidate access grant.</p>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createInterviewerRoleRule" class="nesp-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <label>
+                            Interviewer
+                            <select name="interviewerProfileID">
+                                <option value="">Choose interviewer</option>
+                                <?php foreach ($this->interviewerProfiles as $profile): ?>
+                                    <option value="<?php echo((int) $profile['interviewer_profile_id']); ?>"><?php $this->_($profile['display_name']); ?><?php if ((int) $profile['is_active'] !== 1): ?> (inactive)<?php endif; ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Role match text
+                            <input type="text" name="roleMatchText" placeholder="freelance photographer" />
+                        </label>
+                        <label>
+                            Exact job ID, optional
+                            <input type="text" name="jobOrderID" />
+                        </label>
+                        <label>
+                            Mode
+                            <select name="assignmentMode">
+                                <option value="suggest_only">Suggest only</option>
+                                <option value="manual_review">Manual review</option>
+                            </select>
+                        </label>
+                        <label>
+                            Priority
+                            <input type="text" name="priority" value="50" />
+                        </label>
+                        <label>
+                            Notes
+                            <textarea name="notes" rows="3"></textarea>
+                        </label>
+                        <button type="submit" class="nesp-secondary-button">Add Routing Rule</button>
+                    </form>
+
+                    <?php if (count($this->assignmentRuleExamples)): ?>
+                        <div class="nesp-reference-list">
+                            <strong>Useful starting rules</strong>
+                            <ul>
+                                <?php foreach ($this->assignmentRuleExamples as $example): ?>
+                                <li><?php $this->_($example['role_match_text']); ?> - <?php $this->_($example['assignment_mode']); ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="nesp-panel">
+                    <h3>Manual Candidate Assignment</h3>
+                    <p class="nesp-help-text">Creates an explicit interviewer grant. Use only after Craig approves real interviewer access for that person.</p>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createCandidateGrant" class="nesp-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <label>
+                            Interviewer
+                            <select name="interviewerProfileID">
+                                <option value="">Choose interviewer</option>
+                                <?php foreach ($this->interviewerProfiles as $profile): ?>
+                                    <option value="<?php echo((int) $profile['interviewer_profile_id']); ?>"><?php $this->_($profile['display_name']); ?><?php if ((int) $profile['is_active'] !== 1): ?> (inactive)<?php endif; ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Candidate ID
+                            <input type="text" name="candidateID" />
+                        </label>
+                        <label>
+                            Job ID
+                            <input type="text" name="jobOrderID" />
+                        </label>
+                        <button type="submit" class="nesp-secondary-button">Grant Assignment</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="nesp-two-column">
+                <div class="nesp-panel">
+                    <h3>Availability Blocks</h3>
+                    <p class="nesp-help-text">Availability is internal scheduling prep. It does not email applicants or create Zoom meetings.</p>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createInterviewerAvailability" class="nesp-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <label>
+                            Interviewer
+                            <select name="interviewerProfileID">
+                                <option value="">Choose interviewer</option>
+                                <?php foreach ($this->interviewerProfiles as $profile): ?>
+                                    <option value="<?php echo((int) $profile['interviewer_profile_id']); ?>"><?php $this->_($profile['display_name']); ?><?php if ((int) $profile['is_active'] !== 1): ?> (inactive)<?php endif; ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Weekday
+                            <select name="weekdayKey">
+                                <?php foreach (array('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday') as $weekday): ?>
+                                    <option value="<?php $this->_($weekday); ?>"><?php $this->_($weekday); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Start time
+                            <input type="text" name="startTime" value="09:00" />
+                        </label>
+                        <label>
+                            End time
+                            <input type="text" name="endTime" value="12:00" />
+                        </label>
+                        <label>
+                            Timezone
+                            <input type="text" name="timezone" value="<?php $this->_($this->availabilityTemplate['timezone']); ?>" />
+                        </label>
+                        <label>
+                            Slot minutes
+                            <input type="text" name="slotMinutes" value="<?php $this->_($this->availabilityTemplate['slot_minutes']); ?>" />
+                        </label>
+                        <label>
+                            Buffer minutes
+                            <input type="text" name="bufferMinutes" value="<?php $this->_($this->availabilityTemplate['buffer_minutes']); ?>" />
+                        </label>
+                        <label>
+                            Notes
+                            <textarea name="notes" rows="3"><?php $this->_($this->availabilityTemplate['notes']); ?></textarea>
+                        </label>
+                        <button type="submit" class="nesp-secondary-button">Add Availability</button>
+                    </form>
+                </div>
+
+                <div class="nesp-panel">
+                    <h3>Scheduling Safety</h3>
+                    <ul class="nesp-list">
+                        <li>Applicant self-booking is not exposed yet.</li>
+                        <li>Zoom meeting creation stays disabled.</li>
+                        <li>Email and SMS confirmations stay disabled.</li>
+                        <li>Interview slots are internal planning records until Craig approves the next rollout.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="nesp-panel">
+                <h3>Routing and Availability Review</h3>
+                <div class="nesp-two-column">
+                    <div>
+                        <h4>Rules</h4>
+                        <table class="nesp-table">
+                            <tr>
+                                <th>Interviewer</th>
+                                <th>Match</th>
+                                <th>Exact Job</th>
+                                <th>Mode</th>
+                                <th>Priority</th>
+                            </tr>
+                            <?php foreach ($this->assignmentRules as $rule): ?>
+                            <tr>
+                                <td><?php $this->_($rule['interviewer_name']); ?></td>
+                                <td><?php $this->_($rule['role_match_text']); ?></td>
+                                <td><?php $this->_($rule['job_title']); ?></td>
+                                <td><?php $this->_($rule['assignment_mode']); ?></td>
+                                <td><?php $this->_($rule['priority']); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (!count($this->assignmentRules)): ?>
+                            <tr>
+                                <td colspan="5">No routing rules have been created.</td>
+                            </tr>
+                            <?php endif; ?>
+                        </table>
+                    </div>
+                    <div>
+                        <h4>Availability</h4>
+                        <table class="nesp-table">
+                            <tr>
+                                <th>Interviewer</th>
+                                <th>Day</th>
+                                <th>Window</th>
+                                <th>Slots</th>
+                            </tr>
+                            <?php foreach ($this->interviewerAvailability as $availability): ?>
+                            <tr>
+                                <td><?php $this->_($availability['interviewer_name']); ?></td>
+                                <td><?php $this->_($availability['weekday_key']); ?></td>
+                                <td><?php $this->_(substr($availability['start_time'], 0, 5) . ' - ' . substr($availability['end_time'], 0, 5)); ?></td>
+                                <td><?php $this->_((int) $availability['slot_minutes'] . ' min'); ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                            <?php if (!count($this->interviewerAvailability)): ?>
+                            <tr>
+                                <td colspan="4">No availability blocks have been created.</td>
+                            </tr>
+                            <?php endif; ?>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <div class="nesp-panel">
