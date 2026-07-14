@@ -114,6 +114,17 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('Zoom creation remain disabled', $template['notes']);
     }
 
+    public function testAvailabilityTimeValidationRejectsImpossibleTimes()
+    {
+        $this->assertTrue(NESPWorkflow::isValidAvailabilityTime('00:00'));
+        $this->assertTrue(NESPWorkflow::isValidAvailabilityTime('09:30'));
+        $this->assertTrue(NESPWorkflow::isValidAvailabilityTime('23:59'));
+        $this->assertFalse(NESPWorkflow::isValidAvailabilityTime('24:00'));
+        $this->assertFalse(NESPWorkflow::isValidAvailabilityTime('12:75'));
+        $this->assertFalse(NESPWorkflow::isValidAvailabilityTime('9:30'));
+        $this->assertFalse(NESPWorkflow::isValidAvailabilityTime('soon'));
+    }
+
     public function testStaffingCSVParserHandlesDatesInRows()
     {
         $csv = "Date,Start,End,State,Sport,Event,Role,Staff\n"

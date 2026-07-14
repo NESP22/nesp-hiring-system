@@ -195,6 +195,20 @@ class NESPWorkflow
         );
     }
 
+    public static function isValidAvailabilityTime($time)
+    {
+        $time = trim($time);
+        if (!preg_match('/^(\d{2}):(\d{2})$/', $time, $matches))
+        {
+            return false;
+        }
+
+        return (int) $matches[1] >= 0
+            && (int) $matches[1] <= 23
+            && (int) $matches[2] >= 0
+            && (int) $matches[2] <= 59;
+    }
+
     public static function matchAssignmentRuleForRole($roleTitle, $rules)
     {
         $roleTitle = strtolower(trim($roleTitle));
@@ -1051,6 +1065,8 @@ class NESPWorkflow
     {
         $interviewerProfileID = (int) $interviewerProfileID;
         $weekdayKey = trim($weekdayKey);
+        $startTime = trim($startTime);
+        $endTime = trim($endTime);
         $defaultAvailability = self::getDefaultAvailabilityTemplate();
         $timezone = trim($timezone) === '' ? $defaultAvailability['timezone'] : trim($timezone);
         $slotMinutes = max(15, min(180, (int) $slotMinutes));
@@ -1061,7 +1077,7 @@ class NESPWorkflow
         {
             return false;
         }
-        if (!preg_match('/^\d{2}:\d{2}$/', $startTime) || !preg_match('/^\d{2}:\d{2}$/', $endTime) || strcmp($startTime, $endTime) >= 0)
+        if (!self::isValidAvailabilityTime($startTime) || !self::isValidAvailabilityTime($endTime) || strcmp($startTime, $endTime) >= 0)
         {
             return false;
         }
