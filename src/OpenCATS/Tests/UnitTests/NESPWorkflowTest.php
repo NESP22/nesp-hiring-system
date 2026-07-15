@@ -480,6 +480,16 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse($payload['assistantOverrides']['artifactPlan']['recordingEnabled']);
         $this->assertFalse($payload['assistantOverrides']['artifactPlan']['videoRecordingEnabled']);
         $this->assertTrue($payload['assistantOverrides']['artifactPlan']['transcriptPlan']['enabled']);
+        $this->assertFalse($payload['assistantOverrides']['firstMessageInterruptionsEnabled']);
+        $this->assertSame('off', $payload['assistantOverrides']['voicemailDetection']);
+        $this->assertSame(600, $payload['assistantOverrides']['maxDurationSeconds']);
+        $this->assertSame('off', $payload['assistantOverrides']['backgroundSound']);
+        $this->assertFalse($payload['assistantOverrides']['modelOutputInMessagesEnabled']);
+        $this->assertFalse($payload['assistantOverrides']['monitorPlan']['listenEnabled']);
+        $this->assertFalse($payload['assistantOverrides']['monitorPlan']['controlEnabled']);
+        $this->assertTrue($payload['assistantOverrides']['backgroundSpeechDenoisingPlan']['smartDenoisingPlan']['enabled']);
+        $this->assertFalse($payload['assistantOverrides']['transportConfigurations'][0]['record']);
+        $this->assertSame('mono', $payload['assistantOverrides']['transportConfigurations'][0]['recordingChannels']);
         $this->assertStringNotContainsString('recordingPath', json_encode($payload));
         $this->assertStringNotContainsString('recordingUrl', json_encode($payload));
         $this->assertSame('Freelance Photographer', $payload['assistantOverrides']['variableValues']['role']);
