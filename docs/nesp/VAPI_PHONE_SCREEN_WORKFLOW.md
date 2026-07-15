@@ -6,6 +6,14 @@ Code foundation added. Production calls remain disabled until all mock/security 
 
 The workflow is candidate-scheduled. Craig approval generates a secure scheduling link; it does not place a call.
 
+Production deployment note:
+
+- PR #7 deployed the candidate-scheduled workflow.
+- PR #8 deployed the public scheduler include-path hotfix.
+- Current deployed hotfix commit: `a806ceea0c2bf34f09942a4a76ee33e32a2c192a`.
+- The public scheduler endpoint now returns a safe branded unavailable page for missing or invalid tokens.
+- No valid production token flow has been tested yet because creating a production fake candidate requires Craig's separate approval.
+
 Current safety defaults:
 
 - `NESP_VAPI_ENABLED = 0`
@@ -93,6 +101,8 @@ The runner:
 - audits every action
 
 If a candidate does not answer, the webhook marks `No Answer`. Craig may then choose whether to allow another scheduling attempt.
+
+Production note: no Render cron job has been created yet. Keep it that way until Craig approves the scheduled-call test setup.
 
 ## Consent Opening
 
