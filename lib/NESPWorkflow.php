@@ -3644,6 +3644,8 @@ class NESPWorkflow
             return array('ok' => false, 'state' => 'validation_failed', 'missing' => $validation['missing']);
         }
 
+        $transactionStarted = $this->_db->beginTransaction();
+
         $this->_db->query(
             sprintf(
                 'UPDATE nesp_screening_questionnaire
@@ -3662,6 +3664,10 @@ class NESPWorkflow
         );
         if ($this->_db->getAffectedRows() !== 1)
         {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
             $this->logQuestionnaireActivity($questionnaire['screening_questionnaire_id'], $tokenHash, 'duplicate_submit_blocked', array());
             return array('ok' => false, 'state' => 'already_submitted');
         }
@@ -3687,6 +3693,10 @@ class NESPWorkflow
 
         $this->logQuestionnaireActivity($questionnaire['screening_questionnaire_id'], $tokenHash, 'submitted', array('answer_count' => count($questions)));
         $this->logAuditEvent(null, 'screening_questionnaire_submitted', 'screening_questionnaire', $questionnaire['screening_questionnaire_id'], array('question_set_key' => $questionnaire['question_set_key']));
+        if ($transactionStarted)
+        {
+            $this->_db->commitTransaction();
+        }
         return array('ok' => true, 'state' => 'completed');
     }
 
@@ -3713,6 +3723,12 @@ class NESPWorkflow
                 $this->_db->makeQueryString($tokenHash)
             )
         );
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            $this->logQuestionnaireActivity($questionnaire['screening_questionnaire_id'], $tokenHash, 'human_follow_up_not_updated', array());
+            return array('ok' => false, 'state' => 'unavailable');
+        }
+
         $this->logQuestionnaireActivity($questionnaire['screening_questionnaire_id'], $tokenHash, 'human_follow_up_requested', array());
         return array('ok' => true, 'state' => 'human_follow_up_requested');
     }

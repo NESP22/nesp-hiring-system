@@ -90,8 +90,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST')
     }
     else if ($action === 'humanFollowUp')
     {
-        $workflow->requestQuestionnaireHumanFollowUpFromToken($token);
-        nesp_questionnaire_render('Human Follow-Up Requested', '<div class="panel"><h2>Human follow-up requested</h2><p>The NESP hiring team will review your request for a person to follow up.</p></div>');
+        $result = $workflow->requestQuestionnaireHumanFollowUpFromToken($token);
+        if (!empty($result['ok']))
+        {
+            nesp_questionnaire_render('Human Follow-Up Requested', '<div class="panel"><h2>Human follow-up requested</h2><p>The NESP hiring team will review your request for a person to follow up.</p></div>');
+        }
+        nesp_questionnaire_render('Questionnaire Unavailable', '<div class="panel"><h2>Questionnaire unavailable</h2><p>This questionnaire is invalid, expired, revoked, already submitted, or temporarily rate-limited.</p></div>');
     }
 }
 
