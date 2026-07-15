@@ -3338,7 +3338,11 @@ class NESPWorkflow
         );
         if (!empty($existing))
         {
-            return (int) $existing['screening_questionnaire_id'];
+            return array(
+                'questionnaire_id' => (int) $existing['screening_questionnaire_id'],
+                'one_time_invitation_copy' => '',
+                'link_generated' => false
+            );
         }
 
         $token = self::generateQuestionnaireToken();
@@ -3349,16 +3353,14 @@ class NESPWorkflow
         $this->_db->query(
             sprintf(
                 'INSERT INTO nesp_screening_questionnaire
-                    (candidate_id, joborder_id, status_key, question_set_key, question_set_version, token_hash, token_expires_at, link_created_at, link_url, invitation_copy_text, requested_by_user_id, review_status_key, date_created, date_modified)
+                    (candidate_id, joborder_id, status_key, question_set_key, question_set_version, token_hash, token_expires_at, link_created_at, requested_by_user_id, review_status_key, date_created, date_modified)
                  VALUES
-                    (%s, %s, "link_ready", %s, 1, %s, DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s HOUR), UTC_TIMESTAMP(), %s, %s, %s, "not_started", NOW(), NOW())',
+                    (%s, %s, "link_ready", %s, 1, %s, DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s HOUR), UTC_TIMESTAMP(), %s, "not_started", NOW(), NOW())',
                 $this->_db->makeQueryInteger($candidateID),
                 $this->_db->makeQueryInteger($jobOrderID),
                 $this->_db->makeQueryString($preview['question_set_key']),
                 $this->_db->makeQueryString($tokenHash),
                 $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()),
-                $this->_db->makeQueryString($link),
-                $this->_db->makeQueryString($invitation),
                 $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
             )
         );
@@ -3367,7 +3369,11 @@ class NESPWorkflow
         $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'link_created', array('expires_at_hours' => self::getQuestionnaireDefaultExpirationHours()));
         $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_created', 'screening_questionnaire', $questionnaireID, array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID, 'question_set_key' => $preview['question_set_key']));
 
-        return $questionnaireID;
+        return array(
+            'questionnaire_id' => $questionnaireID,
+            'one_time_invitation_copy' => $invitation,
+            'link_generated' => true
+        );
     }
 
     public function getQuestionnaireSummaries($limit)
@@ -3544,22 +3550,27 @@ class NESPWorkflow
                      token_revoked_at = NULL,
                      token_used_at = NULL,
                      link_created_at = UTC_TIMESTAMP(),
-                     link_url = %s,
-                     invitation_copy_text = %s,
                      invitation_copied_at = NULL,
                      date_modified = NOW()
                  WHERE screening_questionnaire_id = %s
                    AND submitted_at IS NULL',
                 $this->_db->makeQueryString($tokenHash),
                 $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()),
-                $this->_db->makeQueryString($link),
-                $this->_db->makeQueryString($invitation),
                 $this->_db->makeQueryInteger($questionnaireID)
             )
         );
         $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'link_regenerated', array());
         $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_regenerated', 'screening_questionnaire', $questionnaireID, array());
-        return $this->_db->getAffectedRows() === 1;
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            return false;
+        }
+
+        return array(
+            'questionnaire_id' => (int) $questionnaireID,
+            'one_time_invitation_copy' => $invitation,
+            'link_generated' => true
+        );
     }
 
     public function getQuestionnairePageByToken($token)

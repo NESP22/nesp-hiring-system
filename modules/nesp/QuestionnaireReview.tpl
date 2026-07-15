@@ -34,10 +34,14 @@
             <?php if ($this->isAdmin): ?>
             <div class="nesp-panel">
                 <h3>Copy-Only Invitation</h3>
-                <textarea id="questionnaireInvitationCopy" rows="5" readonly><?php $this->_($this->questionnaire['invitation_copy_text']); ?></textarea>
+                <?php if ($this->oneTimeInvitationCopy !== ''): ?>
+                <textarea id="questionnaireInvitationCopy" rows="5" readonly><?php $this->_($this->oneTimeInvitationCopy); ?></textarea>
                 <p>
                     <button type="button" class="nesp-secondary-action" onclick="document.getElementById('questionnaireInvitationCopy').select(); document.execCommand('copy');">Copy Invitation</button>
                 </p>
+                <?php else: ?>
+                <div class="nesp-empty">The secure invitation text is shown only immediately after link generation. Regenerate the link if Craig needs a fresh copy.</div>
+                <?php endif; ?>
                 <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=markQuestionnaireInvitationCopied">
                     <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                     <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />

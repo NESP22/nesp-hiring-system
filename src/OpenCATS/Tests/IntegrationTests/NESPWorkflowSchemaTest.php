@@ -125,6 +125,8 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'token_hash'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_set_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'reviewer_profile_id'));
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'link_url'));
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'invitation_copy_text'));
         $this->assertSame(1, $this->countUniqueIndexes('nesp_screening_questionnaire', 'IDX_questionnaire_token_hash'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire_answer', 'answer_text'));
         $this->assertSame(1, $this->countUniqueIndexes('nesp_screening_questionnaire_answer', 'IDX_questionnaire_answer_key'));

@@ -729,6 +729,16 @@ class NESPUI extends UserInterface
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to prepare questionnaire link.');
         }
+        if (is_array($questionnaireID))
+        {
+            $result = $questionnaireID;
+            $questionnaireID = (int) $result['questionnaire_id'];
+            if (!empty($result['one_time_invitation_copy']))
+            {
+                $this->displayQuestionnaireReview($questionnaireID, $result['one_time_invitation_copy']);
+                return;
+            }
+        }
 
         CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . (int) $questionnaireID);
     }
@@ -736,6 +746,11 @@ class NESPUI extends UserInterface
     private function reviewQuestionnaire()
     {
         $questionnaireID = isset($_GET['questionnaireID']) ? (int) $_GET['questionnaireID'] : 0;
+        $this->displayQuestionnaireReview($questionnaireID);
+    }
+
+    private function displayQuestionnaireReview($questionnaireID, $oneTimeInvitationCopy = '')
+    {
         $isAdmin = $this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA;
         $detail = $this->_workflow->getQuestionnaireDetail($questionnaireID, $isAdmin ? null : $this->_userID);
         if (empty($detail))
@@ -747,6 +762,7 @@ class NESPUI extends UserInterface
         $this->_template->assign('subActive', 'Questionnaires');
         $this->_template->assign('isAdmin', $isAdmin);
         $this->_template->assign('questionnaire', $detail);
+        $this->_template->assign('oneTimeInvitationCopy', $oneTimeInvitationCopy);
         $this->_template->assign('interviewerProfiles', $isAdmin ? $this->_workflow->getInterviewerProfiles() : array());
         $this->_template->display('./modules/nesp/QuestionnaireReview.tpl');
     }
@@ -768,7 +784,12 @@ class NESPUI extends UserInterface
     private function regenerateQuestionnaireLink()
     {
         $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
-        $this->_workflow->regenerateQuestionnaireLink($questionnaireID, $this->_userID);
+        $result = $this->_workflow->regenerateQuestionnaireLink($questionnaireID, $this->_userID);
+        if (is_array($result) && !empty($result['one_time_invitation_copy']))
+        {
+            $this->displayQuestionnaireReview($questionnaireID, $result['one_time_invitation_copy']);
+            return;
+        }
         CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
     }
 

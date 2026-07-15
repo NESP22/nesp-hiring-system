@@ -1502,8 +1502,6 @@ CREATE TABLE `nesp_screening_questionnaire` (
   `token_revoked_at` DATETIME,
   `token_used_at` DATETIME,
   `link_created_at` DATETIME,
-  `link_url` VARCHAR(512) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `invitation_copy_text` TEXT COLLATE utf8mb4_unicode_ci,
   `invitation_copied_at` DATETIME,
   `started_at` DATETIME,
   `submitted_at` DATETIME,
