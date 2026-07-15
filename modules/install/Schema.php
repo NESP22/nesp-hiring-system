@@ -2293,6 +2293,69 @@ class CATSSchema
                   KEY `IDX_renewal_date` (`renewal_date`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+                CREATE TABLE IF NOT EXISTS `nesp_screening_questionnaire` (
+                  `screening_questionnaire_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `candidate_id` INT(11) NOT NULL,
+                  `joborder_id` INT(11) NOT NULL,
+                  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_invited',
+                  `question_set_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `question_set_version` INT(11) NOT NULL DEFAULT 1,
+                  `token_hash` CHAR(64) COLLATE utf8mb4_unicode_ci,
+                  `token_expires_at` DATETIME,
+                  `token_revoked_at` DATETIME,
+                  `token_used_at` DATETIME,
+                  `link_created_at` DATETIME,
+                  `link_url` VARCHAR(512) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `invitation_copy_text` TEXT COLLATE utf8mb4_unicode_ci,
+                  `invitation_copied_at` DATETIME,
+                  `started_at` DATETIME,
+                  `submitted_at` DATETIME,
+                  `requested_by_user_id` INT(11),
+                  `reviewer_profile_id` INT(11),
+                  `review_status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_started',
+                  `review_notes` TEXT COLLATE utf8mb4_unicode_ci,
+                  `review_completed_by_user_id` INT(11),
+                  `review_completed_at` DATETIME,
+                  `human_follow_up_requested_at` DATETIME,
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`screening_questionnaire_id`),
+                  UNIQUE KEY `IDX_questionnaire_token_hash` (`token_hash`),
+                  KEY `IDX_questionnaire_candidate_job` (`candidate_id`, `joborder_id`),
+                  KEY `IDX_questionnaire_status` (`status_key`),
+                  KEY `IDX_questionnaire_reviewer` (`reviewer_profile_id`, `review_status_key`),
+                  KEY `IDX_questionnaire_submitted` (`submitted_at`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_screening_questionnaire_answer` (
+                  `questionnaire_answer_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `screening_questionnaire_id` INT(11) NOT NULL,
+                  `question_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `question_label` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `answer_text` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+                  `sort_order` INT(11) NOT NULL DEFAULT 0,
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`questionnaire_answer_id`),
+                  UNIQUE KEY `IDX_questionnaire_answer_key` (`screening_questionnaire_id`, `question_key`),
+                  KEY `IDX_questionnaire_answer_parent` (`screening_questionnaire_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                CREATE TABLE IF NOT EXISTS `nesp_screening_questionnaire_activity` (
+                  `questionnaire_activity_id` INT(11) NOT NULL AUTO_INCREMENT,
+                  `screening_questionnaire_id` INT(11),
+                  `token_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `activity_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `ip_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `user_agent_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `metadata_json` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                  PRIMARY KEY (`questionnaire_activity_id`),
+                  KEY `IDX_questionnaire_activity_token` (`token_hash`, `date_created`),
+                  KEY `IDX_questionnaire_activity_parent` (`screening_questionnaire_id`, `date_created`),
+                  KEY `IDX_questionnaire_activity_ip` (`ip_hash`, `date_created`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
                 CREATE TABLE IF NOT EXISTS `nesp_vapi_phone_screen` (
                   `vapi_phone_screen_id` INT(11) NOT NULL AUTO_INCREMENT,
                   `call_request_key` CHAR(64) COLLATE utf8mb4_unicode_ci,
@@ -2809,7 +2872,7 @@ class CATSSchema
 
                 INSERT INTO nesp_integration_status
                     (integration_key, display_name, status_key, message, date_created, date_modified)
-                SELECT 'vapi', 'Vapi Phone Screening', 'disabled', 'Disabled in Phase 1. No calls can be placed.', NOW(), NOW()
+                SELECT 'vapi', 'Vapi Phone Screening', 'disabled', 'Optional automated phone screen — currently disabled pending final test.', NOW(), NOW()
                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_integration_status WHERE integration_key = 'vapi');
 
                 INSERT INTO nesp_integration_status

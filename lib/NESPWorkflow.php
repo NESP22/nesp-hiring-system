@@ -53,6 +53,7 @@ class NESPWorkflow
             array('key' => 'needsCraig', 'label' => 'Needs Craig', 'action' => 'dashboard'),
             array('key' => 'waiting', 'label' => 'Waiting', 'action' => 'waiting'),
             array('key' => 'interviews', 'label' => 'Interviews', 'action' => 'interviews'),
+            array('key' => 'questionnaires', 'label' => 'Questionnaires', 'action' => 'questionnaires'),
             array('key' => 'phoneScreens', 'label' => 'Phone Screens', 'action' => 'phoneScreens'),
             array('key' => 'jobAds', 'label' => 'Job Ads', 'action' => 'jobAds'),
             array('key' => 'completed', 'label' => 'Completed', 'action' => 'completed'),
@@ -87,7 +88,7 @@ class NESPWorkflow
     public static function getDefaultIntegrationStatuses()
     {
         return array(
-            array('vapi', 'Vapi Phone Screening', 'disabled', 'Disabled in Phase 2. No calls can be placed.'),
+            array('vapi', 'Vapi Phone Screening', 'disabled', 'Optional automated phone screen — currently disabled pending final test.'),
             array('zoom', 'Zoom Scheduling', 'disabled', 'Disabled in Phase 2. No meetings can be created.'),
             array('ai_review', 'AI Candidate Review', 'disabled', 'Disabled in Phase 2. No model calls can run.'),
             array('email', 'Applicant Email', 'disabled', 'Disabled in Phase 2. No outbound applicant email can be sent.')
@@ -145,6 +146,21 @@ class NESPWorkflow
         }
 
         if (in_array($action, array(
+            'questionnaires',
+            'confirmQuestionnaire',
+            'requestQuestionnaire',
+            'reviewQuestionnaire',
+            'markQuestionnaireInvitationCopied',
+            'revokeQuestionnaireLink',
+            'regenerateQuestionnaireLink',
+            'assignQuestionnaireReviewer',
+            'saveQuestionnaireReview'
+        )))
+        {
+            return 'NESP_WORKFLOW_ENABLED';
+        }
+
+        if (in_array($action, array(
             'phoneScreens',
             'confirmPhoneScreen',
             'reviewPhoneScreen',
@@ -176,6 +192,250 @@ class NESPWorkflow
         }
 
         return 'NESP_WORKFLOW_ENABLED';
+    }
+
+    public static function getQuestionnaireStatusLabels()
+    {
+        return array(
+            'not_invited' => 'Questionnaire Not Invited',
+            'link_ready' => 'Questionnaire Link Ready',
+            'waiting' => 'Waiting for Questionnaire',
+            'in_progress' => 'Questionnaire In Progress',
+            'completed' => 'Questionnaire Completed',
+            'expired' => 'Questionnaire Expired',
+            'human_follow_up_requested' => 'Human Follow-Up Requested',
+            'revoked' => 'Questionnaire Revoked'
+        );
+    }
+
+    public static function getQuestionnaireDefaultExpirationHours()
+    {
+        return 168;
+    }
+
+    public static function generateQuestionnaireToken()
+    {
+        if (function_exists('random_bytes'))
+        {
+            return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        }
+
+        return hash('sha256', uniqid('', true) . mt_rand());
+    }
+
+    public static function questionnaireTokenHash($token)
+    {
+        return hash('sha256', (string) $token);
+    }
+
+    public static function getQuestionnaireLink($token)
+    {
+        $baseURLValue = getenv('NESP_PUBLIC_BASE_URL');
+        $baseURL = rtrim($baseURLValue === false ? '' : trim($baseURLValue), '/');
+        if ($baseURL === '')
+        {
+            $baseURL = 'https://careers.nesportsphoto.com';
+        }
+
+        return $baseURL . '/modules/nesp/screeningQuestionnaire.php?t=' . rawurlencode($token);
+    }
+
+    public static function buildQuestionnaireInvitationCopy($firstName, $roleTitle, $link)
+    {
+        $firstName = trim($firstName);
+        $roleTitle = trim($roleTitle);
+        if ($firstName === '')
+        {
+            $firstName = '[First Name]';
+        }
+        if ($roleTitle === '')
+        {
+            $roleTitle = '[Role]';
+        }
+
+        return 'Hi ' . $firstName . ', thank you for applying for the ' . $roleTitle . ' position with New England Sports Photo. Please complete this brief screening questionnaire using the secure link below. It should take approximately 5-10 minutes. Your answers will be reviewed by a member of our hiring team, and no automated hiring decision will be made.' . "\n\n" . $link;
+    }
+
+    public static function evaluateQuestionnaireTokenState($token, $row, $nowTimestamp)
+    {
+        if (trim((string) $token) === '' || empty($row))
+        {
+            return 'invalid';
+        }
+        if (!hash_equals((string) $row['token_hash'], self::questionnaireTokenHash($token)))
+        {
+            return 'invalid';
+        }
+        if (!empty($row['token_revoked_at']))
+        {
+            return 'revoked';
+        }
+        if (!empty($row['token_expires_at']) && strtotime($row['token_expires_at']) < (int) $nowTimestamp)
+        {
+            return 'expired';
+        }
+        if (!empty($row['submitted_at']) || (isset($row['status_key']) && $row['status_key'] === 'completed'))
+        {
+            return 'submitted';
+        }
+        return 'valid';
+    }
+
+    public static function getQuestionnaireQuestionSets()
+    {
+        return array(
+            'weekend_sports_photographer' => array(
+                'label' => 'Weekend Sports Photographer',
+                'match' => array('weekend sports photographer', 'staff photographer', 'freelance photographer', 'sports photographer', 'photographer'),
+                'questions' => array(
+                    array('key' => 'weekend_availability', 'label' => 'Are you available on Saturdays and Sundays?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'travel_areas', 'label' => 'What towns or areas can you reliably travel to?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'transportation', 'label' => 'Do you have reliable transportation?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'camera_ownership', 'label' => 'Do you own a DSLR or mirrorless camera?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'photography_experience', 'label' => 'Describe your photography experience.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'youth_sports_comfort', 'label' => 'Are you comfortable photographing children and youth sports?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'lifting_ability', 'label' => 'Can you lift and carry approximately 25-40 pounds of equipment?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
+                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true),
+                    array('key' => 'interest', 'label' => 'Why are you interested in working with NESP?', 'type' => 'textarea', 'required' => true)
+                )
+            ),
+            'school_photographer' => array(
+                'label' => 'School Photographer',
+                'match' => array('school photographer'),
+                'questions' => array(
+                    array('key' => 'weekday_morning_availability', 'label' => 'What weekday morning availability do you have?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'transportation', 'label' => 'Do you have reliable transportation?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'camera_experience', 'label' => 'Describe your camera experience.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'children_experience', 'label' => 'Describe your experience working with children.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'high_volume_comfort', 'label' => 'Are you comfortable with repetitive posing and high-volume photography?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'travel_range', 'label' => 'What travel range can you reliably cover?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
+                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true)
+                )
+            ),
+            'photography_assistant_poser' => array(
+                'label' => 'Photography Assistant / Poser',
+                'match' => array('assistant', 'poser', 'field assistant'),
+                'questions' => array(
+                    array('key' => 'availability', 'label' => 'What weekend and weekday availability do you have?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'children_comfort', 'label' => 'Are you comfortable working with children?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'standing', 'label' => 'Are you able to stand for long periods?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'carry_equipment', 'label' => 'Are you able to carry equipment as needed?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'transportation', 'label' => 'Do you have reliable transportation?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'customer_service', 'label' => 'Describe any customer-service experience.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
+                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true)
+                )
+            ),
+            'customer_service' => array(
+                'label' => 'Customer Service',
+                'match' => array('customer service'),
+                'questions' => array(
+                    array('key' => 'weekday_availability', 'label' => 'What weekday availability do you have?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'phone_email_support', 'label' => 'Describe your phone or email support experience.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'conflict_resolution', 'label' => 'Describe your conflict-resolution experience.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'computer_comfort', 'label' => 'How comfortable are you using computers and office systems?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'work_preference', 'label' => 'Do you prefer remote or in-office work?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
+                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true)
+                )
+            ),
+            'packing_production' => array(
+                'label' => 'Packing / Production',
+                'match' => array('packing', 'production'),
+                'questions' => array(
+                    array('key' => 'weekday_availability', 'label' => 'What weekday availability do you have?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'standing_repetitive_work', 'label' => 'Are you able to stand and perform repetitive work?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'attention_to_detail', 'label' => 'Describe your attention to detail.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'lifting_ability', 'label' => 'What lifting ability should we know about for packing or production work?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'methuen_transportation', 'label' => 'Do you have transportation to Methuen?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
+                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true)
+                )
+            ),
+            'scheduler_office_support' => array(
+                'label' => 'Scheduler / Office Support',
+                'match' => array('scheduler', 'office support', 'administrative'),
+                'questions' => array(
+                    array('key' => 'weekday_availability', 'label' => 'What weekday availability do you have?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'scheduling_admin', 'label' => 'Describe your scheduling or administrative experience.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'phone_email', 'label' => 'Describe your phone and email experience.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'spreadsheet_computer', 'label' => 'Describe your spreadsheet and computer experience.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'independent_work', 'label' => 'Are you comfortable working independently?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
+                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true)
+                )
+            ),
+            'sales_representative' => array(
+                'label' => 'Sales Representative',
+                'match' => array('sales representative', 'sales'),
+                'questions' => array(
+                    array('key' => 'sales_experience', 'label' => 'Describe your sales experience.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'sports_school_contacts', 'label' => 'Do you have youth sports or school contacts relevant to this role?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'territory_travel', 'label' => 'What territory or travel availability do you have?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'commission_comfort', 'label' => 'Are you comfortable with commission-based compensation structures?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
+                    array('key' => 'pay_expectations', 'label' => 'What pay range are you seeking?', 'type' => 'text', 'required' => true)
+                )
+            )
+        );
+    }
+
+    public static function getQuestionnaireSetForRole($roleTitle)
+    {
+        $roleTitle = strtolower((string) $roleTitle);
+        $sets = self::getQuestionnaireQuestionSets();
+        foreach ($sets as $key => $set)
+        {
+            foreach ($set['match'] as $match)
+            {
+                if (strpos($roleTitle, $match) !== false)
+                {
+                    $set['key'] = $key;
+                    return $set;
+                }
+            }
+        }
+
+        $sets['weekend_sports_photographer']['key'] = 'weekend_sports_photographer';
+        return $sets['weekend_sports_photographer'];
+    }
+
+    public static function getQuestionnaireQuestionsForSet($questionSetKey)
+    {
+        $sets = self::getQuestionnaireQuestionSets();
+        if (!isset($sets[$questionSetKey]))
+        {
+            $questionSetKey = 'weekend_sports_photographer';
+        }
+
+        $questions = $sets[$questionSetKey]['questions'];
+        $questions[] = array(
+            'key' => 'anything_else',
+            'label' => 'Anything else you would like us to know?',
+            'type' => 'textarea',
+            'required' => false
+        );
+        return $questions;
+    }
+
+    public static function validateQuestionnaireAnswers($questions, $answers)
+    {
+        $clean = array();
+        $errors = array();
+        foreach ($questions as $question)
+        {
+            $key = $question['key'];
+            $value = isset($answers[$key]) ? trim((string) $answers[$key]) : '';
+            if (!empty($question['required']) && $value === '')
+            {
+                $errors[] = $key;
+            }
+            $clean[$key] = substr($value, 0, 4000);
+        }
+
+        return array('ok' => count($errors) === 0, 'answers' => $clean, 'missing' => $errors);
     }
 
     public static function getQueueDefinitions()
@@ -809,6 +1069,9 @@ class NESPWorkflow
             'nesp_vapi_blackout_date',
             'nesp_vapi_scheduling_activity',
             'nesp_vapi_webhook_event',
+            'nesp_screening_questionnaire',
+            'nesp_screening_questionnaire_answer',
+            'nesp_screening_questionnaire_activity',
             'nesp_recruiting_campaign_control',
             'nesp_audit_event',
             'nesp_session_security_event',
@@ -848,6 +1111,11 @@ class NESPWorkflow
             array('nesp_vapi_blackout_date', 'blackout_date'),
             array('nesp_vapi_scheduling_activity', 'activity_key'),
             array('nesp_vapi_webhook_event', 'provider_event_id'),
+            array('nesp_screening_questionnaire', 'token_hash'),
+            array('nesp_screening_questionnaire', 'question_set_key'),
+            array('nesp_screening_questionnaire', 'reviewer_profile_id'),
+            array('nesp_screening_questionnaire_answer', 'answer_text'),
+            array('nesp_screening_questionnaire_activity', 'activity_key'),
             array('nesp_recruiting_campaign_control', 'manual_spend'),
             array('nesp_staffing_import_batch', 'undone_at'),
             array('nesp_staffing_import_row', 'source_row_hash'),
@@ -3002,6 +3270,504 @@ class NESPWorkflow
         return NESPVapiIntegration::getConfigurationStatus($this->isFeatureFlagEnabled('NESP_VAPI_ENABLED'));
     }
 
+    public function getCandidateQuestionnairePreview($candidateID, $jobOrderID)
+    {
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        if ($candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return array();
+        }
+
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    c.candidate_id,
+                    c.first_name,
+                    c.last_name,
+                    c.email1,
+                    jo.joborder_id,
+                    jo.title
+                 FROM candidate c
+                 INNER JOIN candidate_joborder cjo
+                    ON cjo.candidate_id = c.candidate_id
+                 INNER JOIN joborder jo
+                    ON jo.joborder_id = cjo.joborder_id
+                 WHERE c.candidate_id = %s
+                   AND jo.joborder_id = %s
+                   AND c.is_active = 1
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID)
+            )
+        );
+        if (empty($row))
+        {
+            return array();
+        }
+
+        $row['candidate_name'] = trim($row['first_name'] . ' ' . $row['last_name']);
+        $set = self::getQuestionnaireSetForRole($row['title']);
+        $row['question_set_key'] = $set['key'];
+        $row['question_set_label'] = $set['label'];
+        $row['questions'] = self::getQuestionnaireQuestionsForSet($set['key']);
+        $row['estimated_minutes'] = '5-10 minutes';
+        return $row;
+    }
+
+    public function requestQuestionnaire($candidateID, $jobOrderID, $actorUserID)
+    {
+        $preview = $this->getCandidateQuestionnairePreview($candidateID, $jobOrderID);
+        if (empty($preview))
+        {
+            return false;
+        }
+
+        $existing = $this->_db->getAssoc(
+            sprintf(
+                'SELECT screening_questionnaire_id
+                 FROM nesp_screening_questionnaire
+                 WHERE candidate_id = %s
+                   AND joborder_id = %s
+                   AND status_key IN ("link_ready", "waiting", "in_progress", "completed", "human_follow_up_requested")
+                 ORDER BY screening_questionnaire_id DESC
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID)
+            )
+        );
+        if (!empty($existing))
+        {
+            return (int) $existing['screening_questionnaire_id'];
+        }
+
+        $token = self::generateQuestionnaireToken();
+        $tokenHash = self::questionnaireTokenHash($token);
+        $link = self::getQuestionnaireLink($token);
+        $invitation = self::buildQuestionnaireInvitationCopy($preview['first_name'], $preview['title'], $link);
+
+        $this->_db->query(
+            sprintf(
+                'INSERT INTO nesp_screening_questionnaire
+                    (candidate_id, joborder_id, status_key, question_set_key, question_set_version, token_hash, token_expires_at, link_created_at, link_url, invitation_copy_text, requested_by_user_id, review_status_key, date_created, date_modified)
+                 VALUES
+                    (%s, %s, "link_ready", %s, 1, %s, DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s HOUR), UTC_TIMESTAMP(), %s, %s, %s, "not_started", NOW(), NOW())',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID),
+                $this->_db->makeQueryString($preview['question_set_key']),
+                $this->_db->makeQueryString($tokenHash),
+                $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()),
+                $this->_db->makeQueryString($link),
+                $this->_db->makeQueryString($invitation),
+                $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+            )
+        );
+
+        $questionnaireID = (int) $this->_db->getLastInsertID();
+        $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'link_created', array('expires_at_hours' => self::getQuestionnaireDefaultExpirationHours()));
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_created', 'screening_questionnaire', $questionnaireID, array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID, 'question_set_key' => $preview['question_set_key']));
+
+        return $questionnaireID;
+    }
+
+    public function getQuestionnaireSummaries($limit)
+    {
+        $limit = max(1, min(200, (int) $limit));
+        $rows = $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT
+                    q.screening_questionnaire_id,
+                    q.candidate_id,
+                    q.joborder_id,
+                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                    jo.title AS role_title,
+                    q.status_key,
+                    q.question_set_key,
+                    q.token_expires_at,
+                    q.token_revoked_at,
+                    q.link_created_at,
+                    q.invitation_copied_at,
+                    q.started_at,
+                    q.submitted_at,
+                    q.review_status_key,
+                    q.reviewer_profile_id,
+                    ip.display_name AS reviewer_name,
+                    q.date_created,
+                    q.date_modified
+                 FROM nesp_screening_questionnaire q
+                 INNER JOIN candidate c ON c.candidate_id = q.candidate_id
+                 INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id
+                 LEFT JOIN nesp_interviewer_profile ip ON ip.interviewer_profile_id = q.reviewer_profile_id
+                 ORDER BY q.date_modified DESC, q.screening_questionnaire_id DESC
+                 LIMIT %s',
+                $this->_db->makeQueryInteger($limit)
+            )
+        );
+        return $this->decorateQuestionnaireRows($rows);
+    }
+
+    public function getQuestionnaireQueues()
+    {
+        $rows = $this->getQuestionnaireSummaries(200);
+        $queues = array(
+            'ready' => array(),
+            'waiting' => array(),
+            'completed' => array(),
+            'human_follow_up' => array()
+        );
+        foreach ($rows as $row)
+        {
+            if ($row['status_key'] === 'link_ready')
+            {
+                $queues['ready'][] = $row;
+            }
+            if ($row['status_key'] === 'waiting' || $row['status_key'] === 'in_progress')
+            {
+                $queues['waiting'][] = $row;
+            }
+            if ($row['status_key'] === 'completed')
+            {
+                $queues['completed'][] = $row;
+            }
+            if ($row['status_key'] === 'human_follow_up_requested')
+            {
+                $queues['human_follow_up'][] = $row;
+            }
+        }
+        return $queues;
+    }
+
+    public function getQuestionnaireDetail($questionnaireID, $viewerUserID = null)
+    {
+        $detail = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    q.*,
+                    c.first_name,
+                    c.last_name,
+                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                    c.email1,
+                    jo.title AS role_title,
+                    ip.display_name AS reviewer_name
+                 FROM nesp_screening_questionnaire q
+                 INNER JOIN candidate c ON c.candidate_id = q.candidate_id
+                 INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id
+                 LEFT JOIN nesp_interviewer_profile ip ON ip.interviewer_profile_id = q.reviewer_profile_id
+                 WHERE q.screening_questionnaire_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($questionnaireID)
+            )
+        );
+        if (empty($detail))
+        {
+            return array();
+        }
+
+        if ($viewerUserID !== null && !$this->userCanReviewQuestionnaire($viewerUserID, $detail))
+        {
+            return array();
+        }
+
+        $detail = $this->decorateQuestionnaireRow($detail);
+        $detail['questions'] = self::getQuestionnaireQuestionsForSet($detail['question_set_key']);
+        $answers = $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT question_key, question_label, answer_text, sort_order
+                 FROM nesp_screening_questionnaire_answer
+                 WHERE screening_questionnaire_id = %s
+                 ORDER BY sort_order ASC, questionnaire_answer_id ASC',
+                $this->_db->makeQueryInteger($questionnaireID)
+            )
+        );
+        $detail['answers'] = $answers;
+        $detail['answer_map'] = array();
+        foreach ($answers as $answer)
+        {
+            $detail['answer_map'][$answer['question_key']] = $answer['answer_text'];
+        }
+        return $detail;
+    }
+
+    public function markQuestionnaireInvitationCopied($questionnaireID, $actorUserID)
+    {
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET status_key = "waiting",
+                     invitation_copied_at = UTC_TIMESTAMP(),
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND status_key = "link_ready"
+                   AND token_revoked_at IS NULL',
+                $this->_db->makeQueryInteger($questionnaireID)
+            )
+        );
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_invitation_copied', 'screening_questionnaire', $questionnaireID, array());
+        return $this->_db->getAffectedRows() === 1;
+    }
+
+    public function revokeQuestionnaireLink($questionnaireID, $actorUserID)
+    {
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET status_key = "revoked",
+                     token_revoked_at = UTC_TIMESTAMP(),
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND status_key IN ("link_ready", "waiting", "in_progress")',
+                $this->_db->makeQueryInteger($questionnaireID)
+            )
+        );
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_revoked', 'screening_questionnaire', $questionnaireID, array());
+        return $this->_db->getAffectedRows() === 1;
+    }
+
+    public function regenerateQuestionnaireLink($questionnaireID, $actorUserID)
+    {
+        $detail = $this->getQuestionnaireDetail($questionnaireID);
+        if (empty($detail) || $detail['status_key'] === 'completed')
+        {
+            return false;
+        }
+
+        $token = self::generateQuestionnaireToken();
+        $tokenHash = self::questionnaireTokenHash($token);
+        $link = self::getQuestionnaireLink($token);
+        $invitation = self::buildQuestionnaireInvitationCopy($detail['first_name'], $detail['role_title'], $link);
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET status_key = "link_ready",
+                     token_hash = %s,
+                     token_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s HOUR),
+                     token_revoked_at = NULL,
+                     token_used_at = NULL,
+                     link_created_at = UTC_TIMESTAMP(),
+                     link_url = %s,
+                     invitation_copy_text = %s,
+                     invitation_copied_at = NULL,
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND submitted_at IS NULL',
+                $this->_db->makeQueryString($tokenHash),
+                $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()),
+                $this->_db->makeQueryString($link),
+                $this->_db->makeQueryString($invitation),
+                $this->_db->makeQueryInteger($questionnaireID)
+            )
+        );
+        $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'link_regenerated', array());
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_regenerated', 'screening_questionnaire', $questionnaireID, array());
+        return $this->_db->getAffectedRows() === 1;
+    }
+
+    public function getQuestionnairePageByToken($token)
+    {
+        $tokenHash = self::questionnaireTokenHash($token);
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    q.*,
+                    c.first_name,
+                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                    jo.title AS role_title
+                 FROM nesp_screening_questionnaire q
+                 INNER JOIN candidate c ON c.candidate_id = q.candidate_id
+                 INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id
+                 WHERE q.token_hash = %s
+                 LIMIT 1',
+                $this->_db->makeQueryString($tokenHash)
+            )
+        );
+
+        $state = self::evaluateQuestionnaireTokenState($token, $row, time());
+        if ($state !== 'valid')
+        {
+            $this->logQuestionnaireActivity(empty($row) ? null : $row['screening_questionnaire_id'], $tokenHash, 'token_' . $state, array());
+            return array('ok' => false, 'state' => $state);
+        }
+        if ($this->isQuestionnaireRateLimited(empty($row) ? null : $row['screening_questionnaire_id'], $tokenHash))
+        {
+            $this->logQuestionnaireActivity($row['screening_questionnaire_id'], $tokenHash, 'rate_limited', array());
+            return array('ok' => false, 'state' => 'rate_limited');
+        }
+        if (!in_array($row['status_key'], array('link_ready', 'waiting', 'in_progress')))
+        {
+            $this->logQuestionnaireActivity($row['screening_questionnaire_id'], $tokenHash, 'token_not_active', array('status_key' => $row['status_key']));
+            return array('ok' => false, 'state' => 'not_active');
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET status_key = CASE WHEN status_key = "link_ready" OR status_key = "waiting" THEN "in_progress" ELSE status_key END,
+                     started_at = CASE WHEN started_at IS NULL THEN UTC_TIMESTAMP() ELSE started_at END,
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND submitted_at IS NULL',
+                $this->_db->makeQueryInteger($row['screening_questionnaire_id'])
+            )
+        );
+        $this->logQuestionnaireActivity($row['screening_questionnaire_id'], $tokenHash, 'page_viewed', array());
+        $row = $this->decorateQuestionnaireRow($row);
+        $row['questions'] = self::getQuestionnaireQuestionsForSet($row['question_set_key']);
+        return array('ok' => true, 'state' => 'valid', 'questionnaire' => $row);
+    }
+
+    public function submitQuestionnaireFromToken($token, $answers)
+    {
+        $page = $this->getQuestionnairePageByToken($token);
+        if (empty($page['ok']))
+        {
+            return $page;
+        }
+
+        $questionnaire = $page['questionnaire'];
+        $tokenHash = self::questionnaireTokenHash($token);
+        $questions = self::getQuestionnaireQuestionsForSet($questionnaire['question_set_key']);
+        $validation = self::validateQuestionnaireAnswers($questions, $answers);
+        if (empty($validation['ok']))
+        {
+            $this->logQuestionnaireActivity($questionnaire['screening_questionnaire_id'], $tokenHash, 'validation_failed', array('missing_count' => count($validation['missing'])));
+            return array('ok' => false, 'state' => 'validation_failed', 'missing' => $validation['missing']);
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET status_key = "completed",
+                     submitted_at = UTC_TIMESTAMP(),
+                     token_used_at = UTC_TIMESTAMP(),
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND token_hash = %s
+                   AND token_revoked_at IS NULL
+                   AND submitted_at IS NULL
+                   AND status_key IN ("link_ready", "waiting", "in_progress")',
+                $this->_db->makeQueryInteger($questionnaire['screening_questionnaire_id']),
+                $this->_db->makeQueryString($tokenHash)
+            )
+        );
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            $this->logQuestionnaireActivity($questionnaire['screening_questionnaire_id'], $tokenHash, 'duplicate_submit_blocked', array());
+            return array('ok' => false, 'state' => 'already_submitted');
+        }
+
+        $sortOrder = 10;
+        foreach ($questions as $question)
+        {
+            $this->_db->query(
+                sprintf(
+                    'INSERT INTO nesp_screening_questionnaire_answer
+                        (screening_questionnaire_id, question_key, question_label, answer_text, sort_order, date_created, date_modified)
+                     VALUES
+                        (%s, %s, %s, %s, %s, NOW(), NOW())',
+                    $this->_db->makeQueryInteger($questionnaire['screening_questionnaire_id']),
+                    $this->_db->makeQueryString($question['key']),
+                    $this->_db->makeQueryString($question['label']),
+                    $this->_db->makeQueryString($validation['answers'][$question['key']]),
+                    $this->_db->makeQueryInteger($sortOrder)
+                )
+            );
+            $sortOrder += 10;
+        }
+
+        $this->logQuestionnaireActivity($questionnaire['screening_questionnaire_id'], $tokenHash, 'submitted', array('answer_count' => count($questions)));
+        $this->logAuditEvent(null, 'screening_questionnaire_submitted', 'screening_questionnaire', $questionnaire['screening_questionnaire_id'], array('question_set_key' => $questionnaire['question_set_key']));
+        return array('ok' => true, 'state' => 'completed');
+    }
+
+    public function requestQuestionnaireHumanFollowUpFromToken($token)
+    {
+        $page = $this->getQuestionnairePageByToken($token);
+        if (empty($page['ok']))
+        {
+            return $page;
+        }
+        $questionnaire = $page['questionnaire'];
+        $tokenHash = self::questionnaireTokenHash($token);
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET status_key = "human_follow_up_requested",
+                     human_follow_up_requested_at = UTC_TIMESTAMP(),
+                     token_revoked_at = UTC_TIMESTAMP(),
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND token_hash = %s
+                   AND submitted_at IS NULL',
+                $this->_db->makeQueryInteger($questionnaire['screening_questionnaire_id']),
+                $this->_db->makeQueryString($tokenHash)
+            )
+        );
+        $this->logQuestionnaireActivity($questionnaire['screening_questionnaire_id'], $tokenHash, 'human_follow_up_requested', array());
+        return array('ok' => true, 'state' => 'human_follow_up_requested');
+    }
+
+    public function assignQuestionnaireReviewer($questionnaireID, $interviewerProfileID, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        if ($interviewerProfileID <= 0)
+        {
+            return false;
+        }
+        $detail = $this->getQuestionnaireDetail($questionnaireID);
+        if (empty($detail))
+        {
+            return false;
+        }
+        if ($this->createCandidateGrant($interviewerProfileID, $detail['candidate_id'], $detail['joborder_id'], $actorUserID) === false)
+        {
+            return false;
+        }
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET reviewer_profile_id = %s,
+                     review_status_key = "assigned",
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s',
+                $this->_db->makeQueryInteger($interviewerProfileID),
+                $this->_db->makeQueryInteger($questionnaireID)
+            )
+        );
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_reviewer_assigned', 'screening_questionnaire', $questionnaireID, array('interviewer_profile_id' => $interviewerProfileID));
+        return $this->_db->getAffectedRows() === 1;
+    }
+
+    public function saveQuestionnaireReview($questionnaireID, $actorUserID, $reviewNote, $markComplete)
+    {
+        $detail = $this->getQuestionnaireDetail($questionnaireID, $actorUserID);
+        if (empty($detail))
+        {
+            return false;
+        }
+        $reviewNote = trim($reviewNote);
+        $statusSQL = $markComplete ? '"complete"' : '"in_review"';
+        $completedBySQL = $markComplete ? $this->_db->makeQueryInteger($actorUserID) : 'review_completed_by_user_id';
+        $completedAtSQL = $markComplete ? 'UTC_TIMESTAMP()' : 'review_completed_at';
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET review_notes = %s,
+                     review_status_key = %s,
+                     review_completed_by_user_id = %s,
+                     review_completed_at = %s,
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s',
+                $this->_db->makeQueryString($reviewNote),
+                $statusSQL,
+                $completedBySQL,
+                $completedAtSQL,
+                $this->_db->makeQueryInteger($questionnaireID)
+            )
+        );
+        $this->logAuditEvent($actorUserID, $markComplete ? 'screening_questionnaire_review_completed' : 'screening_questionnaire_review_saved', 'screening_questionnaire', $questionnaireID, array('review_note_length' => strlen($reviewNote)));
+        return true;
+    }
+
     public function getPhoneScreenStatusLabels()
     {
         return NESPVapiIntegration::getPhoneScreenStatusLabels();
@@ -3868,6 +4634,119 @@ class NESPWorkflow
 
         $rs = $this->_db->getAssoc($sql);
         return !empty($rs);
+    }
+
+    private function decorateQuestionnaireRows($rows)
+    {
+        $decorated = array();
+        foreach ($rows as $row)
+        {
+            $decorated[] = $this->decorateQuestionnaireRow($row);
+        }
+        return $decorated;
+    }
+
+    private function decorateQuestionnaireRow($row)
+    {
+        if (empty($row['submitted_at']) && empty($row['token_revoked_at']) && !empty($row['token_expires_at'])
+            && strtotime($row['token_expires_at']) < time()
+            && in_array($row['status_key'], array('link_ready', 'waiting', 'in_progress')))
+        {
+            $row['status_key'] = 'expired';
+        }
+        $labels = self::getQuestionnaireStatusLabels();
+        $row['status_label'] = isset($labels[$row['status_key']]) ? $labels[$row['status_key']] : $row['status_key'];
+        $set = self::getQuestionnaireSetForRole(isset($row['role_title']) ? $row['role_title'] : '');
+        if (empty($row['question_set_key']))
+        {
+            $row['question_set_key'] = $set['key'];
+        }
+        $sets = self::getQuestionnaireQuestionSets();
+        $row['question_set_label'] = isset($sets[$row['question_set_key']]) ? $sets[$row['question_set_key']]['label'] : $set['label'];
+        $row['candidate_name'] = isset($row['candidate_name']) ? trim($row['candidate_name']) : '';
+        $row['reviewer_name'] = empty($row['reviewer_name']) ? 'Unassigned' : $row['reviewer_name'];
+        $row['has_active_link'] = !empty($row['token_hash'])
+            && empty($row['token_revoked_at'])
+            && empty($row['submitted_at'])
+            && (empty($row['token_expires_at']) || strtotime($row['token_expires_at']) >= time());
+        return $row;
+    }
+
+    private function userCanReviewQuestionnaire($userID, $detail)
+    {
+        if ($this->getUserIsAdmin($userID))
+        {
+            return true;
+        }
+        $profile = $this->getInterviewerProfileForUser($userID);
+        if (empty($profile))
+        {
+            return false;
+        }
+        if (!empty($detail['reviewer_profile_id']) && (int) $detail['reviewer_profile_id'] === (int) $profile['interviewer_profile_id'])
+        {
+            return $this->userCanAccessCandidate($userID, $detail['candidate_id'], $detail['joborder_id']);
+        }
+        return false;
+    }
+
+    private function getUserIsAdmin($userID)
+    {
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT access_level
+                 FROM `user`
+                 WHERE user_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($userID)
+            )
+        );
+        return !empty($row) && (int) $row['access_level'] >= ACCESS_LEVEL_SA;
+    }
+
+    private function isQuestionnaireRateLimited($questionnaireID, $tokenHash)
+    {
+        $ipHash = $this->publicRequestIPHash();
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT COUNT(*) AS total
+                 FROM nesp_screening_questionnaire_activity
+                 WHERE token_hash = %s
+                   AND ip_hash = %s
+                   AND date_created >= DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+                $this->_db->makeQueryString($tokenHash),
+                $this->_db->makeQueryString($ipHash)
+            )
+        );
+        return !empty($row) && (int) $row['total'] > 80;
+    }
+
+    private function logQuestionnaireActivity($questionnaireID, $tokenHash, $activityKey, $metadata)
+    {
+        $metadataJSON = json_encode($metadata);
+        if ($metadataJSON === false)
+        {
+            $metadataJSON = '{}';
+        }
+        $this->_db->query(
+            sprintf(
+                'INSERT INTO nesp_screening_questionnaire_activity
+                    (screening_questionnaire_id, token_hash, activity_key, ip_hash, user_agent_hash, metadata_json, date_created)
+                 VALUES
+                    (%s, %s, %s, %s, %s, %s, NOW())',
+                $questionnaireID === null ? 'NULL' : $this->_db->makeQueryInteger($questionnaireID),
+                $this->_db->makeQueryString($tokenHash),
+                $this->_db->makeQueryString($activityKey),
+                $this->_db->makeQueryString($this->publicRequestIPHash()),
+                $this->_db->makeQueryString(hash('sha256', isset($_SERVER['HTTP_USER_AGENT']) ? substr($_SERVER['HTTP_USER_AGENT'], 0, 255) : '')),
+                $this->_db->makeQueryString($metadataJSON)
+            )
+        );
+    }
+
+    private function publicRequestIPHash()
+    {
+        return hash('sha256', isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
     }
 
     private function decoratePhoneScreenRows($rows)

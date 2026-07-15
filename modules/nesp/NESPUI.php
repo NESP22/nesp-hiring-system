@@ -22,6 +22,7 @@ class NESPUI extends UserInterface
             'Needs Craig' => CATSUtility::getIndexName() . '?m=nesp*al=' . ACCESS_LEVEL_READ,
             'Waiting' => CATSUtility::getIndexName() . '?m=nesp&amp;a=waiting*al=' . ACCESS_LEVEL_READ,
             'Interviews' => CATSUtility::getIndexName() . '?m=nesp&amp;a=interviews*al=' . ACCESS_LEVEL_READ,
+            'Questionnaires' => CATSUtility::getIndexName() . '?m=nesp&amp;a=questionnaires*al=' . ACCESS_LEVEL_READ,
             'Phone Screens' => CATSUtility::getIndexName() . '?m=nesp&amp;a=phoneScreens*al=' . ACCESS_LEVEL_READ,
             'Job Ads' => CATSUtility::getIndexName() . '?m=nesp&amp;a=jobAds*al=' . ACCESS_LEVEL_READ,
             'Completed' => CATSUtility::getIndexName() . '?m=nesp&amp;a=completed*al=' . ACCESS_LEVEL_READ,
@@ -147,6 +148,55 @@ class NESPUI extends UserInterface
             case 'phoneScreens':
                 $this->adminOnly();
                 $this->phoneScreens();
+                break;
+
+            case 'questionnaires':
+                $this->adminOnly();
+                $this->questionnaires();
+                break;
+
+            case 'confirmQuestionnaire':
+                $this->adminOnly();
+                $this->confirmQuestionnaire();
+                break;
+
+            case 'requestQuestionnaire':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->requestQuestionnaire();
+                break;
+
+            case 'reviewQuestionnaire':
+                $this->reviewQuestionnaire();
+                break;
+
+            case 'markQuestionnaireInvitationCopied':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->markQuestionnaireInvitationCopied();
+                break;
+
+            case 'revokeQuestionnaireLink':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->revokeQuestionnaireLink();
+                break;
+
+            case 'regenerateQuestionnaireLink':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->regenerateQuestionnaireLink();
+                break;
+
+            case 'assignQuestionnaireReviewer':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->assignQuestionnaireReviewer();
+                break;
+
+            case 'saveQuestionnaireReview':
+                $this->requirePostCSRF();
+                $this->saveQuestionnaireReview();
                 break;
 
             case 'jobAds':
@@ -643,6 +693,108 @@ class NESPUI extends UserInterface
         CATSUtility::transferRelativeURI('m=nesp&a=assignedCandidate&candidateID=' . $candidateID . '&jobOrderID=' . $jobOrderID);
     }
 
+    private function questionnaires()
+    {
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Questionnaires');
+        $this->_template->assign('viewKey', 'questionnaires');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('questionnaireQueues', $this->_workflow->getQuestionnaireQueues());
+        $this->_template->assign('questionnaires', $this->_workflow->getQuestionnaireSummaries(100));
+        $this->_template->display('./modules/nesp/Questionnaires.tpl');
+    }
+
+    private function confirmQuestionnaire()
+    {
+        $candidateID = isset($_GET['candidateID']) ? (int) $_GET['candidateID'] : 0;
+        $jobOrderID = isset($_GET['jobOrderID']) ? (int) $_GET['jobOrderID'] : 0;
+        $preview = $this->_workflow->getCandidateQuestionnairePreview($candidateID, $jobOrderID);
+        if (empty($preview))
+        {
+            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid questionnaire candidate.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Questionnaires');
+        $this->_template->assign('preview', $preview);
+        $this->_template->display('./modules/nesp/QuestionnaireConfirm.tpl');
+    }
+
+    private function requestQuestionnaire()
+    {
+        $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
+        $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+        $questionnaireID = $this->_workflow->requestQuestionnaire($candidateID, $jobOrderID, $this->_userID);
+        if ($questionnaireID === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to prepare questionnaire link.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . (int) $questionnaireID);
+    }
+
+    private function reviewQuestionnaire()
+    {
+        $questionnaireID = isset($_GET['questionnaireID']) ? (int) $_GET['questionnaireID'] : 0;
+        $isAdmin = $this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA;
+        $detail = $this->_workflow->getQuestionnaireDetail($questionnaireID, $isAdmin ? null : $this->_userID);
+        if (empty($detail))
+        {
+            CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'Invalid or unauthorized questionnaire.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Questionnaires');
+        $this->_template->assign('isAdmin', $isAdmin);
+        $this->_template->assign('questionnaire', $detail);
+        $this->_template->assign('interviewerProfiles', $isAdmin ? $this->_workflow->getInterviewerProfiles() : array());
+        $this->_template->display('./modules/nesp/QuestionnaireReview.tpl');
+    }
+
+    private function markQuestionnaireInvitationCopied()
+    {
+        $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
+        $this->_workflow->markQuestionnaireInvitationCopied($questionnaireID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
+    }
+
+    private function revokeQuestionnaireLink()
+    {
+        $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
+        $this->_workflow->revokeQuestionnaireLink($questionnaireID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
+    }
+
+    private function regenerateQuestionnaireLink()
+    {
+        $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
+        $this->_workflow->regenerateQuestionnaireLink($questionnaireID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
+    }
+
+    private function assignQuestionnaireReviewer()
+    {
+        $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->_workflow->assignQuestionnaireReviewer($questionnaireID, $interviewerProfileID, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid interviewer.');
+        }
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
+    }
+
+    private function saveQuestionnaireReview()
+    {
+        $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
+        $reviewNote = isset($_POST['reviewNote']) ? $_POST['reviewNote'] : '';
+        $markComplete = isset($_POST['markComplete']) ? 1 : 0;
+        if ($this->_workflow->saveQuestionnaireReview($questionnaireID, $this->_userID, $reviewNote, $markComplete) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You cannot review this questionnaire.');
+        }
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
+    }
+
     private function unlockScorecard()
     {
         $scorecardResponseID = isset($_POST['scorecardResponseID']) ? (int) $_POST['scorecardResponseID'] : 0;
@@ -908,6 +1060,10 @@ class NESPUI extends UserInterface
         if ($viewKey === 'interviews')
         {
             return 'Interviews';
+        }
+        if ($viewKey === 'questionnaires')
+        {
+            return 'Questionnaires';
         }
         if ($viewKey === 'phoneScreens')
         {
