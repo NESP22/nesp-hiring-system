@@ -325,32 +325,46 @@ class JOB_TYPES {
 */
 
 
-/*
 require_once(LEGACY_ROOT . '/constants.php');
 
-class ACL_SETUP {
+if (!class_exists('ACL_SETUP'))
+{
+    class ACL_SETUP {
 
-    // defining user roles
-    public static $USER_ROLES = array(
-        'candidate' => array('Candidate', 'candidate', 'This is a candidate.', ACCESS_LEVEL_SA, ACCESS_LEVEL_READ),
-        'demo' => array('Demo', 'demo', 'This is a demo user.', ACCESS_LEVEL_SA, ACCESS_LEVEL_READ)
-    );
-   
-    // defining access levels different from the default access level    
-    public static $ACCESS_LEVEL_MAP = array(
-        'candidate' => array(
-        ),
-        'demo' => array(
-            'candidates' => ACCESS_LEVEL_DELETE,
-            'candidates.emailCandidates' => ACCESS_LEVEL_DISABLED,
-            'candidates.history' => ACCESS_LEVEL_DEMO,
-            'joborders' => ACCESS_LEVEL_DELETE,
-            'joborders.show' => ACCESS_LEVEL_DEMO,
-            'joborders.email' => ACCESS_LEVEL_DISABLED,
-        )
-    );
-};
-*/
+        public static $USER_ROLES = array(
+            'candidate' => array('Candidate', 'candidate', 'This is a candidate.', ACCESS_LEVEL_SA, ACCESS_LEVEL_READ),
+            'demo' => array('Demo', 'demo', 'This is a demo user.', ACCESS_LEVEL_SA, ACCESS_LEVEL_READ),
+            'nesp_interviewer' => array('NESP Interviewer', 'nesp_interviewer', 'Scoped NESP interviewer. Legacy OpenCATS modules are disabled.', ACCESS_LEVEL_SA, ACCESS_LEVEL_READ)
+        );
+
+        public static $ACCESS_LEVEL_MAP = array(
+            'candidate' => array(
+            ),
+            'demo' => array(
+                'candidates' => ACCESS_LEVEL_DELETE,
+                'candidates.emailCandidates' => ACCESS_LEVEL_DISABLED,
+                'candidates.history' => ACCESS_LEVEL_DEMO,
+                'joborders' => ACCESS_LEVEL_DELETE,
+                'joborders.show' => ACCESS_LEVEL_DEMO,
+                'joborders.email' => ACCESS_LEVEL_DISABLED,
+            ),
+            'nesp_interviewer' => array(
+                '' => ACCESS_LEVEL_READ,
+                'nesp' => ACCESS_LEVEL_READ,
+                'candidates' => ACCESS_LEVEL_DISABLED,
+                'joborders' => ACCESS_LEVEL_DISABLED,
+                'companies' => ACCESS_LEVEL_DISABLED,
+                'contacts' => ACCESS_LEVEL_DISABLED,
+                'calendar' => ACCESS_LEVEL_DISABLED,
+                'reports' => ACCESS_LEVEL_DISABLED,
+                'settings' => ACCESS_LEVEL_DISABLED,
+                'pipelines' => ACCESS_LEVEL_DISABLED,
+                'import' => ACCESS_LEVEL_DISABLED,
+                'lists' => ACCESS_LEVEL_DISABLED
+            )
+        );
+    };
+}
 
 /* All possible secure object names 
             'candidates.history'

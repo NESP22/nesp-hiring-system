@@ -1,6 +1,8 @@
 <?php
 use PHPUnit\Framework\TestCase;
 
+include_once(LEGACY_ROOT . '/constants.php');
+include_once(LEGACY_ROOT . '/config.php');
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
@@ -74,6 +76,22 @@ class NESPWorkflowTest extends TestCase
             array('Needs Craig', 'Waiting', 'Interviews', 'Phone Screens', 'Job Ads', 'Completed', 'Staffing Forecast', 'Interviewer Settings'),
             $labels
         );
+    }
+
+    public function testNespInterviewerAclMapDeniesLegacyGlobalModules()
+    {
+        $this->assertTrue(class_exists('ACL_SETUP'));
+        $this->assertArrayHasKey('nesp_interviewer', ACL_SETUP::$USER_ROLES);
+        $this->assertArrayHasKey('nesp_interviewer', ACL_SETUP::$ACCESS_LEVEL_MAP);
+
+        $map = ACL_SETUP::$ACCESS_LEVEL_MAP['nesp_interviewer'];
+        $this->assertSame(ACCESS_LEVEL_READ, $map['']);
+        $this->assertSame(ACCESS_LEVEL_READ, $map['nesp']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['candidates']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['joborders']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['settings']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['pipelines']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['reports']);
     }
 
     public function testRecruitingSourceParametersAreSafeAndTracked()
@@ -453,15 +471,49 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('phone_fixture', $payload['phoneNumberId']);
         $this->assertSame('+15551112222', $payload['customer']['number']);
         $this->assertArrayNotHasKey('metadata', $payload);
+        $this->assertFalse($payload['artifactPlan']['recordingEnabled']);
+        $this->assertFalse($payload['artifactPlan']['videoRecordingEnabled']);
+        $this->assertFalse($payload['artifactPlan']['loggingEnabled']);
+        $this->assertFalse($payload['artifactPlan']['pcapEnabled']);
+        $this->assertFalse($payload['artifactPlan']['fullMessageHistoryEnabled']);
+        $this->assertTrue($payload['artifactPlan']['transcriptPlan']['enabled']);
         $this->assertFalse($payload['assistantOverrides']['artifactPlan']['recordingEnabled']);
         $this->assertFalse($payload['assistantOverrides']['artifactPlan']['videoRecordingEnabled']);
         $this->assertTrue($payload['assistantOverrides']['artifactPlan']['transcriptPlan']['enabled']);
+        $this->assertStringNotContainsString('recordingPath', json_encode($payload));
+        $this->assertStringNotContainsString('recordingUrl', json_encode($payload));
         $this->assertSame('Freelance Photographer', $payload['assistantOverrides']['variableValues']['role']);
         $this->assertSame('off', $payload['assistantOverrides']['variableValues']['audio_recording']);
         $this->assertSame('request_fixture', $payload['assistantOverrides']['metadata']['nesp_call_request_key']);
 
         putenv('VAPI_HIRING_ASSISTANT_ID');
         putenv('VAPI_PHONE_NUMBER_ID');
+    }
+
+    public function testVapiStructuredResultsDropRecordingArtifacts()
+    {
+        $message = array(
+            'type' => 'end-of-call-report',
+            'endedReason' => 'hangup',
+            'call' => array('id' => 'call_fixture'),
+            'transcript' => 'Assistant: consent prompt. User: yes.',
+            'analysis' => array(
+                'structuredData' => array(
+                    'consent_accepted' => true,
+                    'experience_summary' => 'Safe summary',
+                    'recording_url' => 'https://provider.example/recording.wav',
+                    'artifact' => array('recordingUrl' => 'https://provider.example/recording.wav')
+                )
+            )
+        );
+
+        $update = NESPVapiIntegration::buildScreenUpdateFromWebhookMessage($message);
+        $structured = json_decode($update['structured_result_json'], true);
+
+        $this->assertSame('Safe summary', $structured['experience_summary']);
+        $this->assertArrayNotHasKey('recording_url', $structured);
+        $this->assertArrayNotHasKey('artifact', $structured);
+        $this->assertStringNotContainsString('recording.wav', $update['structured_result_json']);
     }
 
     public function testSchedulingTokenStateAcceptsValidToken()

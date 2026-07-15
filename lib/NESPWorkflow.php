@@ -2576,11 +2576,6 @@ class NESPWorkflow
             array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID)
         );
 
-        if ($statusKey === 'submitted')
-        {
-            $this->markWorkflowScorecardComplete($userID, $candidateID, $jobOrderID, $responseID);
-        }
-
         return $responseID;
     }
 
@@ -4476,6 +4471,7 @@ class NESPWorkflow
         $username = $this->interviewerUsernameFromEmail($email);
         $names = $this->splitDisplayName($displayName === '' ? $profile['display_name'] : $displayName);
         $accessLevel = $active ? ACCESS_LEVEL_READ : ACCESS_LEVEL_DISABLED;
+        $interviewerCategory = 'nesp_interviewer';
         $userID = (int) $profile['user_id'];
         if ($userID <= 0)
         {
@@ -4499,15 +4495,16 @@ class NESPWorkflow
                 $this->_db->query(
                     sprintf(
                         'INSERT INTO user
-                            (user_name, password, access_level, can_change_password, is_test_user, email, first_name, last_name, can_see_eeo_info)
+                            (user_name, password, access_level, can_change_password, is_test_user, email, first_name, last_name, categories, can_see_eeo_info)
                          VALUES
-                            (%s, %s, %s, 1, 0, %s, %s, %s, 0)',
+                            (%s, %s, %s, 1, 0, %s, %s, %s, %s, 0)',
                         $this->_db->makeQueryString($username),
                         $this->_db->makeQueryString($this->hashTemporaryInterviewerPassword($temporaryPassword)),
                         $this->_db->makeQueryInteger($accessLevel),
                         $this->_db->makeQueryString($email),
                         $this->_db->makeQueryString($names['first_name']),
-                        $this->_db->makeQueryString($names['last_name'])
+                        $this->_db->makeQueryString($names['last_name']),
+                        $this->_db->makeQueryString($interviewerCategory)
                     )
                 );
                 $userID = (int) $this->_db->getLastInsertID();
@@ -4543,6 +4540,7 @@ class NESPWorkflow
                      last_name = %s,
                      password = %s,
                      access_level = %s,
+                     categories = %s,
                      can_change_password = 1
                  WHERE user_id = %s',
                 $this->_db->makeQueryString($username),
@@ -4551,6 +4549,7 @@ class NESPWorkflow
                 $this->_db->makeQueryString($names['last_name']),
                 $this->_db->makeQueryString($this->hashTemporaryInterviewerPassword($temporaryPassword)),
                 $this->_db->makeQueryInteger($accessLevel),
+                $this->_db->makeQueryString($interviewerCategory),
                 $this->_db->makeQueryInteger($userID)
             )
         );
@@ -4601,10 +4600,12 @@ class NESPWorkflow
         $this->_db->query(
             sprintf(
                 'UPDATE user
-                 SET access_level = %s
+                 SET access_level = %s,
+                     categories = %s
                  WHERE user_id = %s
                    AND access_level < %s',
                 $this->_db->makeQueryInteger($active ? ACCESS_LEVEL_READ : ACCESS_LEVEL_DISABLED),
+                $this->_db->makeQueryString('nesp_interviewer'),
                 $this->_db->makeQueryInteger((int) $profile['user_id']),
                 $this->_db->makeQueryInteger(ACCESS_LEVEL_SA)
             )

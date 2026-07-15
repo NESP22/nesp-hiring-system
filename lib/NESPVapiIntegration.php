@@ -325,20 +325,16 @@ class NESPVapiIntegration
     public static function buildOutboundCallPayload($destinationPhone, $candidate, $job, $callRequestKey)
     {
         $roleScript = self::getRoleScript(isset($job['joborder_id']) ? $job['joborder_id'] : 0, isset($job['title']) ? $job['title'] : '');
+        $artifactPlan = self::getNoRecordingArtifactPlan();
         return array(
             'assistantId' => self::getEnvValue('VAPI_HIRING_ASSISTANT_ID'),
             'phoneNumberId' => self::getEnvValue('VAPI_PHONE_NUMBER_ID'),
             'customer' => array(
                 'number' => self::normalizePhoneForDial($destinationPhone)
             ),
+            'artifactPlan' => $artifactPlan,
             'assistantOverrides' => array(
-                'artifactPlan' => array(
-                    'recordingEnabled' => false,
-                    'videoRecordingEnabled' => false,
-                    'transcriptPlan' => array(
-                        'enabled' => true
-                    )
-                ),
+                'artifactPlan' => $artifactPlan,
                 'variableValues' => array(
                     'nesp_call_request_key' => $callRequestKey,
                     'candidate_id' => isset($candidate['candidate_id']) ? (int) $candidate['candidate_id'] : 0,
@@ -355,6 +351,20 @@ class NESPVapiIntegration
                     'consent_required' => true,
                     'audio_recording' => 'off'
                 )
+            )
+        );
+    }
+
+    private static function getNoRecordingArtifactPlan()
+    {
+        return array(
+            'recordingEnabled' => false,
+            'videoRecordingEnabled' => false,
+            'loggingEnabled' => false,
+            'pcapEnabled' => false,
+            'fullMessageHistoryEnabled' => false,
+            'transcriptPlan' => array(
+                'enabled' => true
             )
         );
     }
@@ -677,15 +687,65 @@ class NESPVapiIntegration
         if (isset($message['analysis']) && is_array($message['analysis'])
             && isset($message['analysis']['structuredData']))
         {
-            $json = json_encode($message['analysis']['structuredData']);
+            $json = json_encode(self::sanitizeStructuredResult($message['analysis']['structuredData']));
             return $json === false ? '{}' : $json;
         }
         if (isset($message['structuredResult']) && is_array($message['structuredResult']))
         {
-            $json = json_encode($message['structuredResult']);
+            $json = json_encode(self::sanitizeStructuredResult($message['structuredResult']));
             return $json === false ? '{}' : $json;
         }
         return '{}';
+    }
+
+    private static function sanitizeStructuredResult($structuredResult)
+    {
+        if (!is_array($structuredResult))
+        {
+            return array();
+        }
+
+        $safe = array();
+        foreach ($structuredResult as $key => $value)
+        {
+            $key = (string) $key;
+            if (!self::structuredResultFieldAllowed($key))
+            {
+                continue;
+            }
+            if (is_array($value))
+            {
+                $safe[$key] = self::sanitizeStructuredResult($value);
+            }
+            elseif (is_bool($value) || is_int($value) || is_float($value) || is_string($value) || $value === null)
+            {
+                $safe[$key] = $value;
+            }
+        }
+
+        return $safe;
+    }
+
+    private static function structuredResultFieldAllowed($key)
+    {
+        $allowed = array(
+            'answers',
+            'availability_summary',
+            'concerns',
+            'consent_accepted',
+            'consent_response_raw',
+            'equipment_summary',
+            'experience_summary',
+            'human_follow_up_recommended',
+            'notes',
+            'recommendation',
+            'role_fit',
+            'schedule_fit',
+            'summary',
+            'transportation_summary'
+        );
+
+        return in_array($key, $allowed, true);
     }
 
     private static function extractProviderCallID($message)
