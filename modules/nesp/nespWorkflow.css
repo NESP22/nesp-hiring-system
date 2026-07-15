@@ -8,15 +8,41 @@
 
 .nesp-page-title {
     margin: 0 0 16px;
-    border-bottom: 1px solid #d7dee8;
-    padding-bottom: 12px;
+    border-bottom: 4px solid #cf001c;
+    background: #ffffff;
+    padding: 16px;
+}
+
+.nesp-brand-lockup {
+    align-items: center;
+    display: flex;
+    gap: 18px;
+}
+
+.nesp-brand-lockup img {
+    flex: 0 0 auto;
+    height: auto;
+    max-width: 176px;
+    width: 28%;
+}
+
+.nesp-kicker {
+    color: #cf001c;
+    display: block;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0;
+    line-height: 1.3;
+    margin: 0 0 3px;
+    text-transform: uppercase;
 }
 
 .nesp-page-title h2 {
     margin: 0 0 6px;
-    color: #071e41;
-    font-size: 24px;
+    color: #061f46;
+    font-size: 25px;
     font-weight: bold;
+    line-height: 1.18;
 }
 
 .nesp-page-title p {
@@ -34,6 +60,47 @@
     padding: 11px 13px;
     font-size: 13px;
     font-weight: bold;
+}
+
+.nesp-step-row {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0 0 16px;
+}
+
+.nesp-step {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #d7dee8;
+    color: #536579;
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px;
+}
+
+.nesp-step span {
+    align-items: center;
+    background: #061f46;
+    color: #ffffff;
+    display: inline-flex;
+    flex: 0 0 24px;
+    font-size: 12px;
+    font-weight: bold;
+    height: 24px;
+    justify-content: center;
+}
+
+.nesp-step strong {
+    color: #253647;
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.nesp-step.is-current {
+    border-color: #315f93;
+    box-shadow: inset 3px 0 0 #cf001c;
 }
 
 .nesp-card-grid {
@@ -68,10 +135,18 @@
 
 .nesp-card strong {
     display: block;
-    color: #071e41;
+    color: #061f46;
     font-size: 30px;
     line-height: 1.2;
     margin-top: 4px;
+}
+
+.nesp-card-hint {
+    color: #cf001c;
+    display: block;
+    font-size: 11px;
+    font-weight: bold;
+    margin-top: 3px;
 }
 
 .nesp-two-column {
@@ -82,7 +157,7 @@
 
 .nesp-panel h3 {
     margin: 0 0 10px;
-    color: #071e41;
+    color: #061f46;
     font-size: 17px;
 }
 
@@ -211,9 +286,25 @@
     cursor: pointer;
 }
 
+.nesp-primary-action:hover,
+.nesp-primary-action:focus,
+.nesp-primary-button:hover,
+.nesp-primary-button:focus,
+.nesp-secondary-button:hover,
+.nesp-secondary-button:focus {
+    outline: 3px solid rgba(49, 95, 147, .22);
+}
+
 .nesp-secondary-button {
     border-color: #4f6578;
     background: #4f6578;
+}
+
+.nesp-action-form {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .nesp-form-grid {
@@ -244,6 +335,13 @@
     font-size: 12px;
     font-weight: bold;
     text-decoration: none;
+}
+
+button.nesp-secondary-action {
+    background: #ffffff;
+    border: 1px solid #315f93;
+    padding: 8px 11px;
+    cursor: pointer;
 }
 
 .nesp-secondary-actions {
@@ -371,6 +469,14 @@
     background: #ffffff;
 }
 
+.nesp-table caption {
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    position: absolute;
+    width: 1px;
+}
+
 .nesp-table th,
 .nesp-table td {
     border: 1px solid #d7dee8;
@@ -382,7 +488,7 @@
 
 .nesp-table th {
     background: #f0f4f9;
-    color: #071e41;
+    color: #061f46;
 }
 
 .nesp-status {
@@ -430,6 +536,14 @@
     overflow-wrap: anywhere;
 }
 
+.nesp-field-label {
+    color: #253647;
+    display: block;
+    font-size: 12px;
+    font-weight: bold;
+    margin: 0 0 5px;
+}
+
 .nesp-script-preview {
     margin: 0;
     padding: 12px;
@@ -466,21 +580,64 @@
     .nesp-card-grid-tight,
     .nesp-two-column,
     .nesp-form-wide,
-    .nesp-task-grid {
+    .nesp-task-grid,
+    .nesp-step-row {
         grid-template-columns: 1fr;
+    }
+
+    .nesp-brand-lockup {
+        align-items: flex-start;
+    }
+
+    .nesp-brand-lockup img {
+        max-width: 118px;
+        width: 36%;
     }
 
     .nesp-page-title h2 {
         font-size: 21px;
     }
 
-    .nesp-table {
-        font-size: 11px;
+    .nesp-action-form .nesp-primary-action,
+    .nesp-action-form .nesp-secondary-action {
+        box-sizing: border-box;
+        width: 100%;
     }
 
-    .nesp-table th,
+    .nesp-table,
+    .nesp-table tbody,
+    .nesp-table tr,
     .nesp-table td {
-        padding: 7px 6px;
+        display: block;
+        width: 100%;
+    }
+
+    .nesp-table tr:first-child {
+        display: none;
+    }
+
+    .nesp-table tr {
+        border: 1px solid #d7dee8;
+        box-sizing: border-box;
+        margin: 0 0 10px;
+    }
+
+    .nesp-table td {
+        border: 0;
+        border-bottom: 1px solid #edf1f6;
+        box-sizing: border-box;
+        padding: 8px 8px 8px 108px;
+        position: relative;
+    }
+
+    .nesp-table td:before {
+        color: #536579;
+        content: attr(data-label);
+        font-weight: bold;
+        left: 8px;
+        position: absolute;
+        top: 8px;
+        width: 86px;
     }
 
     .nesp-detail-list {
