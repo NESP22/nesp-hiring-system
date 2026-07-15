@@ -13,6 +13,12 @@
                 Turning on a flag here changes only database feature state. It does not deploy, run migrations, create Zoom meetings, initiate Vapi calls, send messages, or run AI review.
             </div>
 
+            <?php if (trim($this->temporaryLoginMessage) !== ''): ?>
+                <div class="nesp-confirm-box">
+                    <?php $this->_($this->temporaryLoginMessage); ?>
+                </div>
+            <?php endif; ?>
+
             <div class="nesp-dashboard-nav">
                 <?php foreach ($this->dashboardNavigation as $navItem): ?>
                     <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
@@ -60,6 +66,9 @@
 
                 <div class="nesp-panel">
                     <h3>Interviewer Pool</h3>
+                    <div class="nesp-safety-banner">
+                        No email, invitation, password reset, Zoom meeting, Vapi call, or applicant message is sent from this screen.
+                    </div>
                     <div class="nesp-card-grid nesp-card-grid-tight">
                         <div class="nesp-card">
                             <span class="nesp-card-label">Active Interviewers</span>
@@ -90,6 +99,11 @@
                             <input type="text" name="email" />
                         </label>
                         <label>
+                            Temporary password
+                            <input type="password" name="temporaryPassword" autocomplete="new-password" />
+                            <span class="nesp-help-text">Optional. If entered, an OpenCATS login is prepared but remains disabled until Craig activates the interviewer.</span>
+                        </label>
+                        <label>
                             Role
                             <select name="roleKey">
                                 <option value="interviewer">Interviewer</option>
@@ -97,9 +111,92 @@
                                 <option value="field_trainer">Field trainer</option>
                             </select>
                         </label>
+                        <label>
+                            Account state
+                            <select name="accountStateKey">
+                                <?php foreach ($this->accountStates as $stateKey => $stateLabel): ?>
+                                    <option value="<?php $this->_($stateKey); ?>"><?php $this->_($stateLabel); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <fieldset class="nesp-fieldset">
+                            <legend>Approved job roles</legend>
+                            <?php foreach ($this->jobRoleOptions as $roleOption): ?>
+                                <label class="nesp-checkbox-row">
+                                    <input type="checkbox" name="approvedJobOrderIDs[]" value="<?php echo((int) $roleOption['joborder_id']); ?>" />
+                                    <?php $this->_($roleOption['label']); ?> - job <?php echo((int) $roleOption['joborder_id']); ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </fieldset>
+                        <label>
+                            Time zone
+                            <input type="text" name="timezone" value="America/New_York" />
+                        </label>
+                        <label>
+                            Max interviews per day
+                            <input type="text" name="maxInterviewsPerDay" value="3" />
+                        </label>
+                        <label>
+                            Max interviews per week
+                            <input type="text" name="maxInterviewsPerWeek" value="12" />
+                        </label>
+                        <label>
+                            Default interview minutes
+                            <input type="text" name="defaultInterviewMinutes" value="30" />
+                        </label>
+                        <label>
+                            Buffer minutes
+                            <input type="text" name="bufferMinutes" value="15" />
+                        </label>
+                        <label>
+                            Earliest interview time
+                            <input type="text" name="earliestTime" value="09:00" />
+                        </label>
+                        <label>
+                            Latest interview time
+                            <input type="text" name="latestTime" value="17:00" />
+                        </label>
+                        <label class="nesp-checkbox-row">
+                            <input type="checkbox" name="mayRecommend" checked="checked" />
+                            May provide advisory recommendations
+                        </label>
+                        <label class="nesp-checkbox-row">
+                            <input type="checkbox" name="craigMustAttend" />
+                            Craig must attend interviews
+                        </label>
+                        <label>
+                            Private admin notes
+                            <textarea name="privateAdminNotes" rows="3"></textarea>
+                        </label>
+                        <label>
+                            Email warning
+                            <textarea name="emailWarning" rows="2"></textarea>
+                        </label>
                         <button type="submit" class="nesp-secondary-button">Create Inactive Profile</button>
                     </form>
                 </div>
+            </div>
+
+            <div class="nesp-panel">
+                <h3>Approved Real Interviewer Setup</h3>
+                <table class="nesp-table">
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Approved Roles</th>
+                        <th>Account State</th>
+                        <th>Warning</th>
+                    </tr>
+                    <?php foreach ($this->seedProfiles as $seedProfile): ?>
+                    <tr>
+                        <td><?php $this->_($seedProfile['display_name']); ?></td>
+                        <td><?php $this->_($seedProfile['email']); ?></td>
+                        <td><?php $this->_(implode(', ', $seedProfile['approved_joborder_ids'])); ?></td>
+                        <td><?php $this->_($seedProfile['account_state_key']); ?></td>
+                        <td><?php $this->_($seedProfile['email_warning']); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </table>
             </div>
 
             <div class="nesp-panel">
@@ -123,28 +220,152 @@
                     <tr>
                         <th>Name</th>
                         <th>Email</th>
-                        <th>Role</th>
+                        <th>Account</th>
+                        <th>Approved Jobs</th>
                         <th>Status</th>
                         <th>Active Grants</th>
+                        <th>Capacity</th>
                         <th>Last Change</th>
+                        <th>Action</th>
                     </tr>
                     <?php foreach ($this->interviewerProfiles as $profile): ?>
                     <tr>
                         <td><?php $this->_($profile['display_name']); ?></td>
                         <td><?php $this->_($profile['email']); ?></td>
-                        <td><?php $this->_($profile['role_key']); ?></td>
+                        <td>
+                            <?php $this->_(isset($this->accountStates[$profile['account_state_key']]) ? $this->accountStates[$profile['account_state_key']] : $profile['account_state_key']); ?><br />
+                            <span class="nesp-muted"><?php $this->_($profile['role_key']); ?></span>
+                            <?php if (trim($profile['email_warning']) !== ''): ?>
+                                <br /><strong><?php $this->_($profile['email_warning']); ?></strong>
+                            <?php endif; ?>
+                        </td>
+                        <td><?php $this->_($profile['approved_joborder_ids']); ?></td>
                         <td><?php echo(((int) $profile['is_active'] === 1) ? 'Active' : 'Inactive'); ?></td>
                         <td><?php $this->_($profile['active_grants']); ?></td>
+                        <td><?php $this->_((int) $profile['max_interviews_per_day'] . '/day, ' . (int) $profile['max_interviews_per_week'] . '/week'); ?></td>
                         <td><?php $this->_($profile['date_modified']); ?></td>
+                        <td><a class="nesp-secondary-action" href="#interviewer-<?php echo((int) $profile['interviewer_profile_id']); ?>">Edit</a></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (!count($this->interviewerProfiles)): ?>
                     <tr>
-                        <td colspan="6">No interviewer profiles have been created.</td>
+                        <td colspan="9">No interviewer profiles have been created.</td>
                     </tr>
                     <?php endif; ?>
                 </table>
             </div>
+
+            <?php foreach ($this->interviewerProfiles as $profile): ?>
+                <?php
+                    $approvedJobs = array_filter(explode(',', $profile['approved_joborder_ids']));
+                ?>
+                <div class="nesp-panel" id="interviewer-<?php echo((int) $profile['interviewer_profile_id']); ?>">
+                    <h3>Edit Interviewer: <?php $this->_($profile['display_name']); ?></h3>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=updateInterviewerSettings" class="nesp-form nesp-form-wide">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $profile['interviewer_profile_id']); ?>" />
+                        <label>
+                            Full name
+                            <input type="text" name="displayName" value="<?php echo(htmlspecialchars($profile['display_name'], ENT_QUOTES, 'UTF-8')); ?>" />
+                        </label>
+                        <label>
+                            Email address
+                            <input type="text" name="email" value="<?php echo(htmlspecialchars($profile['email'], ENT_QUOTES, 'UTF-8')); ?>" />
+                        </label>
+                        <label>
+                            New temporary password
+                            <input type="password" name="temporaryPassword" autocomplete="new-password" />
+                            <span class="nesp-help-text">Leave blank to keep the current password. Enter a new value to reset it and show one copy-only login message.</span>
+                        </label>
+                        <label>
+                            Linked OpenCATS user ID
+                            <input type="text" name="linkedUserID" value="<?php echo((int) $profile['user_id']); ?>" />
+                        </label>
+                        <label>
+                            Account state
+                            <select name="accountStateKey">
+                                <?php foreach ($this->accountStates as $stateKey => $stateLabel): ?>
+                                    <option value="<?php $this->_($stateKey); ?>"<?php if ($profile['account_state_key'] === $stateKey): ?> selected="selected"<?php endif; ?>><?php $this->_($stateLabel); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label class="nesp-checkbox-row">
+                            <input type="checkbox" name="isActive"<?php if ((int) $profile['is_active'] === 1): ?> checked="checked"<?php endif; ?> />
+                            Active account access. Uncheck to revoke interviewer login access.
+                        </label>
+                        <fieldset class="nesp-fieldset">
+                            <legend>Approved job roles</legend>
+                            <?php foreach ($this->jobRoleOptions as $roleOption): ?>
+                                <label class="nesp-checkbox-row">
+                                    <input type="checkbox" name="approvedJobOrderIDs[]" value="<?php echo((int) $roleOption['joborder_id']); ?>"<?php if (in_array((string) $roleOption['joborder_id'], $approvedJobs)): ?> checked="checked"<?php endif; ?> />
+                                    <?php $this->_($roleOption['label']); ?> - job <?php echo((int) $roleOption['joborder_id']); ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </fieldset>
+                        <label>
+                            Availability status
+                            <select name="availabilityStatusKey">
+                                <option value="open"<?php if ($profile['availability_status_key'] !== 'closed'): ?> selected="selected"<?php endif; ?>>Open for Interviews</option>
+                                <option value="closed"<?php if ($profile['availability_status_key'] === 'closed'): ?> selected="selected"<?php endif; ?>>Closed for Interviews</option>
+                            </select>
+                        </label>
+                        <label>
+                            Reopen date/time
+                            <input type="text" name="availabilityClosedUntil" value="<?php echo(htmlspecialchars($profile['availability_closed_until'], ENT_QUOTES, 'UTF-8')); ?>" />
+                        </label>
+                        <label>
+                            Close reason
+                            <textarea name="availabilityCloseReason" rows="2"><?php echo(htmlspecialchars($profile['availability_close_reason'], ENT_QUOTES, 'UTF-8')); ?></textarea>
+                        </label>
+                        <label>
+                            Time zone
+                            <input type="text" name="timezone" value="<?php echo(htmlspecialchars($profile['timezone'], ENT_QUOTES, 'UTF-8')); ?>" />
+                        </label>
+                        <label>
+                            Max interviews/day
+                            <input type="text" name="maxInterviewsPerDay" value="<?php echo((int) $profile['max_interviews_per_day']); ?>" />
+                        </label>
+                        <label>
+                            Max interviews/week
+                            <input type="text" name="maxInterviewsPerWeek" value="<?php echo((int) $profile['max_interviews_per_week']); ?>" />
+                        </label>
+                        <label>
+                            Default duration
+                            <input type="text" name="defaultInterviewMinutes" value="<?php echo((int) $profile['default_interview_minutes']); ?>" />
+                        </label>
+                        <label>
+                            Buffer minutes
+                            <input type="text" name="bufferMinutes" value="<?php echo((int) $profile['buffer_minutes']); ?>" />
+                        </label>
+                        <label>
+                            Earliest interview
+                            <input type="text" name="earliestTime" value="<?php echo(htmlspecialchars(substr($profile['earliest_time'], 0, 5), ENT_QUOTES, 'UTF-8')); ?>" />
+                        </label>
+                        <label>
+                            Latest interview
+                            <input type="text" name="latestTime" value="<?php echo(htmlspecialchars(substr($profile['latest_time'], 0, 5), ENT_QUOTES, 'UTF-8')); ?>" />
+                        </label>
+                        <label class="nesp-checkbox-row">
+                            <input type="checkbox" name="craigMustAttend"<?php if ((int) $profile['craig_must_attend'] === 1): ?> checked="checked"<?php endif; ?> />
+                            Craig must attend
+                        </label>
+                        <label class="nesp-checkbox-row">
+                            <input type="checkbox" name="mayRecommend"<?php if ((int) $profile['may_recommend'] === 1): ?> checked="checked"<?php endif; ?> />
+                            May provide advisory recommendation
+                        </label>
+                        <label>
+                            Private admin notes
+                            <textarea name="privateAdminNotes" rows="3"><?php echo(htmlspecialchars($profile['private_admin_notes'], ENT_QUOTES, 'UTF-8')); ?></textarea>
+                        </label>
+                        <label>
+                            Email confirmation warning
+                            <textarea name="emailWarning" rows="2"><?php echo(htmlspecialchars($profile['email_warning'], ENT_QUOTES, 'UTF-8')); ?></textarea>
+                        </label>
+                        <div class="nesp-confirm-box">Review these changes before saving. Saving is immediate, audited, and never sends email automatically.</div>
+                        <button type="submit" class="nesp-primary-button">Save Interviewer Settings</button>
+                    </form>
+                </div>
+            <?php endforeach; ?>
 
             <div class="nesp-two-column">
                 <div class="nesp-panel">
@@ -341,6 +562,84 @@
                             <?php endif; ?>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            <div class="nesp-two-column">
+                <div class="nesp-panel">
+                    <h3>Date-Specific Override</h3>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createInterviewerAvailabilityOverride" class="nesp-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <label>
+                            Interviewer
+                            <select name="interviewerProfileID">
+                                <option value="">Choose interviewer</option>
+                                <?php foreach ($this->interviewerProfiles as $profile): ?>
+                                    <option value="<?php echo((int) $profile['interviewer_profile_id']); ?>"><?php $this->_($profile['display_name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Date
+                            <input type="text" name="overrideDate" placeholder="YYYY-MM-DD" />
+                        </label>
+                        <label>
+                            Type
+                            <select name="overrideTypeKey">
+                                <option value="available">Available custom hours</option>
+                                <option value="available_all_day">Available all day</option>
+                                <option value="unavailable">Unavailable</option>
+                            </select>
+                        </label>
+                        <label>
+                            Open
+                            <input type="text" name="startTime" value="09:00" />
+                        </label>
+                        <label>
+                            Close
+                            <input type="text" name="endTime" value="17:00" />
+                        </label>
+                        <input type="hidden" name="timezone" value="America/New_York" />
+                        <label>
+                            Private reason
+                            <textarea name="privateReason" rows="2"></textarea>
+                        </label>
+                        <button type="submit" class="nesp-secondary-button">Save Override</button>
+                    </form>
+                </div>
+
+                <div class="nesp-panel">
+                    <h3>Blackout Date</h3>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createInterviewerBlackout" class="nesp-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <label>
+                            Interviewer
+                            <select name="interviewerProfileID">
+                                <option value="">Choose interviewer</option>
+                                <?php foreach ($this->interviewerProfiles as $profile): ?>
+                                    <option value="<?php echo((int) $profile['interviewer_profile_id']); ?>"><?php $this->_($profile['display_name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <label>
+                            Starts
+                            <input type="text" name="startsAt" placeholder="YYYY-MM-DD HH:MM" />
+                        </label>
+                        <label>
+                            Ends
+                            <input type="text" name="endsAt" placeholder="YYYY-MM-DD HH:MM" />
+                        </label>
+                        <label class="nesp-checkbox-row">
+                            <input type="checkbox" name="isAllDay" />
+                            All day
+                        </label>
+                        <input type="hidden" name="timezone" value="America/New_York" />
+                        <label>
+                            Private reason
+                            <textarea name="privateReason" rows="2"></textarea>
+                        </label>
+                        <button type="submit" class="nesp-secondary-button">Save Blackout</button>
+                    </form>
                 </div>
             </div>
 

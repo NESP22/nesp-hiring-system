@@ -9,6 +9,11 @@
                 <p>Scoped interviewer view. Only explicitly granted candidate and role assignments appear here.</p>
             </div>
 
+            <div class="nesp-dashboard-nav">
+                <a class="active" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignedCandidates">My Next Actions</a>
+                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=myAvailability">My Availability</a>
+            </div>
+
             <?php if (count($this->assignedCandidates)): ?>
                 <div class="nesp-task-grid">
                     <?php foreach ($this->assignedCandidates as $candidate): ?>

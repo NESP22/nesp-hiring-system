@@ -310,6 +310,7 @@
 
 .nesp-form input,
 .nesp-form select,
+.nesp-form textarea,
 .nesp-scorecard-form select,
 .nesp-scorecard-form textarea {
     box-sizing: border-box;
@@ -317,6 +318,50 @@
     border: 1px solid #b8c5d3;
     padding: 7px;
     font-size: 13px;
+}
+
+.nesp-fieldset {
+    border: 1px solid #d8dee8;
+    border-radius: 6px;
+    margin: 0;
+    padding: 10px 12px;
+}
+
+.nesp-fieldset legend {
+    color: #475569;
+    font-weight: 700;
+    padding: 0 4px;
+}
+
+.nesp-checkbox-row {
+    align-items: flex-start;
+    display: flex;
+    gap: 8px;
+    line-height: 1.35;
+}
+
+.nesp-checkbox-row input[type="checkbox"] {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    width: auto;
+}
+
+.nesp-form-wide {
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+}
+
+.nesp-form-wide textarea,
+.nesp-form-wide .nesp-fieldset,
+.nesp-form-wide .nesp-confirm-box {
+    grid-column: 1 / -1;
+}
+
+.nesp-confirm-box {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 6px;
+    color: #9a3412;
+    padding: 10px 12px;
 }
 
 .nesp-table {
@@ -420,6 +465,7 @@
     .nesp-card-grid-compact,
     .nesp-card-grid-tight,
     .nesp-two-column,
+    .nesp-form-wide,
     .nesp-task-grid {
         grid-template-columns: 1fr;
     }

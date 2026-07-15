@@ -1,6 +1,8 @@
 <?php
 use PHPUnit\Framework\TestCase;
 
+include_once(LEGACY_ROOT . '/constants.php');
+include_once(LEGACY_ROOT . '/config.php');
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
@@ -71,9 +73,25 @@ class NESPWorkflowTest extends TestCase
         );
 
         $this->assertSame(
-            array('Needs Craig', 'Waiting', 'Interviews', 'Phone Screens', 'Job Ads', 'Completed', 'Staffing Forecast', 'Settings'),
+            array('Needs Craig', 'Waiting', 'Interviews', 'Phone Screens', 'Job Ads', 'Completed', 'Staffing Forecast', 'Interviewer Settings'),
             $labels
         );
+    }
+
+    public function testNespInterviewerAclMapDeniesLegacyGlobalModules()
+    {
+        $this->assertTrue(class_exists('ACL_SETUP'));
+        $this->assertArrayHasKey('nesp_interviewer', ACL_SETUP::$USER_ROLES);
+        $this->assertArrayHasKey('nesp_interviewer', ACL_SETUP::$ACCESS_LEVEL_MAP);
+
+        $map = ACL_SETUP::$ACCESS_LEVEL_MAP['nesp_interviewer'];
+        $this->assertSame(ACCESS_LEVEL_READ, $map['']);
+        $this->assertSame(ACCESS_LEVEL_READ, $map['nesp']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['candidates']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['joborders']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['settings']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['pipelines']);
+        $this->assertSame(ACCESS_LEVEL_DISABLED, $map['reports']);
     }
 
     public function testRecruitingSourceParametersAreSafeAndTracked()
@@ -154,8 +172,108 @@ class NESPWorkflowTest extends TestCase
         $template = NESPWorkflow::getDefaultAvailabilityTemplate();
 
         $this->assertSame('America/New_York', $template['timezone']);
+        $this->assertSame('Eastern Time', $template['timezone_label']);
         $this->assertSame(30, $template['slot_minutes']);
+        $this->assertSame(15, $template['buffer_minutes']);
         $this->assertStringContainsString('Zoom creation remain disabled', $template['notes']);
+    }
+
+    public function testApprovedRealInterviewerSeedsKeepBrandonInactiveAndUnconfirmed()
+    {
+        $profiles = NESPWorkflow::getApprovedRealInterviewerSeedProfiles();
+        $byName = array();
+        foreach ($profiles as $profile)
+        {
+            $byName[$profile['display_name']] = $profile;
+            $this->assertSame(0, $profile['is_active']);
+        }
+
+        $this->assertSame(array(41002, 41003), $byName['Suthir']['approved_joborder_ids']);
+        $this->assertSame(array(41005), $byName['Brandon']['approved_joborder_ids']);
+        $this->assertSame('email_needs_confirmation', $byName['Brandon']['account_state_key']);
+        $this->assertStringContainsString('Please confirm', $byName['Brandon']['email_warning']);
+        $this->assertSame(array(41002, 41003, 41005), $byName['Nate']['approved_joborder_ids']);
+        $this->assertNotContains(41001, $byName['Nate']['approved_joborder_ids']);
+    }
+
+    public function testApprovedInterviewerJobRoleOptionsKeepCustomerServiceCraigOnly()
+    {
+        $roleOptions = NESPWorkflow::getInterviewerJobRoleOptions();
+        $roleKeysByJob = array();
+        foreach ($roleOptions as $option)
+        {
+            $roleKeysByJob[(int) $option['joborder_id']] = $option['role_key'];
+        }
+
+        $this->assertSame('customer_service', $roleKeysByJob[41001]);
+
+        foreach (NESPWorkflow::getApprovedRealInterviewerSeedProfiles() as $profile)
+        {
+            $this->assertNotContains(41001, $profile['approved_joborder_ids']);
+        }
+    }
+
+    public function testSchedulingConflictsRejectForbiddenCustomerServiceForNate()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'open',
+            'max_interviews_per_day' => 3,
+            'max_interviews_per_week' => 12,
+            'buffer_minutes' => 15
+        );
+        $blocks = array(
+            array('weekday_key' => 'Tuesday', 'start_time' => '09:00:00', 'end_time' => '17:00:00', 'is_active' => 1)
+        );
+
+        $conflicts = NESPWorkflow::findSchedulingConflicts(
+            $interviewer,
+            array(41002, 41003, 41005),
+            $blocks,
+            array(),
+            array(),
+            41001,
+            '2026-07-14 10:00:00',
+            '2026-07-14 10:30:00'
+        );
+
+        $this->assertContains('Interviewer is not approved for this job role.', $conflicts);
+    }
+
+    public function testSchedulingConflictsDetectClosedBlackoutOverlapAndLimits()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'closed',
+            'max_interviews_per_day' => 1,
+            'max_interviews_per_week' => 1,
+            'buffer_minutes' => 15
+        );
+        $blocks = array(
+            array('weekday_key' => 'Tuesday', 'start_time' => '09:00:00', 'end_time' => '17:00:00', 'is_active' => 1)
+        );
+        $blackouts = array(
+            array('starts_at' => '2026-07-14 09:30:00', 'ends_at' => '2026-07-14 12:00:00')
+        );
+        $existing = array(
+            array('scheduled_start' => '2026-07-14 12:30:00', 'scheduled_end' => '2026-07-14 13:00:00')
+        );
+
+        $conflicts = NESPWorkflow::findSchedulingConflicts(
+            $interviewer,
+            array(41002),
+            $blocks,
+            $blackouts,
+            $existing,
+            41002,
+            '2026-07-14 10:00:00',
+            '2026-07-14 10:30:00'
+        );
+
+        $this->assertContains('Interviewer is closed for interviews.', $conflicts);
+        $this->assertContains('Requested time overlaps a blackout date.', $conflicts);
+        $this->assertContains('Maximum daily interviews would be exceeded.', $conflicts);
+        $this->assertContains('Maximum weekly interviews would be exceeded.', $conflicts);
     }
 
     public function testAvailabilityTimeValidationRejectsImpossibleTimes()
@@ -353,15 +471,49 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('phone_fixture', $payload['phoneNumberId']);
         $this->assertSame('+15551112222', $payload['customer']['number']);
         $this->assertArrayNotHasKey('metadata', $payload);
+        $this->assertFalse($payload['artifactPlan']['recordingEnabled']);
+        $this->assertFalse($payload['artifactPlan']['videoRecordingEnabled']);
+        $this->assertFalse($payload['artifactPlan']['loggingEnabled']);
+        $this->assertFalse($payload['artifactPlan']['pcapEnabled']);
+        $this->assertFalse($payload['artifactPlan']['fullMessageHistoryEnabled']);
+        $this->assertTrue($payload['artifactPlan']['transcriptPlan']['enabled']);
         $this->assertFalse($payload['assistantOverrides']['artifactPlan']['recordingEnabled']);
         $this->assertFalse($payload['assistantOverrides']['artifactPlan']['videoRecordingEnabled']);
         $this->assertTrue($payload['assistantOverrides']['artifactPlan']['transcriptPlan']['enabled']);
+        $this->assertStringNotContainsString('recordingPath', json_encode($payload));
+        $this->assertStringNotContainsString('recordingUrl', json_encode($payload));
         $this->assertSame('Freelance Photographer', $payload['assistantOverrides']['variableValues']['role']);
         $this->assertSame('off', $payload['assistantOverrides']['variableValues']['audio_recording']);
         $this->assertSame('request_fixture', $payload['assistantOverrides']['metadata']['nesp_call_request_key']);
 
         putenv('VAPI_HIRING_ASSISTANT_ID');
         putenv('VAPI_PHONE_NUMBER_ID');
+    }
+
+    public function testVapiStructuredResultsDropRecordingArtifacts()
+    {
+        $message = array(
+            'type' => 'end-of-call-report',
+            'endedReason' => 'hangup',
+            'call' => array('id' => 'call_fixture'),
+            'transcript' => 'Assistant: consent prompt. User: yes.',
+            'analysis' => array(
+                'structuredData' => array(
+                    'consent_accepted' => true,
+                    'experience_summary' => 'Safe summary',
+                    'recording_url' => 'https://provider.example/recording.wav',
+                    'artifact' => array('recordingUrl' => 'https://provider.example/recording.wav')
+                )
+            )
+        );
+
+        $update = NESPVapiIntegration::buildScreenUpdateFromWebhookMessage($message);
+        $structured = json_decode($update['structured_result_json'], true);
+
+        $this->assertSame('Safe summary', $structured['experience_summary']);
+        $this->assertArrayNotHasKey('recording_url', $structured);
+        $this->assertArrayNotHasKey('artifact', $structured);
+        $this->assertStringNotContainsString('recording.wav', $update['structured_result_json']);
     }
 
     public function testSchedulingTokenStateAcceptsValidToken()

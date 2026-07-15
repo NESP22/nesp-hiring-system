@@ -8,6 +8,8 @@ An interviewer can view a candidate only when:
 
 - The current user is linked to an interviewer profile.
 - The interviewer profile is active.
+- The interviewer profile is open for interviews when a new grant is created.
+- The interviewer profile is approved for the exact job order when a new grant is created.
 - The candidate/job grant is active.
 - The requested candidate ID and job order ID match that grant.
 - The candidate is still active.
@@ -34,11 +36,20 @@ An interviewer can view a candidate only when:
 ## Implemented Safeguards
 
 - Direct candidate URL guesses are rejected by the same grant lookup.
+- New candidate grants are rejected for inactive, closed, or unapproved interviewer profiles.
+- Approved job-role rows enforce the real interviewer map before any grant is created.
 - Scorecard save and submit use scoped access checks.
 - Inactive interviewer profiles are denied.
 - Admin-only screens use OpenCATS access checks.
 - POST routes require CSRF.
 - Feature-gated routes fail closed when flags are off.
+
+## Real Interviewer Role Guardrails
+
+- Suthir can be approved only for Staff Photographer `41002` and Freelance Photographer `41003` unless Craig edits the settings.
+- Brandon can be staged for Field Assistant `41005`, but remains inactive and requires email confirmation before account activation.
+- Nate can be approved for `41002`, `41003`, and `41005`; Customer Service `41001` is intentionally not present in his seed roles.
+- Craig remains the Customer Service owner until he changes the approved-role settings.
 
 ## Current Production State
 

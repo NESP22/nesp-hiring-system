@@ -57,7 +57,7 @@ class NESPWorkflow
             array('key' => 'jobAds', 'label' => 'Job Ads', 'action' => 'jobAds'),
             array('key' => 'completed', 'label' => 'Completed', 'action' => 'completed'),
             array('key' => 'staffingForecast', 'label' => 'Staffing Forecast', 'action' => 'staffingForecast'),
-            array('key' => 'settings', 'label' => 'Settings', 'action' => 'settings')
+            array('key' => 'settings', 'label' => 'Interviewer Settings', 'action' => 'settings')
         );
     }
 
@@ -126,9 +126,14 @@ class NESPWorkflow
             'unlockScorecard',
             'interviewerAccess',
             'createInterviewer',
+            'updateInterviewerSettings',
             'createInterviewerRoleRule',
             'createCandidateGrant',
-            'createInterviewerAvailability'
+            'createInterviewerAvailability',
+            'myAvailability',
+            'setInterviewerAvailabilityStatus',
+            'createInterviewerAvailabilityOverride',
+            'createInterviewerBlackout'
         )))
         {
             return 'NESP_INTERVIEWER_POOL_ENABLED';
@@ -260,10 +265,171 @@ class NESPWorkflow
     {
         return array(
             'timezone' => 'America/New_York',
+            'timezone_label' => 'Eastern Time',
             'slot_minutes' => 30,
-            'buffer_minutes' => 10,
+            'buffer_minutes' => 15,
             'notes' => 'Internal availability only. Applicant self-booking and Zoom creation remain disabled until separately approved.'
         );
+    }
+
+    public static function getInterviewerJobRoleOptions()
+    {
+        return array(
+            array('joborder_id' => 41001, 'role_key' => 'customer_service', 'label' => 'Customer Service', 'default_duration_minutes' => 30),
+            array('joborder_id' => 41002, 'role_key' => 'staff_photographer', 'label' => 'Staff Photographer', 'default_duration_minutes' => 25),
+            array('joborder_id' => 41003, 'role_key' => 'freelance_photographer', 'label' => 'Freelance Photographer', 'default_duration_minutes' => 30),
+            array('joborder_id' => 41005, 'role_key' => 'field_assistant', 'label' => 'Field Assistant', 'default_duration_minutes' => 20)
+        );
+    }
+
+    public static function getInterviewerAccountStates()
+    {
+        return array(
+            'profile_created' => 'Profile Created',
+            'email_needs_confirmation' => 'Email Needs Confirmation',
+            'ready_for_account_creation' => 'Ready for Account Creation',
+            'account_prepared' => 'Account Prepared',
+            'temporary_password_set' => 'Temporary Password Set',
+            'awaiting_craig_activation' => 'Awaiting Craig Activation',
+            'active' => 'Active',
+            'suspended' => 'Suspended',
+            'deactivated' => 'Deactivated'
+        );
+    }
+
+    public static function getApprovedRealInterviewerSeedProfiles()
+    {
+        return array(
+            array(
+                'display_name' => 'Suthir',
+                'email' => 'suthir@nesportsphoto.com',
+                'role_group' => 'Photographer interviews',
+                'account_state_key' => 'ready_for_account_creation',
+                'is_active' => 0,
+                'approved_joborder_ids' => array(41002, 41003),
+                'email_warning' => ''
+            ),
+            array(
+                'display_name' => 'Brandon',
+                'email' => 'brandon@sportsphoto.com',
+                'role_group' => 'Table, greeter, and field-support interviews',
+                'account_state_key' => 'email_needs_confirmation',
+                'is_active' => 0,
+                'approved_joborder_ids' => array(41005),
+                'email_warning' => 'Please confirm that brandon@sportsphoto.com is the correct email address.'
+            ),
+            array(
+                'display_name' => 'Nate',
+                'email' => 'nate@nesportsphoto.com',
+                'role_group' => 'All field roles except Customer Service',
+                'account_state_key' => 'ready_for_account_creation',
+                'is_active' => 0,
+                'approved_joborder_ids' => array(41002, 41003, 41005),
+                'email_warning' => ''
+            )
+        );
+    }
+
+    public static function findSchedulingConflicts($interviewer, $approvedJobIDs, $availabilityBlocks, $blackouts, $existingInterviews, $jobOrderID, $startTime, $endTime)
+    {
+        $conflicts = array();
+        $jobOrderID = (int) $jobOrderID;
+        $start = strtotime($startTime);
+        $end = strtotime($endTime);
+        if ($start === false || $end === false || $start >= $end)
+        {
+            return array('Invalid interview time.');
+        }
+
+        if (empty($interviewer) || (int) $interviewer['is_active'] !== 1)
+        {
+            $conflicts[] = 'Interviewer account is not active.';
+        }
+        if (isset($interviewer['availability_status_key']) && $interviewer['availability_status_key'] === 'closed')
+        {
+            $conflicts[] = 'Interviewer is closed for interviews.';
+        }
+        if (!in_array($jobOrderID, array_map('intval', $approvedJobIDs)))
+        {
+            $conflicts[] = 'Interviewer is not approved for this job role.';
+        }
+
+        $insideBlock = false;
+        $weekday = date('l', $start);
+        $candidateStart = date('H:i:s', $start);
+        $candidateEnd = date('H:i:s', $end);
+        foreach ($availabilityBlocks as $block)
+        {
+            if ((int) $block['is_active'] !== 1 || $block['weekday_key'] !== $weekday)
+            {
+                continue;
+            }
+            if ($candidateStart >= $block['start_time'] && $candidateEnd <= $block['end_time'])
+            {
+                $insideBlock = true;
+                break;
+            }
+        }
+        if (!$insideBlock)
+        {
+            $conflicts[] = 'Requested time is outside available blocks.';
+        }
+
+        foreach ($blackouts as $blackout)
+        {
+            $blackoutStart = strtotime($blackout['starts_at']);
+            $blackoutEnd = strtotime($blackout['ends_at']);
+            if ($blackoutStart !== false && $blackoutEnd !== false && $start < $blackoutEnd && $end > $blackoutStart)
+            {
+                $conflicts[] = 'Requested time overlaps a blackout date.';
+                break;
+            }
+        }
+
+        $bufferMinutes = isset($interviewer['buffer_minutes']) ? (int) $interviewer['buffer_minutes'] : 15;
+        foreach ($existingInterviews as $interview)
+        {
+            $existingStart = strtotime($interview['scheduled_start']) - ($bufferMinutes * 60);
+            $existingEnd = strtotime($interview['scheduled_end']) + ($bufferMinutes * 60);
+            if ($existingStart !== false && $existingEnd !== false && $start < $existingEnd && $end > $existingStart)
+            {
+                $conflicts[] = 'Requested time overlaps an existing interview or buffer.';
+                break;
+            }
+        }
+
+        $dailyLimit = isset($interviewer['max_interviews_per_day']) ? (int) $interviewer['max_interviews_per_day'] : 3;
+        $weeklyLimit = isset($interviewer['max_interviews_per_week']) ? (int) $interviewer['max_interviews_per_week'] : 12;
+        $dayCount = 0;
+        $weekCount = 0;
+        $targetDay = date('Y-m-d', $start);
+        $targetWeek = date('o-W', $start);
+        foreach ($existingInterviews as $interview)
+        {
+            $existingStart = strtotime($interview['scheduled_start']);
+            if ($existingStart === false)
+            {
+                continue;
+            }
+            if (date('Y-m-d', $existingStart) === $targetDay)
+            {
+                $dayCount++;
+            }
+            if (date('o-W', $existingStart) === $targetWeek)
+            {
+                $weekCount++;
+            }
+        }
+        if ($dailyLimit > 0 && $dayCount >= $dailyLimit)
+        {
+            $conflicts[] = 'Maximum daily interviews would be exceeded.';
+        }
+        if ($weeklyLimit > 0 && $weekCount >= $weeklyLimit)
+        {
+            $conflicts[] = 'Maximum weekly interviews would be exceeded.';
+        }
+
+        return $conflicts;
     }
 
     public static function isValidAvailabilityTime($time)
@@ -1276,24 +1442,61 @@ class NESPWorkflow
 
     public function getInterviewerProfiles()
     {
+        $profileSelect = array(
+            'ip.interviewer_profile_id',
+            'ip.user_id',
+            'ip.display_name',
+            'ip.email',
+            'ip.role_key',
+            'ip.is_active',
+            'ip.can_view_resume',
+            'ip.can_add_notes',
+            'ip.can_submit_scorecard',
+            'ip.date_modified'
+        );
+
+        $optionalColumns = array(
+            'account_state_key' => '"profile_created"',
+            'timezone' => '"America/New_York"',
+            'availability_status_key' => '"open"',
+            'availability_closed_until' => 'NULL',
+            'availability_close_reason' => '""',
+            'max_interviews_per_day' => '3',
+            'max_interviews_per_week' => '12',
+            'default_interview_minutes' => '30',
+            'buffer_minutes' => '15',
+            'earliest_time' => '"09:00:00"',
+            'latest_time' => '"17:00:00"',
+            'craig_must_attend' => '0',
+            'may_recommend' => '1',
+            'private_admin_notes' => '""',
+            'last_login_at' => 'NULL',
+            'email_warning' => '""'
+        );
+
+        foreach ($optionalColumns as $column => $fallback)
+        {
+            $profileSelect[] = $this->selectOptionalColumn('nesp_interviewer_profile', 'ip', $column, $fallback) . ' AS ' . $column;
+        }
+
+        $jobRoleSelect = $this->isTableInstalled('nesp_interviewer_job_role')
+            ? 'GROUP_CONCAT(DISTINCT ijr.joborder_id ORDER BY ijr.joborder_id SEPARATOR ",") AS approved_joborder_ids'
+            : '"" AS approved_joborder_ids';
+        $jobRoleJoin = $this->isTableInstalled('nesp_interviewer_job_role')
+            ? 'LEFT JOIN nesp_interviewer_job_role ijr ON ijr.interviewer_profile_id = ip.interviewer_profile_id AND ijr.is_active = 1'
+            : '';
+
         return $this->_db->getAllAssoc(
             'SELECT
-                ip.interviewer_profile_id,
-                ip.user_id,
-                ip.display_name,
-                ip.email,
-                ip.role_key,
-                ip.is_active,
-                ip.can_view_resume,
-                ip.can_add_notes,
-                ip.can_submit_scorecard,
-                ip.date_modified,
-                COUNT(cg.grant_id) AS active_grants
+                ' . implode(",\n                ", $profileSelect) . ',
+                COUNT(DISTINCT cg.grant_id) AS active_grants
+                , ' . $jobRoleSelect . '
              FROM
                 nesp_interviewer_profile ip
              LEFT JOIN nesp_interviewer_candidate_grant cg
                 ON cg.interviewer_profile_id = ip.interviewer_profile_id
                 AND cg.date_revoked IS NULL
+             ' . $jobRoleJoin . '
              GROUP BY
                 ip.interviewer_profile_id
              ORDER BY
@@ -1403,6 +1606,18 @@ class NESPWorkflow
             return false;
         }
 
+        if (!$this->interviewerCanReceiveAssignment($interviewerProfileID, $jobOrderID))
+        {
+            $this->logAuditEvent(
+                $actorUserID,
+                'interviewer_candidate_grant_rejected',
+                'interviewer_profile',
+                $interviewerProfileID,
+                array('candidate_id' => $candidateID, 'joborder_id' => $jobOrderID, 'reason' => 'inactive_closed_or_unapproved_role')
+            );
+            return false;
+        }
+
         $existing = $this->_db->getAssoc(
             sprintf(
                 'SELECT grant_id
@@ -1474,6 +1689,128 @@ class NESPWorkflow
         );
     }
 
+    public function getInterviewerAvailabilityOverrides()
+    {
+        if (!$this->isTableInstalled('nesp_interviewer_availability_override'))
+        {
+            return array();
+        }
+
+        return $this->_db->getAllAssoc(
+            'SELECT
+                override_id,
+                interviewer_profile_id,
+                override_date,
+                override_type_key,
+                start_time,
+                end_time,
+                timezone,
+                private_reason,
+                date_modified
+             FROM
+                nesp_interviewer_availability_override
+             WHERE
+                is_active = 1
+             ORDER BY
+                override_date ASC,
+                start_time ASC'
+        );
+    }
+
+    public function getInterviewerBlackouts()
+    {
+        if (!$this->isTableInstalled('nesp_interviewer_blackout'))
+        {
+            return array();
+        }
+
+        return $this->_db->getAllAssoc(
+            'SELECT
+                blackout_id,
+                interviewer_profile_id,
+                starts_at,
+                ends_at,
+                is_all_day,
+                timezone,
+                private_reason,
+                date_modified
+             FROM
+                nesp_interviewer_blackout
+             WHERE
+                is_active = 1
+             ORDER BY
+                starts_at ASC'
+        );
+    }
+
+    public function getInterviewerProfileForUser($userID)
+    {
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT *
+                 FROM nesp_interviewer_profile
+                 WHERE user_id = %s
+                   AND is_active = 1
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($userID)
+            )
+        );
+
+        return empty($row) ? array() : $row;
+    }
+
+    public function getAvailabilityForProfile($interviewerProfileID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        if ($interviewerProfileID <= 0)
+        {
+            return array('recurring' => array(), 'overrides' => array(), 'blackouts' => array());
+        }
+
+        $recurring = $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT *
+                 FROM nesp_interviewer_availability
+                 WHERE interviewer_profile_id = %s
+                   AND is_active = 1
+                 ORDER BY FIELD(weekday_key, "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"), start_time ASC',
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+
+        $overrides = array();
+        if ($this->isTableInstalled('nesp_interviewer_availability_override'))
+        {
+            $overrides = $this->_db->getAllAssoc(
+                sprintf(
+                    'SELECT *
+                     FROM nesp_interviewer_availability_override
+                     WHERE interviewer_profile_id = %s
+                       AND is_active = 1
+                     ORDER BY override_date ASC, start_time ASC',
+                    $this->_db->makeQueryInteger($interviewerProfileID)
+                )
+            );
+        }
+
+        $blackouts = array();
+        if ($this->isTableInstalled('nesp_interviewer_blackout'))
+        {
+            $blackouts = $this->_db->getAllAssoc(
+                sprintf(
+                    'SELECT *
+                     FROM nesp_interviewer_blackout
+                     WHERE interviewer_profile_id = %s
+                       AND is_active = 1
+                     ORDER BY starts_at ASC',
+                    $this->_db->makeQueryInteger($interviewerProfileID)
+                )
+            );
+        }
+
+        return array('recurring' => $recurring, 'overrides' => $overrides, 'blackouts' => $blackouts);
+    }
+
     public function createInterviewerAvailability($interviewerProfileID, $weekdayKey, $startTime, $endTime, $timezone, $slotMinutes, $bufferMinutes, $notes, $actorUserID)
     {
         $interviewerProfileID = (int) $interviewerProfileID;
@@ -1526,14 +1863,31 @@ class NESPWorkflow
 
     public function getInterviewerAccountability()
     {
+        $availabilityStatus = $this->selectOptionalColumn('nesp_interviewer_profile', 'ip', 'availability_status_key', '"open"');
+        $maxDaily = $this->selectOptionalColumn('nesp_interviewer_profile', 'ip', 'max_interviews_per_day', '3');
+        $maxWeekly = $this->selectOptionalColumn('nesp_interviewer_profile', 'ip', 'max_interviews_per_week', '12');
+        $roleSelect = $this->isTableInstalled('nesp_interviewer_job_role')
+            ? 'GROUP_CONCAT(DISTINCT jo_role.title ORDER BY jo_role.joborder_id SEPARATOR ", ") AS approved_roles,'
+            : '"" AS approved_roles,';
+        $roleJoin = $this->isTableInstalled('nesp_interviewer_job_role')
+            ? 'LEFT JOIN nesp_interviewer_job_role ijr ON ijr.interviewer_profile_id = ip.interviewer_profile_id AND ijr.is_active = 1
+             LEFT JOIN joborder jo_role ON jo_role.joborder_id = ijr.joborder_id'
+            : '';
+
         return $this->_db->getAllAssoc(
             'SELECT
                 ip.interviewer_profile_id,
                 ip.display_name,
                 ip.role_key,
                 ip.is_active,
+                ' . $availabilityStatus . ' AS availability_status_key,
+                ' . $maxDaily . ' AS max_interviews_per_day,
+                ' . $maxWeekly . ' AS max_interviews_per_week,
+                ' . $roleSelect . '
                 COUNT(DISTINCT cg.grant_id) AS active_grants,
                 COUNT(DISTINCT CASE WHEN i.status_key IN ("scheduled", "confirmed", "needs_notes") THEN i.interview_id END) AS open_interviews,
+                COUNT(DISTINCT CASE WHEN DATE(i.scheduled_start) = CURDATE() AND i.status_key IN ("scheduled", "confirmed", "needs_notes") THEN i.interview_id END) AS interviews_today,
+                COUNT(DISTINCT CASE WHEN i.scheduled_start >= CURDATE() AND i.scheduled_start < DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND i.status_key IN ("scheduled", "confirmed", "needs_notes") THEN i.interview_id END) AS interviews_this_week,
                 COUNT(DISTINCT CASE WHEN cg.grant_id IS NOT NULL AND (sr.scorecard_response_id IS NULL OR sr.status_key = "draft") THEN cg.grant_id END) AS scorecards_due,
                 COUNT(DISTINCT CASE WHEN cw.due_at IS NOT NULL AND cw.due_at < NOW() THEN cw.candidate_workflow_id END) AS overdue_items,
                 COUNT(DISTINCT ia.availability_id) AS availability_blocks
@@ -1554,6 +1908,7 @@ class NESPWorkflow
              LEFT JOIN nesp_interviewer_availability ia
                 ON ia.interviewer_profile_id = ip.interviewer_profile_id
                 AND ia.is_active = 1
+             ' . $roleJoin . '
              GROUP BY
                 ip.interviewer_profile_id
              ORDER BY
@@ -1642,7 +1997,7 @@ class NESPWorkflow
         );
     }
 
-    public function createInactiveInterviewerProfile($displayName, $email, $roleKey, $actorUserID)
+    public function createInactiveInterviewerProfile($displayName, $email, $roleKey, $actorUserID, $options = array())
     {
         $displayName = trim($displayName);
         $email = trim($email);
@@ -1653,18 +2008,57 @@ class NESPWorkflow
             return false;
         }
 
-        $sql = sprintf(
-            'INSERT INTO nesp_interviewer_profile
-                (user_id, display_name, email, role_key, is_active, can_view_resume, can_add_notes, can_submit_scorecard, date_created, date_modified)
-             VALUES
-                (NULL, %s, %s, %s, 0, 0, 1, 1, NOW(), NOW())',
+        $columns = array('user_id', 'display_name', 'email', 'role_key', 'is_active', 'can_view_resume', 'can_add_notes', 'can_submit_scorecard', 'date_created', 'date_modified');
+        $values = array(
+            'NULL',
             $this->_db->makeQueryString($displayName),
             $this->_db->makeQueryString($email),
-            $this->_db->makeQueryString($roleKey)
+            $this->_db->makeQueryString($roleKey),
+            '0',
+            '0',
+            '1',
+            '1',
+            'NOW()',
+            'NOW()'
+        );
+
+        $extraDefaults = $this->normalizeInterviewerSettingsOptions($options);
+        foreach ($extraDefaults as $column => $value)
+        {
+            if ($this->isColumnInstalled('nesp_interviewer_profile', $column))
+            {
+                $columns[] = $column;
+                $values[] = $this->sqlValueForInterviewerSetting($column, $value);
+            }
+        }
+
+        $sql = sprintf(
+            'INSERT INTO nesp_interviewer_profile
+                (%s)
+             VALUES
+                (%s)',
+            implode(', ', $columns),
+            implode(', ', $values)
         );
 
         $this->_db->query($sql);
         $profileID = $this->_db->getLastInsertID();
+        if (!empty($options['approved_joborder_ids']))
+        {
+            $this->replaceInterviewerJobRoles($profileID, $options['approved_joborder_ids'], $actorUserID);
+        }
+        $accountResult = array();
+        if (!empty($options['temporary_password']))
+        {
+            $accountResult = $this->createOrResetInterviewerUser(
+                $profileID,
+                $displayName,
+                $email,
+                $options['temporary_password'],
+                false,
+                $actorUserID
+            );
+        }
         $this->logAuditEvent(
             $actorUserID,
             'interviewer_profile_created_inactive',
@@ -1673,7 +2067,229 @@ class NESPWorkflow
             array('display_name' => $displayName, 'role_key' => $roleKey)
         );
 
-        return $profileID;
+        return array(
+            'interviewer_profile_id' => $profileID,
+            'temporary_login_message' => isset($accountResult['temporary_login_message']) ? $accountResult['temporary_login_message'] : ''
+        );
+    }
+
+    public function updateInterviewerSettings($interviewerProfileID, $settings, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        if ($interviewerProfileID <= 0)
+        {
+            return false;
+        }
+
+        $before = $this->_db->getAssoc(
+            sprintf(
+                'SELECT *
+                 FROM nesp_interviewer_profile
+                 WHERE interviewer_profile_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+        if (empty($before))
+        {
+            return false;
+        }
+
+        $normalized = $this->normalizeInterviewerSettingsOptions($settings);
+        $sets = array();
+        foreach ($normalized as $column => $value)
+        {
+            if ($this->isColumnInstalled('nesp_interviewer_profile', $column))
+            {
+                $sets[] = $column . ' = ' . $this->sqlValueForInterviewerSetting($column, $value);
+            }
+        }
+        if (isset($settings['display_name']))
+        {
+            $sets[] = 'display_name = ' . $this->_db->makeQueryString(trim($settings['display_name']));
+        }
+        if (isset($settings['email']))
+        {
+            $sets[] = 'email = ' . $this->_db->makeQueryString(trim($settings['email']));
+        }
+        if (isset($settings['role_key']))
+        {
+            $sets[] = 'role_key = ' . $this->_db->makeQueryString(trim($settings['role_key']));
+        }
+        if (isset($settings['is_active']))
+        {
+            $sets[] = 'is_active = ' . (((int) $settings['is_active']) === 1 ? '1' : '0');
+        }
+        if (isset($settings['user_id']))
+        {
+            $userID = (int) $settings['user_id'];
+            $sets[] = 'user_id = ' . ($userID > 0 ? $this->_db->makeQueryInteger($userID) : 'NULL');
+        }
+
+        if (!empty($sets))
+        {
+            $sets[] = 'date_modified = NOW()';
+            $this->_db->query(
+                sprintf(
+                    'UPDATE nesp_interviewer_profile
+                     SET %s
+                     WHERE interviewer_profile_id = %s',
+                    implode(', ', $sets),
+                    $this->_db->makeQueryInteger($interviewerProfileID)
+                )
+            );
+        }
+
+        if (isset($settings['approved_joborder_ids']) && is_array($settings['approved_joborder_ids']))
+        {
+            $this->replaceInterviewerJobRoles($interviewerProfileID, $settings['approved_joborder_ids'], $actorUserID);
+        }
+
+        $accountResult = array();
+        if (!empty($settings['temporary_password']))
+        {
+            $accountResult = $this->createOrResetInterviewerUser(
+                $interviewerProfileID,
+                isset($settings['display_name']) ? $settings['display_name'] : $before['display_name'],
+                isset($settings['email']) ? $settings['email'] : $before['email'],
+                $settings['temporary_password'],
+                !empty($settings['is_active']),
+                $actorUserID
+            );
+            if ($accountResult === false)
+            {
+                return false;
+            }
+        }
+        elseif (isset($settings['is_active']))
+        {
+            $this->syncInterviewerUserAccess($interviewerProfileID, !empty($settings['is_active']), $actorUserID);
+        }
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_settings_updated',
+            'interviewer_profile',
+            $interviewerProfileID,
+            array(
+                'old' => $this->auditSafeInterviewerSettings($before),
+                'new' => $this->auditSafeInterviewerSettings($this->_db->getAssoc(sprintf(
+                    'SELECT * FROM nesp_interviewer_profile WHERE interviewer_profile_id = %s LIMIT 1',
+                    $this->_db->makeQueryInteger($interviewerProfileID)
+                )))
+            )
+        );
+
+        return array(
+            'ok' => true,
+            'temporary_login_message' => isset($accountResult['temporary_login_message']) ? $accountResult['temporary_login_message'] : ''
+        );
+    }
+
+    public function setInterviewerAvailabilityStatus($interviewerProfileID, $statusKey, $reason, $closedUntil, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $statusKey = $statusKey === 'closed' ? 'closed' : 'open';
+        if ($interviewerProfileID <= 0 || !$this->isColumnInstalled('nesp_interviewer_profile', 'availability_status_key'))
+        {
+            return false;
+        }
+
+        $sql = sprintf(
+            'UPDATE nesp_interviewer_profile
+             SET availability_status_key = %s,
+                 availability_close_reason = %s,
+                 availability_closed_until = %s,
+                 date_modified = NOW()
+             WHERE interviewer_profile_id = %s',
+            $this->_db->makeQueryString($statusKey),
+            $this->_db->makeQueryString(trim($reason)),
+            trim($closedUntil) === '' ? 'NULL' : $this->_db->makeQueryString(trim($closedUntil)),
+            $this->_db->makeQueryInteger($interviewerProfileID)
+        );
+        $this->_db->query($sql);
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_availability_status_updated',
+            'interviewer_profile',
+            $interviewerProfileID,
+            array('status_key' => $statusKey, 'closed_until' => trim($closedUntil))
+        );
+
+        return true;
+    }
+
+    public function createInterviewerAvailabilityOverride($interviewerProfileID, $overrideDate, $overrideTypeKey, $startTime, $endTime, $timezone, $privateReason, $actorUserID)
+    {
+        if (!$this->isTableInstalled('nesp_interviewer_availability_override'))
+        {
+            return false;
+        }
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $overrideDate = trim($overrideDate);
+        $overrideTypeKey = in_array($overrideTypeKey, array('available', 'available_all_day', 'unavailable')) ? $overrideTypeKey : 'available';
+        $timezone = trim($timezone) === '' ? 'America/New_York' : trim($timezone);
+        if ($interviewerProfileID <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $overrideDate))
+        {
+            return false;
+        }
+        if ($overrideTypeKey === 'available' && (!self::isValidAvailabilityTime($startTime) || !self::isValidAvailabilityTime($endTime) || strcmp($startTime, $endTime) >= 0))
+        {
+            return false;
+        }
+
+        $sql = sprintf(
+            'INSERT INTO nesp_interviewer_availability_override
+                (interviewer_profile_id, override_date, override_type_key, start_time, end_time, timezone, private_reason, is_active, created_by_user_id, date_created, date_modified)
+             VALUES
+                (%s, %s, %s, %s, %s, %s, %s, 1, %s, NOW(), NOW())',
+            $this->_db->makeQueryInteger($interviewerProfileID),
+            $this->_db->makeQueryString($overrideDate),
+            $this->_db->makeQueryString($overrideTypeKey),
+            $overrideTypeKey === 'available' ? $this->_db->makeQueryString($startTime) : 'NULL',
+            $overrideTypeKey === 'available' ? $this->_db->makeQueryString($endTime) : 'NULL',
+            $this->_db->makeQueryString($timezone),
+            $this->_db->makeQueryString(trim($privateReason)),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+        );
+        $this->_db->query($sql);
+        $overrideID = $this->_db->getLastInsertID();
+        $this->logAuditEvent($actorUserID, 'interviewer_availability_override_created', 'interviewer_availability_override', $overrideID, array('interviewer_profile_id' => $interviewerProfileID, 'override_type_key' => $overrideTypeKey));
+
+        return $overrideID;
+    }
+
+    public function createInterviewerBlackout($interviewerProfileID, $startsAt, $endsAt, $isAllDay, $timezone, $privateReason, $actorUserID)
+    {
+        if (!$this->isTableInstalled('nesp_interviewer_blackout'))
+        {
+            return false;
+        }
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $timezone = trim($timezone) === '' ? 'America/New_York' : trim($timezone);
+        if ($interviewerProfileID <= 0 || trim($startsAt) === '' || trim($endsAt) === '' || strtotime($startsAt) === false || strtotime($endsAt) === false || strtotime($startsAt) >= strtotime($endsAt))
+        {
+            return false;
+        }
+
+        $sql = sprintf(
+            'INSERT INTO nesp_interviewer_blackout
+                (interviewer_profile_id, starts_at, ends_at, is_all_day, timezone, private_reason, is_active, created_by_user_id, date_created, date_modified)
+             VALUES
+                (%s, %s, %s, %s, %s, %s, 1, %s, NOW(), NOW())',
+            $this->_db->makeQueryInteger($interviewerProfileID),
+            $this->_db->makeQueryString(trim($startsAt)),
+            $this->_db->makeQueryString(trim($endsAt)),
+            ((int) $isAllDay) === 1 ? '1' : '0',
+            $this->_db->makeQueryString($timezone),
+            $this->_db->makeQueryString(trim($privateReason)),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+        );
+        $this->_db->query($sql);
+        $blackoutID = $this->_db->getLastInsertID();
+        $this->logAuditEvent($actorUserID, 'interviewer_blackout_created', 'interviewer_blackout', $blackoutID, array('interviewer_profile_id' => $interviewerProfileID));
+
+        return $blackoutID;
     }
 
     public function getAssignedCandidatesForUser($userID)
@@ -1959,11 +2575,6 @@ class NESPWorkflow
             $responseID,
             array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID)
         );
-
-        if ($statusKey === 'submitted')
-        {
-            $this->markWorkflowScorecardComplete($userID, $candidateID, $jobOrderID, $responseID);
-        }
 
         return $responseID;
     }
@@ -3732,6 +4343,412 @@ class NESPWorkflow
         );
 
         $this->_db->query($sql);
+    }
+
+    public function interviewerCanReceiveAssignment($interviewerProfileID, $jobOrderID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $jobOrderID = (int) $jobOrderID;
+        if ($interviewerProfileID <= 0 || $jobOrderID <= 0)
+        {
+            return false;
+        }
+
+        $availabilityColumn = $this->isColumnInstalled('nesp_interviewer_profile', 'availability_status_key')
+            ? "AND ip.availability_status_key = 'open'"
+            : '';
+
+        if (!$this->isTableInstalled('nesp_interviewer_job_role'))
+        {
+            return false;
+        }
+
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT ip.interviewer_profile_id
+                 FROM nesp_interviewer_profile ip
+                 INNER JOIN nesp_interviewer_job_role ijr
+                    ON ijr.interviewer_profile_id = ip.interviewer_profile_id
+                    AND ijr.is_active = 1
+                    AND ijr.joborder_id = %s
+                 WHERE ip.interviewer_profile_id = %s
+                   AND ip.is_active = 1
+                   ' . $availabilityColumn . '
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($jobOrderID),
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+
+        return !empty($row);
+    }
+
+    private function replaceInterviewerJobRoles($interviewerProfileID, $jobOrderIDs, $actorUserID)
+    {
+        if (!$this->isTableInstalled('nesp_interviewer_job_role'))
+        {
+            return false;
+        }
+
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $allowed = array();
+        foreach (self::getInterviewerJobRoleOptions() as $option)
+        {
+            $allowed[(int) $option['joborder_id']] = $option;
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_interviewer_job_role
+                 SET is_active = 0,
+                     date_modified = NOW()
+                 WHERE interviewer_profile_id = %s',
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+
+        $saved = array();
+        foreach ($jobOrderIDs as $jobOrderID)
+        {
+            $jobOrderID = (int) $jobOrderID;
+            if (!isset($allowed[$jobOrderID]))
+            {
+                continue;
+            }
+            $saved[] = $jobOrderID;
+            $sql = sprintf(
+                'INSERT INTO nesp_interviewer_job_role
+                    (interviewer_profile_id, joborder_id, role_key, is_active, created_by_user_id, date_created, date_modified)
+                 VALUES
+                    (%s, %s, %s, 1, %s, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE
+                    role_key = VALUES(role_key),
+                    is_active = 1,
+                    date_modified = NOW()',
+                $this->_db->makeQueryInteger($interviewerProfileID),
+                $this->_db->makeQueryInteger($jobOrderID),
+                $this->_db->makeQueryString($allowed[$jobOrderID]['role_key']),
+                $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+            );
+            $this->_db->query($sql);
+        }
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_job_roles_updated',
+            'interviewer_profile',
+            $interviewerProfileID,
+            array('approved_joborder_ids' => $saved)
+        );
+
+        return true;
+    }
+
+    private function createOrResetInterviewerUser($interviewerProfileID, $displayName, $email, $temporaryPassword, $active, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $email = trim((string) $email);
+        $temporaryPassword = (string) $temporaryPassword;
+        if ($interviewerProfileID <= 0 || $email === '' || strlen($temporaryPassword) < 8)
+        {
+            return false;
+        }
+
+        $profile = $this->_db->getAssoc(
+            sprintf(
+                'SELECT user_id, display_name, email
+                 FROM nesp_interviewer_profile
+                 WHERE interviewer_profile_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+        if (empty($profile))
+        {
+            return false;
+        }
+
+        $username = $this->interviewerUsernameFromEmail($email);
+        $names = $this->splitDisplayName($displayName === '' ? $profile['display_name'] : $displayName);
+        $accessLevel = $active ? ACCESS_LEVEL_READ : ACCESS_LEVEL_DISABLED;
+        $interviewerCategory = 'nesp_interviewer';
+        $userID = (int) $profile['user_id'];
+        if ($userID <= 0)
+        {
+            $existing = $this->_db->getAssoc(
+                sprintf(
+                    'SELECT user_id
+                     FROM user
+                     WHERE user_name = %s OR email = %s
+                     ORDER BY user_id ASC
+                     LIMIT 1',
+                    $this->_db->makeQueryString($username),
+                    $this->_db->makeQueryString($email)
+                )
+            );
+            if (!empty($existing))
+            {
+                return false;
+            }
+            else
+            {
+                $this->_db->query(
+                    sprintf(
+                        'INSERT INTO user
+                            (user_name, password, access_level, can_change_password, is_test_user, email, first_name, last_name, categories, can_see_eeo_info)
+                         VALUES
+                            (%s, %s, %s, 1, 0, %s, %s, %s, %s, 0)',
+                        $this->_db->makeQueryString($username),
+                        $this->_db->makeQueryString($this->hashTemporaryInterviewerPassword($temporaryPassword)),
+                        $this->_db->makeQueryInteger($accessLevel),
+                        $this->_db->makeQueryString($email),
+                        $this->_db->makeQueryString($names['first_name']),
+                        $this->_db->makeQueryString($names['last_name']),
+                        $this->_db->makeQueryString($interviewerCategory)
+                    )
+                );
+                $userID = (int) $this->_db->getLastInsertID();
+                if ($userID <= 0)
+                {
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            $linkedUser = $this->_db->getAssoc(
+                sprintf(
+                    'SELECT access_level
+                     FROM user
+                     WHERE user_id = %s
+                     LIMIT 1',
+                    $this->_db->makeQueryInteger($userID)
+                )
+            );
+            if (empty($linkedUser) || (int) $linkedUser['access_level'] >= ACCESS_LEVEL_SA)
+            {
+                return false;
+            }
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE user
+                 SET user_name = %s,
+                     email = %s,
+                     first_name = %s,
+                     last_name = %s,
+                     password = %s,
+                     access_level = %s,
+                     categories = %s,
+                     can_change_password = 1
+                 WHERE user_id = %s',
+                $this->_db->makeQueryString($username),
+                $this->_db->makeQueryString($email),
+                $this->_db->makeQueryString($names['first_name']),
+                $this->_db->makeQueryString($names['last_name']),
+                $this->_db->makeQueryString($this->hashTemporaryInterviewerPassword($temporaryPassword)),
+                $this->_db->makeQueryInteger($accessLevel),
+                $this->_db->makeQueryString($interviewerCategory),
+                $this->_db->makeQueryInteger($userID)
+            )
+        );
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_interviewer_profile
+                 SET user_id = %s,
+                     account_state_key = %s,
+                     date_modified = NOW()
+                 WHERE interviewer_profile_id = %s',
+                $this->_db->makeQueryInteger($userID),
+                $this->_db->makeQueryString($active ? 'temporary_password_set' : 'account_prepared'),
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_login_prepared',
+            'interviewer_profile',
+            $interviewerProfileID,
+            array('user_id' => $userID, 'access_enabled' => $active ? 1 : 0, 'temporary_password_length' => strlen($temporaryPassword))
+        );
+
+        return array(
+            'user_id' => $userID,
+            'username' => $username,
+            'temporary_login_message' => $this->buildTemporaryLoginMessage($displayName, $username, $active)
+        );
+    }
+
+    private function syncInterviewerUserAccess($interviewerProfileID, $active, $actorUserID)
+    {
+        $profile = $this->_db->getAssoc(
+            sprintf(
+                'SELECT user_id
+                 FROM nesp_interviewer_profile
+                 WHERE interviewer_profile_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger((int) $interviewerProfileID)
+            )
+        );
+        if (empty($profile) || (int) $profile['user_id'] <= 0)
+        {
+            return false;
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE user
+                 SET access_level = %s,
+                     categories = %s
+                 WHERE user_id = %s
+                   AND access_level < %s',
+                $this->_db->makeQueryInteger($active ? ACCESS_LEVEL_READ : ACCESS_LEVEL_DISABLED),
+                $this->_db->makeQueryString('nesp_interviewer'),
+                $this->_db->makeQueryInteger((int) $profile['user_id']),
+                $this->_db->makeQueryInteger(ACCESS_LEVEL_SA)
+            )
+        );
+        $this->logAuditEvent(
+            $actorUserID,
+            $active ? 'interviewer_login_enabled' : 'interviewer_login_disabled',
+            'interviewer_profile',
+            (int) $interviewerProfileID,
+            array('user_id' => (int) $profile['user_id'])
+        );
+        return true;
+    }
+
+    private function interviewerUsernameFromEmail($email)
+    {
+        $email = strtolower(trim($email));
+        $local = preg_replace('/[^a-z0-9._-]+/', '.', preg_replace('/@.*/', '', $email));
+        $local = trim($local, '.-_');
+        if ($local === '')
+        {
+            $local = 'interviewer';
+        }
+        return substr('nesp.' . $local, 0, 64);
+    }
+
+    private function hashTemporaryInterviewerPassword($temporaryPassword)
+    {
+        return password_hash((string) $temporaryPassword, PASSWORD_DEFAULT);
+    }
+
+    private function splitDisplayName($displayName)
+    {
+        $parts = preg_split('/\s+/', trim((string) $displayName));
+        if (!$parts || !count($parts))
+        {
+            return array('first_name' => 'NESP', 'last_name' => 'Interviewer');
+        }
+        $first = array_shift($parts);
+        $last = count($parts) ? implode(' ', $parts) : 'Interviewer';
+        return array(
+            'first_name' => substr($first, 0, 40),
+            'last_name' => substr($last, 0, 40)
+        );
+    }
+
+    private function buildTemporaryLoginMessage($displayName, $username, $active)
+    {
+        return 'Copy-only login details prepared for ' . trim((string) $displayName) . ': username '
+            . $username
+            . '. Share the temporary password manually and ask the interviewer to change it after first login. Account access is '
+            . ($active ? 'enabled.' : 'disabled until Craig activates it.');
+    }
+
+    private function normalizeInterviewerSettingsOptions($options)
+    {
+        $states = self::getInterviewerAccountStates();
+        $accountState = isset($options['account_state_key']) && isset($states[$options['account_state_key']])
+            ? $options['account_state_key']
+            : 'profile_created';
+        $availabilityStatus = isset($options['availability_status_key']) && $options['availability_status_key'] === 'closed'
+            ? 'closed'
+            : 'open';
+
+        return array(
+            'account_state_key' => $accountState,
+            'timezone' => isset($options['timezone']) && trim($options['timezone']) !== '' ? trim($options['timezone']) : 'America/New_York',
+            'availability_status_key' => $availabilityStatus,
+            'availability_closed_until' => isset($options['availability_closed_until']) ? trim($options['availability_closed_until']) : '',
+            'availability_close_reason' => isset($options['availability_close_reason']) ? trim($options['availability_close_reason']) : '',
+            'max_interviews_per_day' => isset($options['max_interviews_per_day']) ? max(0, min(20, (int) $options['max_interviews_per_day'])) : 3,
+            'max_interviews_per_week' => isset($options['max_interviews_per_week']) ? max(0, min(80, (int) $options['max_interviews_per_week'])) : 12,
+            'default_interview_minutes' => isset($options['default_interview_minutes']) ? max(10, min(180, (int) $options['default_interview_minutes'])) : 30,
+            'buffer_minutes' => isset($options['buffer_minutes']) ? max(0, min(120, (int) $options['buffer_minutes'])) : 15,
+            'earliest_time' => isset($options['earliest_time']) && self::isValidAvailabilityTime($options['earliest_time']) ? $options['earliest_time'] : '09:00',
+            'latest_time' => isset($options['latest_time']) && self::isValidAvailabilityTime($options['latest_time']) ? $options['latest_time'] : '17:00',
+            'craig_must_attend' => isset($options['craig_must_attend']) && (int) $options['craig_must_attend'] === 1 ? 1 : 0,
+            'may_recommend' => isset($options['may_recommend']) && (int) $options['may_recommend'] === 0 ? 0 : 1,
+            'private_admin_notes' => isset($options['private_admin_notes']) ? trim($options['private_admin_notes']) : '',
+            'email_warning' => isset($options['email_warning']) ? trim($options['email_warning']) : ''
+        );
+    }
+
+    private function sqlValueForInterviewerSetting($column, $value)
+    {
+        if (in_array($column, array('max_interviews_per_day', 'max_interviews_per_week', 'default_interview_minutes', 'buffer_minutes', 'craig_must_attend', 'may_recommend')))
+        {
+            return $this->_db->makeQueryInteger($value);
+        }
+        if ($column === 'availability_closed_until' && trim($value) === '')
+        {
+            return 'NULL';
+        }
+
+        return $this->_db->makeQueryString($value);
+    }
+
+    private function auditSafeInterviewerSettings($row)
+    {
+        if (empty($row))
+        {
+            return array();
+        }
+
+        $safe = array();
+        foreach (array('display_name', 'email', 'role_key', 'is_active', 'account_state_key', 'timezone', 'availability_status_key', 'max_interviews_per_day', 'max_interviews_per_week', 'default_interview_minutes', 'buffer_minutes', 'earliest_time', 'latest_time', 'craig_must_attend', 'may_recommend', 'user_id') as $key)
+        {
+            if (isset($row[$key]))
+            {
+                $safe[$key] = $row[$key];
+            }
+        }
+
+        return $safe;
+    }
+
+    private function selectOptionalColumn($table, $alias, $column, $fallbackSQL)
+    {
+        return $this->isColumnInstalled($table, $column)
+            ? $alias . '.' . $column
+            : $fallbackSQL;
+    }
+
+    private function isTableInstalled($table)
+    {
+        $tableExists = $this->_db->getAssoc(
+            sprintf("SHOW TABLES LIKE %s", $this->_db->makeQueryString($table))
+        );
+
+        return !empty($tableExists);
+    }
+
+    private function isColumnInstalled($table, $column)
+    {
+        $columnExists = $this->_db->getAssoc(
+            sprintf(
+                "SHOW COLUMNS FROM %s LIKE %s",
+                $table,
+                $this->_db->makeQueryString($column)
+            )
+        );
+
+        return !empty($columnExists);
     }
 
     private function countRows($sql)

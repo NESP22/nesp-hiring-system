@@ -12,6 +12,8 @@
 - Scoped interviewer assigned-candidate views are grant-gated.
 - Manual interviewer grants require an existing candidate-to-job association.
 - Interviewer role routing rules suggest owners by role text or exact job ID.
+- Interviewer settings support account state, approved job roles, inactive staging, open/closed availability, limits, date overrides, and blackout dates.
+- Real interviewer seed SQL stages Suthir, Brandon, and Nate inactive with approved job roles only; it does not create accounts or messages.
 - Interviewer availability and internal interview slots are stored with Zoom disabled.
 - Dashboard follow-through counts show assigned work, open interviews, missing scorecards, overdue work, and availability blocks.
 - Scorecards support draft save, submit, lock, and Craig/admin unlock.
@@ -33,6 +35,7 @@
 - Default Behat suite inside the Docker Compose test stack.
 - Security Behat suite inside the Docker Compose test stack.
 - Unit coverage was added for feature flags, dashboard queue definitions, routing suggestions, availability defaults, CSV normalization, and forecast formulas.
+- Unit coverage was added for real interviewer seed permissions, Brandon's email-warning state, Nate's Customer Service restriction, and scheduling conflicts.
 - Integration coverage was updated for Phase 2 tables and columns.
 
 ## Fixture-Only
@@ -89,4 +92,5 @@
 - Real historical schedule normalization.
 - Real applicant self-booking pages.
 - Real Zoom meeting creation.
+- Real interviewer account creation, activation, and applicant assignment until Craig approves exact people and messages.
 - Authenticated production dashboard screenshot capture until Craig/admin login is available.

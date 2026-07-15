@@ -21,6 +21,8 @@ Codex cannot claim production backup creation without approved production access
 
 Run `db/nesp_phase2_rollback.sql` only after backup verification.
 
+If the real interviewer settings migration was applied separately, run `db/nesp_interviewer_settings_rollback.sql` only after disabling interviewer access and confirming no active production interviewer work depends on the new availability/settings tables.
+
 The rollback removes:
 
 - Disabled Phase 2 `NESP_*` flags
@@ -35,6 +37,13 @@ The rollback removes:
 - `nesp_staffing_recommendation`
 - Phase 2 dashboard helper columns from `nesp_candidate_workflow`
 - Phase 2 interviewer helper columns from `nesp_interviewer_profile`
+
+`db/nesp_interviewer_settings_rollback.sql` additionally removes:
+
+- `nesp_interviewer_job_role`
+- `nesp_interviewer_availability_override`
+- `nesp_interviewer_blackout`
+- New interviewer account-state, availability-status, limit, timing, notes, and warning columns
 
 It does not delete legacy OpenCATS candidates, job orders, users, activities, calendar events, attachments, or standard pipeline records.
 
