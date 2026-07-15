@@ -140,6 +140,111 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countUniqueIndexes('nesp_staffing_import_batch', 'IDX_nesp_import_source'));
     }
 
+    public function testQuestionnaireSchemaDefinitionsStayConsistentAndDoNotStorePlaintextInvitations()
+    {
+        $catsSchemaColumns = $this->extractCreateTableColumns(file_get_contents('db/cats_schema.sql'), 'nesp_screening_questionnaire');
+        $schemaPhpColumns = $this->extractCreateTableColumns(file_get_contents('modules/install/Schema.php'), 'nesp_screening_questionnaire');
+        $additiveColumns = $this->extractCreateTableColumns(file_get_contents('db/nesp_screening_questionnaire_additive.sql'), 'nesp_screening_questionnaire');
+
+        $this->assertSame($catsSchemaColumns, $schemaPhpColumns);
+        $this->assertSame($catsSchemaColumns, $additiveColumns);
+        $this->assertNotContains('link_url', $catsSchemaColumns);
+        $this->assertNotContains('invitation_copy_text', $catsSchemaColumns);
+        $this->assertContains('token_hash', $catsSchemaColumns);
+    }
+
+    public function testQuestionnaireWorkflowRunsOnAdditiveMigrationSchema()
+    {
+        global $mySQLConnection;
+
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $this->dropQuestionnaireTables();
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_screening_questionnaire_additive.sql'), ";\n");
+
+        $candidateID = $this->insertFakeCandidate('Avery', 'Fixture');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $result = $workflow->requestQuestionnaire($candidateID, $jobOrderID, 1);
+
+        $this->assertIsArray($result);
+        $this->assertTrue($result['link_generated']);
+        $this->assertGreaterThan(0, $result['questionnaire_id']);
+        $this->assertStringContainsString('Hi Avery', $result['one_time_invitation_copy']);
+
+        $token = $this->extractQuestionnaireToken($result['one_time_invitation_copy']);
+        $this->assertNotSame('', $token);
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'link_url'));
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'invitation_copy_text'));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf(
+                "screening_questionnaire_id = %d AND token_hash = '%s'",
+                (int) $result['questionnaire_id'],
+                mysqli_real_escape_string($mySQLConnection, \NESPWorkflow::questionnaireTokenHash($token))
+            )
+        ));
+
+        $duplicate = $workflow->requestQuestionnaire($candidateID, $jobOrderID, 1);
+        $this->assertIsArray($duplicate);
+        $this->assertFalse($duplicate['link_generated']);
+        $this->assertSame('', $duplicate['one_time_invitation_copy']);
+
+        $regenerated = $workflow->regenerateQuestionnaireLink($result['questionnaire_id'], 1);
+        $this->assertIsArray($regenerated);
+        $this->assertTrue($regenerated['link_generated']);
+        $this->assertStringContainsString('Hi Avery', $regenerated['one_time_invitation_copy']);
+        $regeneratedToken = $this->extractQuestionnaireToken($regenerated['one_time_invitation_copy']);
+        $this->assertNotSame($token, $regeneratedToken);
+        $this->assertFalse($workflow->getQuestionnairePageByToken($token)['ok']);
+
+        $page = $workflow->getQuestionnairePageByToken($regeneratedToken);
+        $this->assertTrue($page['ok']);
+        $answers = array();
+        foreach ($page['questionnaire']['questions'] as $question)
+        {
+            $answers[$question['key']] = 'Fixture answer for ' . $question['key'];
+        }
+
+        $submit = $workflow->submitQuestionnaireFromToken($regeneratedToken, $answers);
+        $this->assertSame(array('ok' => true, 'state' => 'completed'), $submit);
+        $duplicateSubmit = $workflow->submitQuestionnaireFromToken($regeneratedToken, $answers);
+        $this->assertFalse($duplicateSubmit['ok']);
+        $this->assertSame('submitted', $duplicateSubmit['state']);
+        $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
+        $this->assertSame(1, $this->countRowsWhere(
+            'candidate_joborder',
+            sprintf('candidate_id = %d AND joborder_id = %d AND status = 0', $candidateID, $jobOrderID)
+        ));
+    }
+
+    public function testQuestionnaireRepairMigrationIsNotNeededForHashedTokenSchema()
+    {
+        $this->dropQuestionnaireTables();
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_screening_questionnaire_additive.sql'), ";\n");
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_screening_questionnaire_additive.sql'), ";\n");
+
+        $this->assertSame(1, $this->countMatchingTables('nesp_screening_questionnaire'));
+        $this->assertSame(1, $this->countMatchingTables('nesp_screening_questionnaire_answer'));
+        $this->assertSame(1, $this->countMatchingTables('nesp_screening_questionnaire_activity'));
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'link_url'));
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'invitation_copy_text'));
+    }
+
+    public function testQuestionnaireRollbackRemovesAdditiveTables()
+    {
+        $this->dropQuestionnaireTables();
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_screening_questionnaire_additive.sql'), ";\n");
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_screening_questionnaire_rollback.sql'), ";\n");
+
+        $this->assertSame(0, $this->countMatchingTables('nesp_screening_questionnaire'));
+        $this->assertSame(0, $this->countMatchingTables('nesp_screening_questionnaire_answer'));
+        $this->assertSame(0, $this->countMatchingTables('nesp_screening_questionnaire_activity'));
+    }
+
     private function countMatchingTables($table)
     {
         global $mySQLConnection;
@@ -210,5 +315,114 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         }
 
         return count($indexes);
+    }
+
+    private function extractCreateTableColumns($source, $table)
+    {
+        $pattern = '/CREATE TABLE(?: IF NOT EXISTS)? `'
+            . preg_quote($table, '/')
+            . '`\s*\((.*?)\)\s*ENGINE=/s';
+        $this->assertMatchesRegularExpression($pattern, $source, $table . ' create statement not found.');
+        preg_match($pattern, $source, $matches);
+
+        preg_match_all('/^\s*`([^`]+)`\s+/m', $matches[1], $columnMatches);
+        return $columnMatches[1];
+    }
+
+    private function dropQuestionnaireTables()
+    {
+        $this->mySQLQueryLocal('DROP TABLE IF EXISTS nesp_screening_questionnaire_activity');
+        $this->mySQLQueryLocal('DROP TABLE IF EXISTS nesp_screening_questionnaire_answer');
+        $this->mySQLQueryLocal('DROP TABLE IF EXISTS nesp_screening_questionnaire');
+    }
+
+    private function insertFakeCandidate($firstName, $lastName)
+    {
+        $this->mySQLQueryLocal(
+            sprintf(
+                "INSERT INTO candidate (first_name, last_name, email1, is_active, entered_by, owner, date_created, date_modified)
+                 VALUES ('%s', '%s', 'fixture@example.test', 1, 1, 1, NOW(), NOW())",
+                $this->escape($firstName),
+                $this->escape($lastName)
+            )
+        );
+        return $this->lastInsertID();
+    }
+
+    private function insertFakeJobOrder($title)
+    {
+        $this->mySQLQueryLocal(
+            sprintf(
+                "INSERT INTO joborder (title, company_id, entered_by, owner, status, public, openings, openings_available, date_created, date_modified)
+                 VALUES ('%s', 1, 1, 1, 'Active', 1, 1, 1, NOW(), NOW())",
+                $this->escape($title)
+            )
+        );
+        return $this->lastInsertID();
+    }
+
+    private function insertFakeCandidateJobOrder($candidateID, $jobOrderID)
+    {
+        $this->mySQLQueryLocal(
+            sprintf(
+                'INSERT INTO candidate_joborder (candidate_id, joborder_id, status, date_submitted, date_created, date_modified)
+                 VALUES (%d, %d, 0, NOW(), NOW(), NOW())',
+                (int) $candidateID,
+                (int) $jobOrderID
+            )
+        );
+    }
+
+    private function extractQuestionnaireToken($copy)
+    {
+        if (!preg_match('/screeningQuestionnaire\.php\?t=([^\s]+)/', $copy, $matches))
+        {
+            return '';
+        }
+
+        return rawurldecode($matches[1]);
+    }
+
+    private function mySQLQueryMultipleLocal($SQLData, $delimiter = ';')
+    {
+        $SQLStatements = explode($delimiter, str_replace("\r\n", "\n", $SQLData));
+
+        foreach ($SQLStatements as $SQL)
+        {
+            $SQL = trim($SQL);
+            if ($SQL === '')
+            {
+                continue;
+            }
+
+            $this->mySQLQueryLocal($SQL);
+        }
+    }
+
+    private function mySQLQueryLocal($query)
+    {
+        global $mySQLConnection;
+
+        $result = mysqli_query($mySQLConnection, $query);
+        if (!$result)
+        {
+            $this->fail('MySQL query failed: ' . mysqli_error($mySQLConnection) . "\n" . $query);
+        }
+
+        return $result;
+    }
+
+    private function lastInsertID()
+    {
+        global $mySQLConnection;
+
+        return (int) mysqli_insert_id($mySQLConnection);
+    }
+
+    private function escape($value)
+    {
+        global $mySQLConnection;
+
+        return mysqli_real_escape_string($mySQLConnection, $value);
     }
 }
