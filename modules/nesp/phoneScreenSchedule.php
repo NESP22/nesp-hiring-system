@@ -6,10 +6,15 @@
  * and never exposes candidate IDs, job-order IDs, admin notes, or secrets.
  */
 
-include_once(dirname(__FILE__) . '/../../config.php');
-include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
-include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
-include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
+$appRoot = realpath(dirname(__FILE__) . '/../..');
+if (!defined('LEGACY_ROOT'))
+{
+    define('LEGACY_ROOT', $appRoot);
+}
+include_once($appRoot . '/config.php');
+include_once($appRoot . '/lib/DatabaseConnection.php');
+include_once($appRoot . '/lib/NESPWorkflow.php');
+include_once($appRoot . '/lib/NESPVapiIntegration.php');
 
 function nesp_schedule_escape($value)
 {
