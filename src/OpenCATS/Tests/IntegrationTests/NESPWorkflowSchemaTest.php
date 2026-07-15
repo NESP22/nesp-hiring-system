@@ -28,6 +28,9 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_vapi_blackout_date',
             'nesp_vapi_scheduling_activity',
             'nesp_vapi_webhook_event',
+            'nesp_screening_questionnaire',
+            'nesp_screening_questionnaire_answer',
+            'nesp_screening_questionnaire_activity',
             'nesp_zoom_interview',
             'nesp_ai_candidate_review',
             'nesp_audit_event',
@@ -70,6 +73,9 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'min_booking_notice_minutes' AND setting_value = '120'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_availability_block', "weekday = 1 AND start_time = '09:00:00' AND end_time = '18:00:00'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_availability_block', "weekday = 6 AND start_time = '09:00:00' AND end_time = '13:00:00'"));
+        $this->assertSame(0, $this->countRows('nesp_screening_questionnaire'));
+        $this->assertSame(0, $this->countRows('nesp_screening_questionnaire_answer'));
+        $this->assertSame(0, $this->countRows('nesp_screening_questionnaire_activity'));
     }
 
     public function testNESPPhase2ColumnsArePresent()
@@ -116,6 +122,15 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_scheduling_activity', 'activity_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_webhook_event', 'provider_event_id'));
         $this->assertSame(1, $this->countUniqueIndexes('nesp_vapi_webhook_event', 'IDX_provider_event_id'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'token_hash'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_set_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'reviewer_profile_id'));
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'link_url'));
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'invitation_copy_text'));
+        $this->assertSame(1, $this->countUniqueIndexes('nesp_screening_questionnaire', 'IDX_questionnaire_token_hash'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire_answer', 'answer_text'));
+        $this->assertSame(1, $this->countUniqueIndexes('nesp_screening_questionnaire_answer', 'IDX_questionnaire_answer_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire_activity', 'activity_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_recruiting_campaign_control', 'platform_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_recruiting_campaign_control', 'manual_spend'));
         $this->assertSame(1, $this->countUniqueIndexes('nesp_recruiting_campaign_control', 'IDX_platform_key'));
@@ -188,6 +203,12 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             )
         );
 
-        return mysqli_num_rows($result);
+        $indexes = array();
+        while ($row = mysqli_fetch_assoc($result))
+        {
+            $indexes[$row['Key_name']] = true;
+        }
+
+        return count($indexes);
     }
 }

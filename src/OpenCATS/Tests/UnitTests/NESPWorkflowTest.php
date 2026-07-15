@@ -73,7 +73,7 @@ class NESPWorkflowTest extends TestCase
         );
 
         $this->assertSame(
-            array('Needs Craig', 'Waiting', 'Interviews', 'Phone Screens', 'Job Ads', 'Completed', 'Staffing Forecast', 'Interviewer Settings'),
+            array('Needs Craig', 'Waiting', 'Interviews', 'Questionnaires', 'Phone Screens', 'Job Ads', 'Completed', 'Staffing Forecast', 'Interviewer Settings'),
             $labels
         );
     }
@@ -141,6 +141,97 @@ class NESPWorkflowTest extends TestCase
         $this->assertCount(4, $questions);
         $this->assertSame('notes', $questions[3]['key']);
         $this->assertSame('textarea', $questions[3]['type']);
+    }
+
+    public function testQuestionnaireTokenStateAcceptsValidToken()
+    {
+        $token = 'questionnaire-token';
+        $row = array(
+            'token_hash' => NESPWorkflow::questionnaireTokenHash($token),
+            'token_expires_at' => '2026-07-16 12:00:00',
+            'token_revoked_at' => null,
+            'submitted_at' => null,
+            'status_key' => 'waiting'
+        );
+
+        $this->assertSame('valid', NESPWorkflow::evaluateQuestionnaireTokenState($token, $row, strtotime('2026-07-15 12:00:00')));
+    }
+
+    public function testQuestionnaireTokenStateRejectsInvalidExpiredRevokedAndSubmittedTokens()
+    {
+        $token = 'questionnaire-token';
+
+        $this->assertSame('invalid', NESPWorkflow::evaluateQuestionnaireTokenState('wrong', array(
+            'token_hash' => NESPWorkflow::questionnaireTokenHash($token),
+            'token_expires_at' => '2026-07-16 12:00:00',
+            'token_revoked_at' => null,
+            'submitted_at' => null,
+            'status_key' => 'waiting'
+        ), strtotime('2026-07-15 12:00:00')));
+
+        $this->assertSame('expired', NESPWorkflow::evaluateQuestionnaireTokenState($token, array(
+            'token_hash' => NESPWorkflow::questionnaireTokenHash($token),
+            'token_expires_at' => '2026-07-14 12:00:00',
+            'token_revoked_at' => null,
+            'submitted_at' => null,
+            'status_key' => 'waiting'
+        ), strtotime('2026-07-15 12:00:00')));
+
+        $this->assertSame('revoked', NESPWorkflow::evaluateQuestionnaireTokenState($token, array(
+            'token_hash' => NESPWorkflow::questionnaireTokenHash($token),
+            'token_expires_at' => '2026-07-16 12:00:00',
+            'token_revoked_at' => '2026-07-15 11:00:00',
+            'submitted_at' => null,
+            'status_key' => 'waiting'
+        ), strtotime('2026-07-15 12:00:00')));
+
+        $this->assertSame('submitted', NESPWorkflow::evaluateQuestionnaireTokenState($token, array(
+            'token_hash' => NESPWorkflow::questionnaireTokenHash($token),
+            'token_expires_at' => '2026-07-16 12:00:00',
+            'token_revoked_at' => null,
+            'submitted_at' => '2026-07-15 11:30:00',
+            'status_key' => 'completed'
+        ), strtotime('2026-07-15 12:00:00')));
+    }
+
+    public function testQuestionnaireInvitationCopyIsCopyOnlyAndHumanReviewed()
+    {
+        $copy = NESPWorkflow::buildQuestionnaireInvitationCopy('Avery', 'Weekend Sports Photographer', 'https://example.test/q?t=abc');
+
+        $this->assertStringContainsString('Hi Avery', $copy);
+        $this->assertStringContainsString('5-10 minutes', $copy);
+        $this->assertStringContainsString('no automated hiring decision will be made', $copy);
+        $this->assertStringContainsString('https://example.test/q?t=abc', $copy);
+    }
+
+    public function testQuestionnaireRoleQuestionsAvoidProtectedCharacteristics()
+    {
+        $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('weekend_sports_photographer');
+        $labels = strtolower(json_encode($questions));
+
+        $this->assertStringContainsString('saturdays and sundays', $labels);
+        $this->assertStringContainsString('anything else', $labels);
+        foreach (array('race', 'religion', 'marital', 'medical history', 'disability') as $forbidden)
+        {
+            $this->assertStringNotContainsString($forbidden, $labels);
+        }
+    }
+
+    public function testQuestionnaireAnswerValidationRequiresCurrentServerQuestions()
+    {
+        $questions = array(
+            array('key' => 'availability', 'label' => 'Availability', 'required' => true),
+            array('key' => 'anything_else', 'label' => 'Anything else?', 'required' => false)
+        );
+
+        $missing = NESPWorkflow::validateQuestionnaireAnswers($questions, array('anything_else' => 'No.'));
+        $this->assertFalse($missing['ok']);
+        $this->assertSame(array('availability'), $missing['missing']);
+
+        $valid = NESPWorkflow::validateQuestionnaireAnswers($questions, array('availability' => 'Weekends', 'tampered' => 'ignored'));
+        $this->assertTrue($valid['ok']);
+        $this->assertArrayHasKey('availability', $valid['answers']);
+        $this->assertArrayNotHasKey('tampered', $valid['answers']);
     }
 
     public function testAssignmentRuleExamplesAreSuggestOnly()
