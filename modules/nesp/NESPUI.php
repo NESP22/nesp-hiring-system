@@ -22,9 +22,11 @@ class NESPUI extends UserInterface
             'Needs Craig' => CATSUtility::getIndexName() . '?m=nesp*al=' . ACCESS_LEVEL_READ,
             'Waiting' => CATSUtility::getIndexName() . '?m=nesp&amp;a=waiting*al=' . ACCESS_LEVEL_READ,
             'Interviews' => CATSUtility::getIndexName() . '?m=nesp&amp;a=interviews*al=' . ACCESS_LEVEL_READ,
+            'Phone Screens' => CATSUtility::getIndexName() . '?m=nesp&amp;a=phoneScreens*al=' . ACCESS_LEVEL_READ,
+            'Job Ads' => CATSUtility::getIndexName() . '?m=nesp&amp;a=jobAds*al=' . ACCESS_LEVEL_READ,
             'Completed' => CATSUtility::getIndexName() . '?m=nesp&amp;a=completed*al=' . ACCESS_LEVEL_READ,
             'Staffing Forecast' => CATSUtility::getIndexName() . '?m=nesp&amp;a=staffingForecast*al=' . ACCESS_LEVEL_READ,
-            'Settings' => CATSUtility::getIndexName() . '?m=nesp&amp;a=settings*al=' . ACCESS_LEVEL_SA
+            'Interviewer Settings' => CATSUtility::getIndexName() . '?m=nesp&amp;a=settings*al=' . ACCESS_LEVEL_SA
         );
 
         $this->_workflow = new NESPWorkflow();
@@ -142,6 +144,103 @@ class NESPUI extends UserInterface
                 $this->unlockScorecard();
                 break;
 
+            case 'phoneScreens':
+                $this->adminOnly();
+                $this->phoneScreens();
+                break;
+
+            case 'jobAds':
+                $this->adminOnly();
+                $this->jobAds();
+                break;
+
+            case 'saveRecruitingCampaignControl':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->saveRecruitingCampaignControl();
+                break;
+
+            case 'phoneScreenAvailability':
+                $this->adminOnly();
+                $this->phoneScreenAvailability();
+                break;
+
+            case 'savePhoneScreenAvailability':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->savePhoneScreenAvailability();
+                break;
+
+            case 'createPhoneScreenAvailabilityBlock':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->createPhoneScreenAvailabilityBlock();
+                break;
+
+            case 'deletePhoneScreenAvailabilityBlock':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->deletePhoneScreenAvailabilityBlock();
+                break;
+
+            case 'createPhoneScreenBlackout':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->createPhoneScreenBlackout();
+                break;
+
+            case 'deletePhoneScreenBlackout':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->deletePhoneScreenBlackout();
+                break;
+
+            case 'confirmPhoneScreen':
+                $this->adminOnly();
+                $this->confirmPhoneScreen();
+                break;
+
+            case 'reviewPhoneScreen':
+                $this->adminOnly();
+                $this->reviewPhoneScreen();
+                break;
+
+            case 'requestPhoneScreen':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->requestPhoneScreen();
+                break;
+
+            case 'markPhoneScreenInvitationCopied':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->markPhoneScreenInvitationCopied();
+                break;
+
+            case 'cancelPhoneScreen':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->cancelPhoneScreen();
+                break;
+
+            case 'revokePhoneScreenSchedulingLink':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->revokePhoneScreenSchedulingLink();
+                break;
+
+            case 'allowPhoneScreenReschedule':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->allowPhoneScreenReschedule();
+                break;
+
+            case 'savePhoneScreenReview':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->savePhoneScreenReview();
+                break;
+
             case 'createStaffingRecommendation':
                 $this->adminOnly();
                 $this->requirePostCSRF();
@@ -191,8 +290,12 @@ class NESPUI extends UserInterface
     private function settings()
     {
         $this->_template->assign('active', $this);
-        $this->_template->assign('subActive', 'Settings');
+        $this->_template->assign('subActive', 'Interviewer Settings');
         $this->_template->assign('viewKey', 'settings');
+        $temporaryLoginMessage = isset($_SESSION['NESP_INTERVIEWER_TEMP_LOGIN_MESSAGE'])
+            ? $_SESSION['NESP_INTERVIEWER_TEMP_LOGIN_MESSAGE'] : '';
+        unset($_SESSION['NESP_INTERVIEWER_TEMP_LOGIN_MESSAGE']);
+        $this->_template->assign('temporaryLoginMessage', $temporaryLoginMessage);
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('featureFlags', $this->_workflow->getFeatureFlags());
         $this->_template->assign('interviewerProfiles', $this->_workflow->getInterviewerProfiles());
@@ -207,6 +310,7 @@ class NESPUI extends UserInterface
         $this->_template->assign('interviewerBlackouts', $this->_workflow->getInterviewerBlackouts());
         $this->_template->assign('scorecards', $this->_workflow->getScorecardSummaries(50));
         $this->_template->assign('summary', $this->_workflow->getInterviewerAccessSummary());
+        $this->_template->assign('vapiConfiguration', $this->_workflow->getVapiConfigurationStatus());
         $this->_template->display('./modules/nesp/Settings.tpl');
     }
 
@@ -246,12 +350,18 @@ class NESPUI extends UserInterface
             'craig_must_attend' => isset($_POST['craigMustAttend']) ? 1 : 0,
             'may_recommend' => isset($_POST['mayRecommend']) ? 1 : 0,
             'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
-            'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : ''
+            'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
+            'temporary_password' => isset($_POST['temporaryPassword']) ? $_POST['temporaryPassword'] : ''
         );
 
-        if ($this->_workflow->createInactiveInterviewerProfile($displayName, $email, $roleKey, $this->_userID, $options) === false)
+        $result = $this->_workflow->createInactiveInterviewerProfile($displayName, $email, $roleKey, $this->_userID, $options);
+        if ($result === false)
         {
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Interviewer display name is required.');
+        }
+        if (is_array($result) && !empty($result['temporary_login_message']))
+        {
+            $_SESSION['NESP_INTERVIEWER_TEMP_LOGIN_MESSAGE'] = $result['temporary_login_message'];
         }
 
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
@@ -281,12 +391,18 @@ class NESPUI extends UserInterface
             'may_recommend' => isset($_POST['mayRecommend']) ? 1 : 0,
             'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
             'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
-            'approved_joborder_ids' => isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array()
+            'approved_joborder_ids' => isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array(),
+            'temporary_password' => isset($_POST['temporaryPassword']) ? $_POST['temporaryPassword'] : ''
         );
 
-        if ($this->_workflow->updateInterviewerSettings($interviewerProfileID, $settings, $this->_userID) === false)
+        $result = $this->_workflow->updateInterviewerSettings($interviewerProfileID, $settings, $this->_userID);
+        if ($result === false)
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to update interviewer settings.');
+        }
+        if (is_array($result) && !empty($result['temporary_login_message']))
+        {
+            $_SESSION['NESP_INTERVIEWER_TEMP_LOGIN_MESSAGE'] = $result['temporary_login_message'];
         }
 
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
@@ -547,6 +663,180 @@ class NESPUI extends UserInterface
         CATSUtility::transferRelativeURI('m=nesp&a=assignedCandidate&candidateID=' . $candidateID . '&jobOrderID=' . $jobOrderID);
     }
 
+    private function phoneScreens()
+    {
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Phone Screens');
+        $this->_template->assign('viewKey', 'phoneScreens');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('vapiConfiguration', $this->_workflow->getVapiConfigurationStatus());
+        $this->_template->assign('phoneScreens', $this->_workflow->getVapiPhoneScreenSummaries(75));
+        $this->_template->assign('phoneScreenQueues', $this->_workflow->getVapiPhoneScreenQueues());
+        $this->_template->display('./modules/nesp/PhoneScreens.tpl');
+    }
+
+    private function jobAds()
+    {
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Job Ads');
+        $this->_template->assign('viewKey', 'jobAds');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('platformMatrix', $this->_workflow->getRecruitingPlatformMatrix());
+        $this->_template->assign('campaignControls', $this->_workflow->getRecruitingCampaignControls());
+        $this->_template->assign('sourceReport', $this->_workflow->getRecruitingSourceReport());
+        $this->_template->assign('adTemplates', $this->_workflow->getRecruitingAdTemplates());
+        $this->_template->display('./modules/nesp/JobAds.tpl');
+    }
+
+    private function saveRecruitingCampaignControl()
+    {
+        if ($this->_workflow->saveRecruitingCampaignControl($_POST, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid recruiting platform.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=jobAds');
+    }
+
+    private function phoneScreenAvailability()
+    {
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Phone Screens');
+        $this->_template->assign('viewKey', 'phoneScreens');
+        $this->_template->assign('settings', $this->_workflow->getPhoneScreenAvailabilitySettings());
+        $this->_template->assign('availabilityBlocks', $this->_workflow->getPhoneScreenAvailabilityBlocks());
+        $this->_template->assign('blackoutDates', $this->_workflow->getPhoneScreenBlackoutDates());
+        $this->_template->display('./modules/nesp/PhoneScreenAvailability.tpl');
+    }
+
+    private function savePhoneScreenAvailability()
+    {
+        $this->_workflow->savePhoneScreenAvailabilitySettings($_POST, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
+    }
+
+    private function createPhoneScreenAvailabilityBlock()
+    {
+        $weekday = isset($_POST['weekday']) ? (int) $_POST['weekday'] : 0;
+        $startTime = isset($_POST['startTime']) ? $_POST['startTime'] : '';
+        $endTime = isset($_POST['endTime']) ? $_POST['endTime'] : '';
+        if ($this->_workflow->createPhoneScreenAvailabilityBlock($weekday, $startTime, $endTime, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid day and time block.');
+        }
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
+    }
+
+    private function deletePhoneScreenAvailabilityBlock()
+    {
+        $availabilityBlockID = isset($_POST['availabilityBlockID']) ? (int) $_POST['availabilityBlockID'] : 0;
+        $this->_workflow->deletePhoneScreenAvailabilityBlock($availabilityBlockID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
+    }
+
+    private function createPhoneScreenBlackout()
+    {
+        $blackoutDate = isset($_POST['blackoutDate']) ? $_POST['blackoutDate'] : '';
+        $label = isset($_POST['label']) ? $_POST['label'] : '';
+        if ($this->_workflow->createPhoneScreenBlackout($blackoutDate, $label, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid blackout date.');
+        }
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
+    }
+
+    private function deletePhoneScreenBlackout()
+    {
+        $blackoutDateID = isset($_POST['blackoutDateID']) ? (int) $_POST['blackoutDateID'] : 0;
+        $this->_workflow->deletePhoneScreenBlackout($blackoutDateID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=phoneScreenAvailability');
+    }
+
+    private function confirmPhoneScreen()
+    {
+        $candidateID = isset($_GET['candidateID']) ? (int) $_GET['candidateID'] : 0;
+        $jobOrderID = isset($_GET['jobOrderID']) ? (int) $_GET['jobOrderID'] : 0;
+        $preview = $this->_workflow->getCandidatePhoneScreenPreview($candidateID, $jobOrderID);
+        if (empty($preview))
+        {
+            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid phone-screen candidate.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Phone Screens');
+        $this->_template->assign('preview', $preview);
+        $this->_template->display('./modules/nesp/PhoneScreenConfirm.tpl');
+    }
+
+    private function reviewPhoneScreen()
+    {
+        $phoneScreenID = isset($_GET['phoneScreenID']) ? (int) $_GET['phoneScreenID'] : 0;
+        $detail = $this->_workflow->getVapiPhoneScreenDetail($phoneScreenID);
+        if (empty($detail))
+        {
+            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid phone screen.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Phone Screens');
+        $this->_template->assign('screen', $detail);
+        $this->_template->display('./modules/nesp/PhoneScreenReview.tpl');
+    }
+
+    private function requestPhoneScreen()
+    {
+        $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
+        $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+        $phoneScreenID = $this->_workflow->requestPhoneScreen($candidateID, $jobOrderID, $this->_userID);
+        if ($phoneScreenID === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'A destination phone number is required before a phone screen can be prepared.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . (int) $phoneScreenID);
+    }
+
+    private function markPhoneScreenInvitationCopied()
+    {
+        $phoneScreenID = isset($_POST['phoneScreenID']) ? (int) $_POST['phoneScreenID'] : 0;
+        $this->_workflow->markPhoneScreenInvitationCopied($phoneScreenID, $this->_userID);
+
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . $phoneScreenID);
+    }
+
+    private function revokePhoneScreenSchedulingLink()
+    {
+        $phoneScreenID = isset($_POST['phoneScreenID']) ? (int) $_POST['phoneScreenID'] : 0;
+        $this->_workflow->revokePhoneScreenSchedulingLink($phoneScreenID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . $phoneScreenID);
+    }
+
+    private function allowPhoneScreenReschedule()
+    {
+        $phoneScreenID = isset($_POST['phoneScreenID']) ? (int) $_POST['phoneScreenID'] : 0;
+        $this->_workflow->allowPhoneScreenReschedule($phoneScreenID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . $phoneScreenID);
+    }
+
+    private function cancelPhoneScreen()
+    {
+        $phoneScreenID = isset($_POST['phoneScreenID']) ? (int) $_POST['phoneScreenID'] : 0;
+        $this->_workflow->cancelPhoneScreen($phoneScreenID, $this->_userID);
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . $phoneScreenID);
+    }
+
+    private function savePhoneScreenReview()
+    {
+        $phoneScreenID = isset($_POST['phoneScreenID']) ? (int) $_POST['phoneScreenID'] : 0;
+        $reviewNote = isset($_POST['reviewNote']) ? $_POST['reviewNote'] : '';
+        if ($this->_workflow->savePhoneScreenReview($phoneScreenID, $this->_userID, $reviewNote) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Enter a review note before saving.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . $phoneScreenID);
+    }
+
     private function createStaffingRecommendation()
     {
         $forecast = $this->_workflow->getStaffingForecast();
@@ -618,6 +908,10 @@ class NESPUI extends UserInterface
         if ($viewKey === 'interviews')
         {
             return 'Interviews';
+        }
+        if ($viewKey === 'phoneScreens')
+        {
+            return 'Phone Screens';
         }
         if ($viewKey === 'completed')
         {

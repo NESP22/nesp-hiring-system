@@ -216,6 +216,28 @@
     background: #4f6578;
 }
 
+.nesp-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.nesp-form-grid button {
+    align-self: end;
+}
+
+.nesp-copy-box {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #b9c5d3;
+    background: #f8fafc;
+    color: #1b2733;
+    padding: 10px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
 .nesp-secondary-action,
 .nesp-secondary-actions a {
     color: #315f93;
@@ -389,6 +411,51 @@
     line-height: 1.6;
 }
 
+.nesp-detail-list {
+    display: grid;
+    grid-template-columns: minmax(120px, 180px) 1fr;
+    gap: 8px 14px;
+    margin: 0 0 14px;
+    font-size: 13px;
+}
+
+.nesp-detail-list dt {
+    color: #4a5968;
+    font-weight: bold;
+}
+
+.nesp-detail-list dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.nesp-script-preview {
+    margin: 0;
+    padding: 12px;
+    background: #f8fafc;
+    border: 1px solid #d7dee8;
+    color: #1b2733;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+.nesp-workflow textarea[readonly],
+.nesp-workflow .nesp-table textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+.nesp-workflow code {
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
 @media (max-width: 700px) {
     .nesp-workflow #contents {
         padding: 14px 10px 28px;
@@ -414,5 +481,10 @@
     .nesp-table th,
     .nesp-table td {
         padding: 7px 6px;
+    }
+
+    .nesp-detail-list {
+        grid-template-columns: 1fr;
+        gap: 3px;
     }
 }

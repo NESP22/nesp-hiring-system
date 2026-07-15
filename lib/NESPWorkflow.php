@@ -7,6 +7,9 @@
  * forecast helpers. External integrations remain disabled by default.
  */
 
+include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
+include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
+
 class NESPWorkflow
 {
     private $_db;
@@ -50,9 +53,11 @@ class NESPWorkflow
             array('key' => 'needsCraig', 'label' => 'Needs Craig', 'action' => 'dashboard'),
             array('key' => 'waiting', 'label' => 'Waiting', 'action' => 'waiting'),
             array('key' => 'interviews', 'label' => 'Interviews', 'action' => 'interviews'),
+            array('key' => 'phoneScreens', 'label' => 'Phone Screens', 'action' => 'phoneScreens'),
+            array('key' => 'jobAds', 'label' => 'Job Ads', 'action' => 'jobAds'),
             array('key' => 'completed', 'label' => 'Completed', 'action' => 'completed'),
             array('key' => 'staffingForecast', 'label' => 'Staffing Forecast', 'action' => 'staffingForecast'),
-            array('key' => 'settings', 'label' => 'Settings', 'action' => 'settings')
+            array('key' => 'settings', 'label' => 'Interviewer Settings', 'action' => 'settings')
         );
     }
 
@@ -109,7 +114,7 @@ class NESPWorkflow
             return 'NESP_WORKFLOW_ENABLED';
         }
 
-        if (in_array($action, array('waiting', 'interviews', 'completed', 'auditLog')))
+        if (in_array($action, array('waiting', 'interviews', 'completed', 'auditLog', 'jobAds')))
         {
             return 'NESP_WORKFLOW_ENABLED';
         }
@@ -137,6 +142,32 @@ class NESPWorkflow
         if (in_array($action, array('staffingForecast', 'createStaffingRecommendation')))
         {
             return 'NESP_STAFFING_FORECAST_ENABLED';
+        }
+
+        if (in_array($action, array(
+            'phoneScreens',
+            'confirmPhoneScreen',
+            'reviewPhoneScreen',
+            'requestPhoneScreen',
+            'cancelPhoneScreen',
+            'markPhoneScreenInvitationCopied',
+            'revokePhoneScreenSchedulingLink',
+            'allowPhoneScreenReschedule',
+            'phoneScreenAvailability',
+            'savePhoneScreenAvailability',
+            'createPhoneScreenAvailabilityBlock',
+            'deletePhoneScreenAvailabilityBlock',
+            'createPhoneScreenBlackout',
+            'deletePhoneScreenBlackout',
+            'savePhoneScreenReview'
+        )))
+        {
+            return 'NESP_WORKFLOW_ENABLED';
+        }
+
+        if (in_array($action, array('saveRecruitingCampaignControl')))
+        {
+            return 'NESP_WORKFLOW_ENABLED';
         }
 
         if (in_array($action, array('settings', 'featureFlags', 'saveFeatureFlags')))
@@ -258,6 +289,7 @@ class NESPWorkflow
             'email_needs_confirmation' => 'Email Needs Confirmation',
             'ready_for_account_creation' => 'Ready for Account Creation',
             'account_prepared' => 'Account Prepared',
+            'temporary_password_set' => 'Temporary Password Set',
             'awaiting_craig_activation' => 'Awaiting Craig Activation',
             'active' => 'Active',
             'suspended' => 'Suspended',
@@ -462,7 +494,7 @@ class NESPWorkflow
             {
                 continue;
             }
-            $rows[] = str_getcsv($line);
+            $rows[] = str_getcsv($line, ',', '"', '\\');
         }
 
         return self::normalizeStaffingRows($rows, $sourceLabel, 'CSV');
@@ -760,10 +792,26 @@ class NESPWorkflow
     {
         $requiredTables = array(
             'nesp_feature_flag',
+            'nesp_workflow_stage',
             'nesp_candidate_workflow',
+            'nesp_interviewer_profile',
+            'nesp_interviewer_candidate_grant',
             'nesp_interviewer_role_rule',
             'nesp_interviewer_availability',
             'nesp_interview_slot',
+            'nesp_interview',
+            'nesp_scorecard_template',
+            'nesp_scorecard_response',
+            'nesp_integration_status',
+            'nesp_vapi_phone_screen',
+            'nesp_vapi_phone_screen_setting',
+            'nesp_vapi_availability_block',
+            'nesp_vapi_blackout_date',
+            'nesp_vapi_scheduling_activity',
+            'nesp_vapi_webhook_event',
+            'nesp_recruiting_campaign_control',
+            'nesp_audit_event',
+            'nesp_session_security_event',
             'nesp_staffing_schedule_history',
             'nesp_staffing_import_batch',
             'nesp_staffing_import_row',
@@ -786,6 +834,21 @@ class NESPWorkflow
         $requiredColumns = array(
             array('nesp_candidate_workflow', 'summary'),
             array('nesp_candidate_workflow', 'next_action_label'),
+            array('nesp_interviewer_profile', 'can_add_notes'),
+            array('nesp_scorecard_response', 'locked_at'),
+            array('nesp_vapi_phone_screen', 'call_request_key'),
+            array('nesp_vapi_phone_screen', 'destination_phone_hash'),
+            array('nesp_vapi_phone_screen', 'consent_status'),
+            array('nesp_vapi_phone_screen', 'structured_result_json'),
+            array('nesp_vapi_phone_screen', 'scheduling_token_hash'),
+            array('nesp_vapi_phone_screen', 'scheduled_start_at_utc'),
+            array('nesp_vapi_phone_screen', 'call_attempt_count'),
+            array('nesp_vapi_phone_screen_setting', 'setting_key'),
+            array('nesp_vapi_availability_block', 'weekday'),
+            array('nesp_vapi_blackout_date', 'blackout_date'),
+            array('nesp_vapi_scheduling_activity', 'activity_key'),
+            array('nesp_vapi_webhook_event', 'provider_event_id'),
+            array('nesp_recruiting_campaign_control', 'manual_spend'),
             array('nesp_staffing_import_batch', 'undone_at'),
             array('nesp_staffing_import_row', 'source_row_hash'),
             array('nesp_staffing_import_issue', 'status_key')
@@ -990,6 +1053,203 @@ class NESPWorkflow
                 'SELECT COUNT(*) AS total FROM nesp_interviewer_availability WHERE is_active = 1'
             )
         );
+    }
+
+    public function getRecruitingPlatformMatrix()
+    {
+        return NESPRecruitingAds::getPlatformMatrix();
+    }
+
+    public function getRecruitingAdTemplates()
+    {
+        return NESPRecruitingAds::getRequestedRoleAdTemplates();
+    }
+
+    public function getRecruitingCampaignControls()
+    {
+        $controls = array();
+        foreach (NESPRecruitingAds::getPlatformMatrix() as $platform)
+        {
+            $controls[$platform['platform_key']] = array(
+                'platform_key' => $platform['platform_key'],
+                'display_name' => $platform['platform'],
+                'campaign_status' => 'draft',
+                'renewal_date' => '',
+                'manual_spend' => '0.00',
+                'owner_approval_required' => 1,
+                'notes' => '',
+                'date_modified' => ''
+            );
+        }
+
+        $rows = $this->_db->getAllAssoc(
+            'SELECT
+                platform_key,
+                display_name,
+                campaign_status,
+                renewal_date,
+                manual_spend,
+                owner_approval_required,
+                notes,
+                date_modified
+             FROM
+                nesp_recruiting_campaign_control
+             ORDER BY
+                display_name'
+        );
+
+        foreach ($rows as $row)
+        {
+            $key = $row['platform_key'];
+            if (isset($controls[$key]))
+            {
+                $controls[$key] = array_merge($controls[$key], $row);
+            }
+        }
+
+        return array_values($controls);
+    }
+
+    public function saveRecruitingCampaignControl($input, $actorUserID)
+    {
+        $platformKey = isset($input['platformKey']) ? preg_replace('/[^a-z0-9_]/', '', strtolower((string) $input['platformKey'])) : '';
+
+        $matrix = NESPRecruitingAds::getPlatformMatrix();
+        $platform = null;
+        foreach ($matrix as $row)
+        {
+            if ($row['platform_key'] === $platformKey)
+            {
+                $platform = $row;
+                break;
+            }
+        }
+
+        if ($platform === null)
+        {
+            return false;
+        }
+
+        $allowedStatuses = array('draft', 'ready_for_review', 'approved_to_publish_manually', 'published_manually', 'paused', 'expired', 'removed');
+        $status = isset($input['campaignStatus']) ? strtolower(trim((string) $input['campaignStatus'])) : 'draft';
+        if (!in_array($status, $allowedStatuses, true))
+        {
+            $status = 'draft';
+        }
+
+        $renewalDate = isset($input['renewalDate']) ? trim((string) $input['renewalDate']) : '';
+        if ($renewalDate !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $renewalDate))
+        {
+            $renewalDate = '';
+        }
+
+        $manualSpend = isset($input['manualSpend']) ? preg_replace('/[^0-9.]/', '', (string) $input['manualSpend']) : '0';
+        $manualSpend = number_format(max(0, (float) $manualSpend), 2, '.', '');
+        $notes = isset($input['notes']) ? substr(trim((string) $input['notes']), 0, 1000) : '';
+
+        $this->_db->query(
+            sprintf(
+                'INSERT INTO nesp_recruiting_campaign_control
+                    (platform_key, display_name, campaign_status, renewal_date, manual_spend, owner_approval_required, notes, updated_by_user_id, date_created, date_modified)
+                 VALUES
+                    (%s, %s, %s, %s, %s, 1, %s, %s, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE
+                    display_name = VALUES(display_name),
+                    campaign_status = VALUES(campaign_status),
+                    renewal_date = VALUES(renewal_date),
+                    manual_spend = VALUES(manual_spend),
+                    owner_approval_required = 1,
+                    notes = VALUES(notes),
+                    updated_by_user_id = VALUES(updated_by_user_id),
+                    date_modified = NOW()',
+                $this->_db->makeQueryString($platformKey),
+                $this->_db->makeQueryString($platform['platform']),
+                $this->_db->makeQueryString($status),
+                $renewalDate === '' ? 'NULL' : $this->_db->makeQueryString($renewalDate),
+                $this->_db->makeQueryString($manualSpend),
+                $this->_db->makeQueryString($notes),
+                $this->_db->makeQueryInteger($actorUserID)
+            )
+        );
+
+        $this->logAuditEvent($actorUserID, 'recruiting_campaign_control_saved', 'nesp_recruiting_campaign_control', 0, array('platform_key' => $platformKey, 'campaign_status' => $status));
+        return true;
+    }
+
+    public function getRecruitingSourceReport()
+    {
+        $report = array();
+        $spendByPlatform = array();
+        foreach ($this->getRecruitingCampaignControls() as $control)
+        {
+            $spendByPlatform[$control['platform_key']] = (float) $control['manual_spend'];
+        }
+
+        foreach (NESPRecruitingAds::getSourceOptions() as $sourceKey => $label)
+        {
+            $sourceLabel = NESPRecruitingAds::getCandidateSourceLabel($sourceKey);
+            $sourceSQL = $this->_db->makeQueryString($sourceLabel);
+            $applications = $this->countRows(
+                sprintf(
+                    'SELECT COUNT(*) AS total
+                     FROM candidate
+                     WHERE is_active = 1
+                       AND source = %s',
+                    $sourceSQL
+                )
+            );
+            $qualified = $this->countRows(
+                sprintf(
+                    'SELECT COUNT(DISTINCT c.candidate_id) AS total
+                     FROM candidate c
+                     INNER JOIN nesp_candidate_workflow cw
+                        ON cw.candidate_id = c.candidate_id
+                     INNER JOIN nesp_workflow_stage ws
+                        ON ws.workflow_stage_id = cw.workflow_stage_id
+                     WHERE c.is_active = 1
+                       AND c.source = %s
+                       AND ws.stage_key NOT IN ("new", "needs_review", "follow_up_needed")',
+                    $sourceSQL
+                )
+            );
+            $scheduled = $this->countRows(
+                sprintf(
+                    'SELECT COUNT(*) AS total
+                     FROM nesp_vapi_phone_screen ps
+                     INNER JOIN candidate c
+                        ON c.candidate_id = ps.candidate_id
+                     WHERE c.source = %s
+                       AND ps.status_key IN ("phone_screen_scheduled", "call_due", "call_started", "ringing", "in_progress", "completed", "no_answer")',
+                    $sourceSQL
+                )
+            );
+            $completed = $this->countRows(
+                sprintf(
+                    'SELECT COUNT(*) AS total
+                     FROM nesp_vapi_phone_screen ps
+                     INNER JOIN candidate c
+                        ON c.candidate_id = ps.candidate_id
+                     WHERE c.source = %s
+                       AND ps.status_key = "completed"',
+                    $sourceSQL
+                )
+            );
+
+            $spend = isset($spendByPlatform[$sourceKey]) ? $spendByPlatform[$sourceKey] : 0;
+            $report[] = array(
+                'source_key' => $sourceKey,
+                'platform' => $label,
+                'candidate_source_label' => $sourceLabel,
+                'applications' => $applications,
+                'qualified_applicants' => $qualified,
+                'scheduled_phone_screens' => $scheduled,
+                'completed_phone_screens' => $completed,
+                'manual_spend' => number_format($spend, 2, '.', ''),
+                'cost_per_applicant' => $applications > 0 ? number_format($spend / $applications, 2, '.', '') : ''
+            );
+        }
+
+        return $report;
     }
 
     public function getDashboardQueues()
@@ -1787,6 +2047,18 @@ class NESPWorkflow
         {
             $this->replaceInterviewerJobRoles($profileID, $options['approved_joborder_ids'], $actorUserID);
         }
+        $accountResult = array();
+        if (!empty($options['temporary_password']))
+        {
+            $accountResult = $this->createOrResetInterviewerUser(
+                $profileID,
+                $displayName,
+                $email,
+                $options['temporary_password'],
+                false,
+                $actorUserID
+            );
+        }
         $this->logAuditEvent(
             $actorUserID,
             'interviewer_profile_created_inactive',
@@ -1795,7 +2067,10 @@ class NESPWorkflow
             array('display_name' => $displayName, 'role_key' => $roleKey)
         );
 
-        return $profileID;
+        return array(
+            'interviewer_profile_id' => $profileID,
+            'temporary_login_message' => isset($accountResult['temporary_login_message']) ? $accountResult['temporary_login_message'] : ''
+        );
     }
 
     public function updateInterviewerSettings($interviewerProfileID, $settings, $actorUserID)
@@ -1870,6 +2145,27 @@ class NESPWorkflow
             $this->replaceInterviewerJobRoles($interviewerProfileID, $settings['approved_joborder_ids'], $actorUserID);
         }
 
+        $accountResult = array();
+        if (!empty($settings['temporary_password']))
+        {
+            $accountResult = $this->createOrResetInterviewerUser(
+                $interviewerProfileID,
+                isset($settings['display_name']) ? $settings['display_name'] : $before['display_name'],
+                isset($settings['email']) ? $settings['email'] : $before['email'],
+                $settings['temporary_password'],
+                !empty($settings['is_active']),
+                $actorUserID
+            );
+            if ($accountResult === false)
+            {
+                return false;
+            }
+        }
+        elseif (isset($settings['is_active']))
+        {
+            $this->syncInterviewerUserAccess($interviewerProfileID, !empty($settings['is_active']), $actorUserID);
+        }
+
         $this->logAuditEvent(
             $actorUserID,
             'interviewer_settings_updated',
@@ -1884,7 +2180,10 @@ class NESPWorkflow
             )
         );
 
-        return true;
+        return array(
+            'ok' => true,
+            'temporary_login_message' => isset($accountResult['temporary_login_message']) ? $accountResult['temporary_login_message'] : ''
+        );
     }
 
     public function setInterviewerAvailabilityStatus($interviewerProfileID, $statusKey, $reason, $closedUntil, $actorUserID)
@@ -2703,6 +3002,829 @@ class NESPWorkflow
         return true;
     }
 
+    public function getVapiConfigurationStatus()
+    {
+        return NESPVapiIntegration::getConfigurationStatus($this->isFeatureFlagEnabled('NESP_VAPI_ENABLED'));
+    }
+
+    public function getPhoneScreenStatusLabels()
+    {
+        return NESPVapiIntegration::getPhoneScreenStatusLabels();
+    }
+
+    public function getPhoneScreenAvailabilitySettings()
+    {
+        $settings = NESPVapiIntegration::getDefaultPhoneScreenAvailabilitySettings();
+        $rows = $this->_db->getAllAssoc(
+            'SELECT setting_key, setting_value
+             FROM nesp_vapi_phone_screen_setting'
+        );
+        foreach ($rows as $row)
+        {
+            if (array_key_exists($row['setting_key'], $settings))
+            {
+                $settings[$row['setting_key']] = $row['setting_value'];
+            }
+        }
+
+        foreach (array('slot_minutes', 'call_duration_minutes', 'buffer_minutes', 'min_booking_notice_minutes', 'link_expiration_hours', 'max_screens_per_hour', 'max_screens_per_day', 'booking_horizon_days') as $key)
+        {
+            $settings[$key] = max(1, (int) $settings[$key]);
+        }
+        if (!self::isValidAvailabilityTime($settings['earliest_call_time']))
+        {
+            $settings['earliest_call_time'] = '09:00';
+        }
+        if (!self::isValidAvailabilityTime($settings['latest_call_time']))
+        {
+            $settings['latest_call_time'] = '18:00';
+        }
+        if (!in_array($settings['timezone'], timezone_identifiers_list()))
+        {
+            $settings['timezone'] = NESPVapiIntegration::DEFAULT_SCHEDULING_TIMEZONE;
+        }
+
+        return $settings;
+    }
+
+    public function getPhoneScreenAvailabilityBlocks()
+    {
+        return $this->_db->getAllAssoc(
+            'SELECT availability_block_id, weekday, TIME_FORMAT(start_time, "%H:%i") AS start_time,
+                    TIME_FORMAT(end_time, "%H:%i") AS end_time, is_available
+             FROM nesp_vapi_availability_block
+             ORDER BY weekday, start_time'
+        );
+    }
+
+    public function getPhoneScreenBlackoutDates()
+    {
+        return $this->_db->getAllAssoc(
+            'SELECT blackout_date_id, blackout_date, label
+             FROM nesp_vapi_blackout_date
+             ORDER BY blackout_date'
+        );
+    }
+
+    public function savePhoneScreenAvailabilitySettings($input, $actorUserID)
+    {
+        $defaults = NESPVapiIntegration::getDefaultPhoneScreenAvailabilitySettings();
+        $settings = array();
+        foreach ($defaults as $key => $defaultValue)
+        {
+            $value = isset($input[$key]) ? trim((string) $input[$key]) : (string) $defaultValue;
+            if (in_array($key, array('slot_minutes', 'call_duration_minutes', 'buffer_minutes', 'min_booking_notice_minutes', 'link_expiration_hours', 'max_screens_per_hour', 'max_screens_per_day', 'booking_horizon_days')))
+            {
+                $value = (string) max(1, (int) $value);
+            }
+            if (in_array($key, array('earliest_call_time', 'latest_call_time')) && !self::isValidAvailabilityTime($value))
+            {
+                $value = (string) $defaultValue;
+            }
+            if ($key === 'timezone' && !in_array($value, timezone_identifiers_list()))
+            {
+                $value = NESPVapiIntegration::DEFAULT_SCHEDULING_TIMEZONE;
+            }
+            $settings[$key] = $value;
+            $this->_db->query(
+                sprintf(
+                    'INSERT INTO nesp_vapi_phone_screen_setting
+                        (setting_key, setting_value, date_created, date_modified)
+                     VALUES
+                        (%s, %s, NOW(), NOW())
+                     ON DUPLICATE KEY UPDATE
+                        setting_value = VALUES(setting_value),
+                        date_modified = NOW()',
+                    $this->_db->makeQueryString($key),
+                    $this->_db->makeQueryString($value)
+                )
+            );
+        }
+
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_availability_settings_saved', 'vapi_phone_screen_setting', null, array('settings' => $settings));
+        return true;
+    }
+
+    public function createPhoneScreenAvailabilityBlock($weekday, $startTime, $endTime, $actorUserID)
+    {
+        $weekday = (int) $weekday;
+        $startTime = trim($startTime);
+        $endTime = trim($endTime);
+        if ($weekday < 0 || $weekday > 6 || !self::isValidAvailabilityTime($startTime) || !self::isValidAvailabilityTime($endTime) || $startTime >= $endTime)
+        {
+            return false;
+        }
+
+        $this->_db->query(
+            sprintf(
+                'INSERT INTO nesp_vapi_availability_block
+                    (weekday, start_time, end_time, is_available, date_created, date_modified)
+                 VALUES
+                    (%s, %s, %s, 1, NOW(), NOW())',
+                $this->_db->makeQueryInteger($weekday),
+                $this->_db->makeQueryString($startTime . ':00'),
+                $this->_db->makeQueryString($endTime . ':00')
+            )
+        );
+        $blockID = $this->_db->getLastInsertID();
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_availability_block_created', 'vapi_availability_block', $blockID, array('weekday' => $weekday, 'start_time' => $startTime, 'end_time' => $endTime));
+        return true;
+    }
+
+    public function deletePhoneScreenAvailabilityBlock($availabilityBlockID, $actorUserID)
+    {
+        $this->_db->query(
+            sprintf(
+                'DELETE FROM nesp_vapi_availability_block
+                 WHERE availability_block_id = %s',
+                $this->_db->makeQueryInteger($availabilityBlockID)
+            )
+        );
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_availability_block_deleted', 'vapi_availability_block', $availabilityBlockID, array());
+        return true;
+    }
+
+    public function createPhoneScreenBlackout($blackoutDate, $label, $actorUserID)
+    {
+        $blackoutDate = trim($blackoutDate);
+        $label = trim($label);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $blackoutDate))
+        {
+            return false;
+        }
+
+        $this->_db->query(
+            sprintf(
+                'INSERT INTO nesp_vapi_blackout_date
+                    (blackout_date, label, date_created, date_modified)
+                 VALUES
+                    (%s, %s, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE
+                    label = VALUES(label),
+                    date_modified = NOW()',
+                $this->_db->makeQueryString($blackoutDate),
+                $this->_db->makeQueryString($label)
+            )
+        );
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_blackout_saved', 'vapi_blackout_date', null, array('blackout_date' => $blackoutDate));
+        return true;
+    }
+
+    public function deletePhoneScreenBlackout($blackoutDateID, $actorUserID)
+    {
+        $this->_db->query(
+            sprintf(
+                'DELETE FROM nesp_vapi_blackout_date
+                 WHERE blackout_date_id = %s',
+                $this->_db->makeQueryInteger($blackoutDateID)
+            )
+        );
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_blackout_deleted', 'vapi_blackout_date', $blackoutDateID, array());
+        return true;
+    }
+
+    public function getVapiPhoneScreenSummaries($limit)
+    {
+        $limit = max(1, min(200, (int) $limit));
+
+        $rows = $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT
+                    ps.vapi_phone_screen_id,
+                    ps.call_request_key,
+                    ps.candidate_id,
+                    ps.joborder_id,
+                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                    jo.title AS role_title,
+                    ps.status_key,
+                    ps.consent_status,
+                    ps.destination_phone_last4,
+                    ps.provider_call_id,
+                    ps.provider_end_reason,
+                    ps.scheduling_link_created_at,
+                    ps.scheduling_invitation_copied_at,
+                    ps.scheduling_token_expires_at,
+                    ps.scheduling_token_revoked_at,
+                    ps.scheduled_start_et,
+                    ps.scheduled_start_at_utc,
+                    ps.scheduled_timezone,
+                    ps.call_attempt_count,
+                    ps.requested_by_user_id,
+                    ps.approved_by_user_id,
+                    ps.date_created,
+                    ps.date_modified
+                 FROM
+                    nesp_vapi_phone_screen ps
+                 INNER JOIN candidate c
+                    ON c.candidate_id = ps.candidate_id
+                 INNER JOIN joborder jo
+                    ON jo.joborder_id = ps.joborder_id
+                 ORDER BY
+                    ps.date_modified DESC,
+                    ps.vapi_phone_screen_id DESC
+                 LIMIT %s',
+                $this->_db->makeQueryInteger($limit)
+            )
+        );
+
+        return $this->decoratePhoneScreenRows($rows);
+    }
+
+    public function getVapiPhoneScreenQueues()
+    {
+        $rows = $this->getVapiPhoneScreenSummaries(200);
+        $queues = array(
+            'ready' => array(),
+            'waiting' => array(),
+            'today' => array(),
+            'upcoming' => array(),
+            'reschedule' => array(),
+            'completed' => array()
+        );
+        $today = new DateTime('now', new DateTimeZone(NESPVapiIntegration::DEFAULT_SCHEDULING_TIMEZONE));
+        $todayKey = $today->format('Y-m-d');
+
+        foreach ($rows as $row)
+        {
+            if ($row['status_key'] === 'scheduling_link_ready')
+            {
+                $queues['ready'][] = $row;
+            }
+            if ($row['status_key'] === 'waiting_for_candidate_to_schedule')
+            {
+                $queues['waiting'][] = $row;
+            }
+            if ($row['status_key'] === 'phone_screen_scheduled' && substr($row['scheduled_start_et'], 0, 10) === $todayKey)
+            {
+                $queues['today'][] = $row;
+            }
+            if (in_array($row['status_key'], array('phone_screen_scheduled', 'call_due', 'call_started')) && substr($row['scheduled_start_et'], 0, 10) > $todayKey)
+            {
+                $queues['upcoming'][] = $row;
+            }
+            if (in_array($row['status_key'], array('no_answer', 'reschedule_requested', 'cancelled')))
+            {
+                $queues['reschedule'][] = $row;
+            }
+            if ($row['status_key'] === 'completed')
+            {
+                $queues['completed'][] = $row;
+            }
+        }
+
+        return $queues;
+    }
+
+    public function getVapiPhoneScreenDetail($phoneScreenID)
+    {
+        $detail = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    ps.*,
+                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                    c.email1,
+                    jo.title AS role_title
+                 FROM
+                    nesp_vapi_phone_screen ps
+                 INNER JOIN candidate c
+                    ON c.candidate_id = ps.candidate_id
+                 INNER JOIN joborder jo
+                    ON jo.joborder_id = ps.joborder_id
+                 WHERE
+                    ps.vapi_phone_screen_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($phoneScreenID)
+            )
+        );
+        if (empty($detail))
+        {
+            return array();
+        }
+
+        $detail['role_script'] = NESPVapiIntegration::getRoleScript($detail['joborder_id'], $detail['role_title']);
+        $detail = $this->decoratePhoneScreenRow($detail);
+        $detail['webhook_events'] = $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT
+                    provider_event_id,
+                    provider_call_id,
+                    event_type,
+                    event_timestamp,
+                    processed_at,
+                    date_created
+                 FROM
+                    nesp_vapi_webhook_event
+                 WHERE
+                    provider_call_id = %s
+                 ORDER BY
+                    date_created DESC,
+                    vapi_webhook_event_id DESC
+                 LIMIT 25',
+                $this->_db->makeQueryString($detail['provider_call_id'])
+            )
+        );
+
+        $structured = json_decode($detail['structured_result_json'], true);
+        $detail['structured_result'] = is_array($structured) ? $structured : array();
+        return $detail;
+    }
+
+    public function getCandidatePhoneScreenPreview($candidateID, $jobOrderID)
+    {
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        if ($candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return array();
+        }
+
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    c.candidate_id,
+                    c.first_name,
+                    c.last_name,
+                    c.phone_cell,
+                    c.phone_home,
+                    c.phone_work,
+                    jo.joborder_id,
+                    jo.title
+                 FROM
+                    candidate c
+                 INNER JOIN candidate_joborder cjo
+                    ON cjo.candidate_id = c.candidate_id
+                 INNER JOIN joborder jo
+                    ON jo.joborder_id = cjo.joborder_id
+                 WHERE
+                    c.candidate_id = %s
+                    AND jo.joborder_id = %s
+                    AND c.is_active = 1
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID)
+            )
+        );
+
+        if (empty($row))
+        {
+            return array();
+        }
+
+        $destinationPhone = trim($row['phone_cell']) !== '' ? $row['phone_cell'] : (trim($row['phone_home']) !== '' ? $row['phone_home'] : $row['phone_work']);
+        $row['candidate_name'] = trim($row['first_name'] . ' ' . $row['last_name']);
+        $row['destination_phone_redacted'] = NESPVapiIntegration::redactPhone($destinationPhone);
+        $row['has_destination_phone'] = NESPVapiIntegration::normalizePhoneForDial($destinationPhone) !== '';
+        $row['role_script'] = NESPVapiIntegration::getRoleScript($jobOrderID, $row['title']);
+        $row['consent_notice'] = NESPVapiIntegration::getConsentOpeningScript();
+        $row['configuration_status'] = $this->getVapiConfigurationStatus();
+        return $row;
+    }
+
+    public function requestPhoneScreen($candidateID, $jobOrderID, $actorUserID)
+    {
+        $preview = $this->getCandidatePhoneScreenPreview($candidateID, $jobOrderID);
+        if (empty($preview) || !$preview['has_destination_phone'])
+        {
+            return false;
+        }
+
+        $destinationPhone = trim($preview['phone_cell']) !== '' ? $preview['phone_cell'] : (trim($preview['phone_home']) !== '' ? $preview['phone_home'] : $preview['phone_work']);
+        $callRequestKey = hash('sha256', (int) $candidateID . '|' . (int) $jobOrderID . '|' . NESPVapiIntegration::phoneHash($destinationPhone));
+        $existing = $this->_db->getAssoc(
+            sprintf(
+                'SELECT vapi_phone_screen_id
+                 FROM nesp_vapi_phone_screen
+                 WHERE call_request_key = %s
+                   AND status_key IN ("scheduling_link_ready", "waiting_for_candidate_to_schedule", "phone_screen_scheduled", "reschedule_requested", "call_due", "call_started", "ringing", "in_progress")
+                 LIMIT 1',
+                $this->_db->makeQueryString($callRequestKey)
+            )
+        );
+        if (!empty($existing))
+        {
+            return (int) $existing['vapi_phone_screen_id'];
+        }
+
+        $token = NESPVapiIntegration::generateSchedulingToken();
+        $tokenHash = NESPVapiIntegration::schedulingTokenHash($token);
+        $settings = $this->getPhoneScreenAvailabilitySettings();
+        $link = NESPVapiIntegration::getSchedulingLink($token);
+        $invitation = NESPVapiIntegration::buildSchedulingInvitationCopy($preview['first_name'], $preview['title'], $link);
+        $expiresSQL = sprintf(
+            'DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s HOUR)',
+            $this->_db->makeQueryInteger($settings['link_expiration_hours'])
+        );
+
+        $sql = sprintf(
+            'INSERT INTO nesp_vapi_phone_screen
+                (call_request_key, candidate_id, joborder_id, destination_phone_hash, destination_phone_last4, status_key, consent_status, requested_by_user_id, caller_label, assistant_label, scheduling_token_hash, scheduling_token_expires_at, scheduling_link_created_at, scheduling_link_url, invitation_copy_text, scheduled_timezone, date_created, date_modified)
+             VALUES
+                (%s, %s, %s, %s, %s, "scheduling_link_ready", "not_requested", %s, "NESP Hiring", "NESP Hiring Phone Screen", %s, %s, UTC_TIMESTAMP(), %s, %s, %s, NOW(), NOW())',
+            $this->_db->makeQueryString($callRequestKey),
+            $this->_db->makeQueryInteger($candidateID),
+            $this->_db->makeQueryInteger($jobOrderID),
+            $this->_db->makeQueryString(NESPVapiIntegration::phoneHash($destinationPhone)),
+            $this->_db->makeQueryString(NESPVapiIntegration::phoneLast4($destinationPhone)),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID),
+            $this->_db->makeQueryString($tokenHash),
+            $expiresSQL,
+            $this->_db->makeQueryString($link),
+            $this->_db->makeQueryString($invitation),
+            $this->_db->makeQueryString($settings['timezone'])
+        );
+        $this->_db->query($sql);
+        $phoneScreenID = $this->_db->getLastInsertID();
+        $this->logSchedulingActivity($phoneScreenID, $tokenHash, 'link_created', array('expires_at_hours' => (int) $settings['link_expiration_hours']));
+        $this->logAuditEvent(
+            $actorUserID,
+            'vapi_phone_screen_scheduling_link_created',
+            'vapi_phone_screen',
+            $phoneScreenID,
+            array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID, 'destination_phone' => NESPVapiIntegration::redactPhone($destinationPhone))
+        );
+
+        return (int) $phoneScreenID;
+    }
+
+    public function markPhoneScreenInvitationCopied($phoneScreenID, $actorUserID)
+    {
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_vapi_phone_screen
+                 SET status_key = "waiting_for_candidate_to_schedule",
+                     scheduling_invitation_copied_at = UTC_TIMESTAMP(),
+                     date_modified = NOW()
+                 WHERE vapi_phone_screen_id = %s
+                   AND status_key = "scheduling_link_ready"
+                   AND scheduling_token_revoked_at IS NULL',
+                $this->_db->makeQueryInteger($phoneScreenID)
+            )
+        );
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_invitation_copied', 'vapi_phone_screen', $phoneScreenID, array());
+        return $this->_db->getAffectedRows() === 1;
+    }
+
+    public function revokePhoneScreenSchedulingLink($phoneScreenID, $actorUserID)
+    {
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_vapi_phone_screen
+                 SET status_key = "cancelled",
+                     scheduling_token_revoked_at = UTC_TIMESTAMP(),
+                     scheduled_start_at_utc = NULL,
+                     scheduled_end_at_utc = NULL,
+                     scheduled_start_et = NULL,
+                     cancelled_at = NOW(),
+                     date_modified = NOW()
+                 WHERE vapi_phone_screen_id = %s
+                   AND status_key IN ("scheduling_link_ready", "waiting_for_candidate_to_schedule", "phone_screen_scheduled", "reschedule_requested")',
+                $this->_db->makeQueryInteger($phoneScreenID)
+            )
+        );
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_scheduling_link_revoked', 'vapi_phone_screen', $phoneScreenID, array());
+        return $this->_db->getAffectedRows() === 1;
+    }
+
+    public function allowPhoneScreenReschedule($phoneScreenID, $actorUserID)
+    {
+        $detail = $this->getVapiPhoneScreenDetail($phoneScreenID);
+        if (empty($detail) || !in_array($detail['status_key'], array('no_answer', 'cancelled', 'reschedule_requested')))
+        {
+            return false;
+        }
+
+        $token = NESPVapiIntegration::generateSchedulingToken();
+        $tokenHash = NESPVapiIntegration::schedulingTokenHash($token);
+        $settings = $this->getPhoneScreenAvailabilitySettings();
+        $link = NESPVapiIntegration::getSchedulingLink($token);
+        $firstName = strtok($detail['candidate_name'], ' ');
+        $invitation = NESPVapiIntegration::buildSchedulingInvitationCopy($firstName, $detail['role_title'], $link);
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_vapi_phone_screen
+                 SET status_key = "reschedule_requested",
+                     scheduling_token_hash = %s,
+                     scheduling_token_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s HOUR),
+                     scheduling_token_revoked_at = NULL,
+                     scheduling_link_created_at = UTC_TIMESTAMP(),
+                     scheduling_link_url = %s,
+                     invitation_copy_text = %s,
+                     scheduled_start_at_utc = NULL,
+                     scheduled_end_at_utc = NULL,
+                     scheduled_start_et = NULL,
+                     provider_call_id = NULL,
+                     provider_end_reason = "",
+                     call_claimed_at = NULL,
+                     call_attempted_at = NULL,
+                     call_attempt_count = 0,
+                     scheduler_claim_key = "",
+                     last_scheduler_error = "",
+                     date_modified = NOW()
+                 WHERE vapi_phone_screen_id = %s',
+                $this->_db->makeQueryString($tokenHash),
+                $this->_db->makeQueryInteger($settings['link_expiration_hours']),
+                $this->_db->makeQueryString($link),
+                $this->_db->makeQueryString($invitation),
+                $this->_db->makeQueryInteger($phoneScreenID)
+            )
+        );
+        $this->logSchedulingActivity($phoneScreenID, $tokenHash, 'reschedule_link_created', array());
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_reschedule_allowed', 'vapi_phone_screen', $phoneScreenID, array());
+        return true;
+    }
+
+    public function cancelPhoneScreen($phoneScreenID, $actorUserID)
+    {
+        $sql = sprintf(
+            'UPDATE nesp_vapi_phone_screen
+             SET status_key = "cancelled",
+                 scheduling_token_revoked_at = UTC_TIMESTAMP(),
+                 scheduled_start_at_utc = NULL,
+                 scheduled_end_at_utc = NULL,
+                 scheduled_start_et = NULL,
+                 cancelled_at = NOW(),
+                 date_modified = NOW()
+             WHERE vapi_phone_screen_id = %s
+               AND status_key IN ("scheduling_link_ready", "waiting_for_candidate_to_schedule", "phone_screen_scheduled", "call_due", "call_started", "ringing")',
+            $this->_db->makeQueryInteger($phoneScreenID)
+        );
+        $this->_db->query($sql);
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_cancelled', 'vapi_phone_screen', $phoneScreenID, array());
+        return true;
+    }
+
+    public function getSchedulingPageByToken($token)
+    {
+        $tokenHash = NESPVapiIntegration::schedulingTokenHash($token);
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    ps.*,
+                    c.first_name,
+                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                    jo.title AS role_title
+                 FROM nesp_vapi_phone_screen ps
+                 INNER JOIN candidate c ON c.candidate_id = ps.candidate_id
+                 INNER JOIN joborder jo ON jo.joborder_id = ps.joborder_id
+                 WHERE ps.scheduling_token_hash = %s
+                 LIMIT 1',
+                $this->_db->makeQueryString($tokenHash)
+            )
+        );
+        $state = NESPVapiIntegration::evaluateSchedulingTokenState($token, $row, time());
+        if ($state !== 'valid')
+        {
+            $this->logSchedulingActivity(null, $tokenHash, 'token_' . $state, array());
+            return array('ok' => false, 'state' => $state);
+        }
+        if ($this->isSchedulingRateLimited($row['vapi_phone_screen_id'], $tokenHash))
+        {
+            $this->logSchedulingActivity($row['vapi_phone_screen_id'], $tokenHash, 'rate_limited', array());
+            return array('ok' => false, 'state' => 'rate_limited');
+        }
+        if (!in_array($row['status_key'], array('scheduling_link_ready', 'waiting_for_candidate_to_schedule', 'phone_screen_scheduled', 'reschedule_requested')))
+        {
+            $this->logSchedulingActivity($row['vapi_phone_screen_id'], $tokenHash, 'token_not_schedulable', array('status_key' => $row['status_key']));
+            return array('ok' => false, 'state' => 'not_schedulable');
+        }
+
+        $this->logSchedulingActivity($row['vapi_phone_screen_id'], $tokenHash, 'page_viewed', array());
+        $row = $this->decoratePhoneScreenRow($row);
+        $row['available_slots'] = $this->getAvailablePhoneScreenSlots($row['vapi_phone_screen_id']);
+        return array('ok' => true, 'state' => 'valid', 'screen' => $row);
+    }
+
+    public function schedulePhoneScreenFromToken($token, $slotStartUTC)
+    {
+        $page = $this->getSchedulingPageByToken($token);
+        if (empty($page['ok']))
+        {
+            return $page;
+        }
+
+        $screen = $page['screen'];
+        $tokenHash = NESPVapiIntegration::schedulingTokenHash($token);
+        if (!in_array($screen['status_key'], array('scheduling_link_ready', 'waiting_for_candidate_to_schedule', 'phone_screen_scheduled', 'reschedule_requested')))
+        {
+            return array('ok' => false, 'state' => 'not_schedulable');
+        }
+        if (!NESPVapiIntegration::slotValueIsInAvailableSlots($slotStartUTC, $screen['available_slots']))
+        {
+            $this->logSchedulingActivity($screen['vapi_phone_screen_id'], $tokenHash, 'unoffered_slot_rejected', array('slot_start_utc' => $slotStartUTC));
+            return array('ok' => false, 'state' => 'slot_unavailable');
+        }
+        if (!$this->isSlotAvailable($slotStartUTC, $screen['vapi_phone_screen_id']))
+        {
+            $this->logSchedulingActivity($screen['vapi_phone_screen_id'], $tokenHash, 'duplicate_booking_blocked', array('slot_start_utc' => $slotStartUTC));
+            return array('ok' => false, 'state' => 'slot_unavailable');
+        }
+
+        $settings = $this->getPhoneScreenAvailabilitySettings();
+        $tz = new DateTimeZone($settings['timezone']);
+        $startUTC = new DateTime($slotStartUTC, new DateTimeZone('UTC'));
+        $endUTC = clone $startUTC;
+        $endUTC->modify('+' . (int) $settings['call_duration_minutes'] . ' minutes');
+        $startLocal = clone $startUTC;
+        $startLocal->setTimezone($tz);
+        $status = $screen['status_key'] === 'phone_screen_scheduled' ? 'phone_screen_scheduled' : 'phone_screen_scheduled';
+        $rescheduleIncrement = $screen['status_key'] === 'phone_screen_scheduled' ? ', reschedule_count = reschedule_count + 1' : '';
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_vapi_phone_screen
+                 SET status_key = %s,
+                     scheduled_start_at_utc = %s,
+                     scheduled_end_at_utc = %s,
+                     scheduled_start_et = %s,
+                     scheduled_timezone = %s,
+                     scheduling_token_used_at = UTC_TIMESTAMP(),
+                     date_modified = NOW()
+                     %s
+                 WHERE vapi_phone_screen_id = %s
+                   AND scheduling_token_hash = %s
+                   AND scheduling_token_revoked_at IS NULL',
+                $this->_db->makeQueryString($status),
+                $this->_db->makeQueryString($startUTC->format('Y-m-d H:i:s')),
+                $this->_db->makeQueryString($endUTC->format('Y-m-d H:i:s')),
+                $this->_db->makeQueryString($startLocal->format('Y-m-d H:i:s')),
+                $this->_db->makeQueryString($settings['timezone']),
+                $rescheduleIncrement,
+                $this->_db->makeQueryInteger($screen['vapi_phone_screen_id']),
+                $this->_db->makeQueryString($tokenHash)
+            )
+        );
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            $this->logSchedulingActivity($screen['vapi_phone_screen_id'], $tokenHash, 'appointment_schedule_lost_race', array('slot_start_utc' => $startUTC->format('Y-m-d H:i:s')));
+            return array('ok' => false, 'state' => 'slot_unavailable');
+        }
+        $this->logSchedulingActivity($screen['vapi_phone_screen_id'], $tokenHash, 'appointment_scheduled', array('slot_start_utc' => $startUTC->format('Y-m-d H:i:s'), 'timezone' => $settings['timezone']));
+        $this->logAuditEvent(null, 'vapi_phone_screen_candidate_scheduled', 'vapi_phone_screen', $screen['vapi_phone_screen_id'], array('scheduled_start_et' => $startLocal->format('Y-m-d H:i:s'), 'timezone' => $settings['timezone']));
+        return array('ok' => true, 'state' => 'scheduled');
+    }
+
+    public function cancelPhoneScreenFromToken($token)
+    {
+        return $this->candidateSchedulingStatusChange($token, 'cancelled', 'candidate_cancelled');
+    }
+
+    public function requestHumanFollowUpFromToken($token)
+    {
+        return $this->candidateSchedulingStatusChange($token, 'human_follow_up_requested', 'human_follow_up_requested');
+    }
+
+    public function startPhoneScreenCall($phoneScreenID, $actorUserID)
+    {
+        if (!NESPVapiIntegration::isReadyForOutboundCalls($this->isFeatureFlagEnabled('NESP_VAPI_ENABLED')))
+        {
+            $this->logAuditEvent($actorUserID, 'vapi_phone_screen_start_blocked', 'vapi_phone_screen', $phoneScreenID, array('reason' => 'configuration_or_feature_flag_not_ready'));
+            return array('ok' => false, 'error' => 'vapi_not_ready');
+        }
+
+        $screen = $this->getVapiPhoneScreenDetail($phoneScreenID);
+        if (empty($screen) || !in_array($screen['status_key'], array('call_due', 'phone_screen_scheduled')))
+        {
+            return array('ok' => false, 'error' => 'invalid_screen_status');
+        }
+        if (!$this->claimPhoneScreenForStart($phoneScreenID))
+        {
+            $this->logAuditEvent($actorUserID, 'vapi_phone_screen_duplicate_start_blocked', 'vapi_phone_screen', $phoneScreenID, array());
+            return array('ok' => false, 'error' => 'duplicate_start_blocked');
+        }
+
+        $candidate = array('candidate_id' => (int) $screen['candidate_id']);
+        $job = array('joborder_id' => (int) $screen['joborder_id'], 'title' => $screen['role_title']);
+        $destinationPhone = $this->getDestinationPhoneForScreen($screen['candidate_id']);
+        $payload = NESPVapiIntegration::buildOutboundCallPayload($destinationPhone, $candidate, $job, $screen['call_request_key']);
+        $response = $this->postVapiCall($payload);
+        if (!$response['ok'])
+        {
+            $this->updatePhoneScreenStatus($phoneScreenID, 'provider_error', '', $response['error']);
+            $this->logAuditEvent($actorUserID, 'vapi_phone_screen_provider_error', 'vapi_phone_screen', $phoneScreenID, array('error' => $response['error']));
+            return $response;
+        }
+
+        $providerCallID = isset($response['body']['id']) ? (string) $response['body']['id'] : '';
+        if ($providerCallID === '')
+        {
+            $this->updatePhoneScreenStatus($phoneScreenID, 'provider_error', '', 'provider_missing_call_id');
+            $this->logAuditEvent($actorUserID, 'vapi_phone_screen_provider_error', 'vapi_phone_screen', $phoneScreenID, array('error' => 'provider_missing_call_id'));
+            return array('ok' => false, 'error' => 'provider_missing_call_id');
+        }
+        $this->updatePhoneScreenStatus($phoneScreenID, 'call_started', $providerCallID, '');
+        $this->logAuditEvent($actorUserID, 'vapi_phone_screen_call_started', 'vapi_phone_screen', $phoneScreenID, array('provider_call_id_present' => $providerCallID !== ''));
+        return array('ok' => true, 'provider_call_id' => $providerCallID);
+    }
+
+    public function runDueScheduledPhoneScreens($limit = 10)
+    {
+        $limit = max(1, min(50, (int) $limit));
+        $this->_db->query(
+            'UPDATE nesp_vapi_phone_screen
+             SET status_key = "call_due",
+                 date_modified = NOW()
+             WHERE status_key = "phone_screen_scheduled"
+               AND scheduled_start_at_utc <= UTC_TIMESTAMP()
+               AND provider_call_id IS NULL
+               AND call_attempt_count = 0
+               AND scheduling_token_revoked_at IS NULL'
+        );
+
+        $rows = $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT vapi_phone_screen_id
+                 FROM nesp_vapi_phone_screen
+                 WHERE status_key = "call_due"
+                   AND scheduled_start_at_utc <= UTC_TIMESTAMP()
+                   AND provider_call_id IS NULL
+                   AND call_attempt_count = 0
+                   AND scheduling_token_revoked_at IS NULL
+                 ORDER BY scheduled_start_at_utc ASC
+                 LIMIT %s',
+                $this->_db->makeQueryInteger($limit)
+            )
+        );
+
+        $results = array();
+        foreach ($rows as $row)
+        {
+            $results[] = $this->startPhoneScreenCall((int) $row['vapi_phone_screen_id'], null);
+        }
+        return $results;
+    }
+
+    public function processVapiWebhook($validation)
+    {
+        if (empty($validation['ok']))
+        {
+            return $validation;
+        }
+
+        $existing = $this->_db->getAssoc(
+            sprintf(
+                'SELECT vapi_webhook_event_id
+                 FROM nesp_vapi_webhook_event
+                 WHERE provider_event_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryString($validation['event_id'])
+            )
+        );
+        if (!empty($existing))
+        {
+            return array('ok' => true, 'duplicate' => true, 'status' => 200);
+        }
+
+        $redactedPayload = NESPVapiIntegration::redactedPayloadForStorage($validation['payload']);
+        $sql = sprintf(
+            'INSERT INTO nesp_vapi_webhook_event
+                (provider_event_id, provider_call_id, event_type, event_timestamp, payload_sha256, redacted_payload_json, processed_at, date_created)
+             VALUES
+                (%s, %s, %s, %s, %s, %s, NOW(), NOW())',
+            $this->_db->makeQueryString($validation['event_id']),
+            $this->_db->makeQueryString($validation['provider_call_id']),
+            $this->_db->makeQueryString($validation['event_type']),
+            $this->_db->makeQueryString($validation['event_timestamp']),
+            $this->_db->makeQueryString($validation['payload_sha256']),
+            $this->_db->makeQueryString($redactedPayload)
+        );
+        $this->_db->query($sql);
+
+        $screen = $this->_db->getAssoc(
+            sprintf(
+                'SELECT vapi_phone_screen_id
+                 FROM nesp_vapi_phone_screen
+                 WHERE provider_call_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryString($validation['provider_call_id'])
+            )
+        );
+        if (!empty($screen))
+        {
+            $update = NESPVapiIntegration::buildScreenUpdateFromWebhookMessage($validation['message']);
+            $this->applyPhoneScreenWebhookUpdate($screen['vapi_phone_screen_id'], $validation, $update);
+        }
+
+        return array('ok' => true, 'duplicate' => false, 'status' => 200);
+    }
+
+    public function savePhoneScreenReview($phoneScreenID, $actorUserID, $reviewNote)
+    {
+        $reviewNote = trim($reviewNote);
+        if ($reviewNote === '')
+        {
+            return false;
+        }
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'vapi_phone_screen_review_saved',
+            'vapi_phone_screen',
+            $phoneScreenID,
+            array('review_note_sha256' => hash('sha256', $reviewNote), 'review_note_length' => strlen($reviewNote))
+        );
+        return true;
+    }
+
     public function getRecentAuditEvents($limit)
     {
         $limit = max(1, min(100, (int) $limit));
@@ -2751,6 +3873,375 @@ class NESPWorkflow
 
         $rs = $this->_db->getAssoc($sql);
         return !empty($rs);
+    }
+
+    private function decoratePhoneScreenRows($rows)
+    {
+        $decorated = array();
+        foreach ($rows as $row)
+        {
+            $decorated[] = $this->decoratePhoneScreenRow($row);
+        }
+        return $decorated;
+    }
+
+    private function decoratePhoneScreenRow($row)
+    {
+        $labels = NESPVapiIntegration::getPhoneScreenStatusLabels();
+        $row['status_label'] = isset($labels[$row['status_key']]) ? $labels[$row['status_key']] : $row['status_key'];
+        $row['has_active_scheduling_link'] = !empty($row['scheduling_token_hash'])
+            && empty($row['scheduling_token_revoked_at'])
+            && (empty($row['scheduling_token_expires_at']) || strtotime($row['scheduling_token_expires_at']) >= time());
+        $row['scheduled_display'] = '';
+        if (!empty($row['scheduled_start_et']))
+        {
+            $row['scheduled_display'] = date('M j, Y g:i A', strtotime($row['scheduled_start_et'])) . ' ET';
+        }
+        return $row;
+    }
+
+    private function getAvailablePhoneScreenSlots($excludePhoneScreenID = 0)
+    {
+        $settings = $this->getPhoneScreenAvailabilitySettings();
+        $blocks = $this->getPhoneScreenAvailabilityBlocks();
+        $blackouts = $this->getPhoneScreenBlackoutDates();
+        $blackoutMap = array();
+        foreach ($blackouts as $blackout)
+        {
+            $blackoutMap[$blackout['blackout_date']] = true;
+        }
+
+        $tz = new DateTimeZone($settings['timezone']);
+        $now = new DateTime('now', $tz);
+        $earliest = clone $now;
+        $earliest->modify('+' . (int) $settings['min_booking_notice_minutes'] . ' minutes');
+        $horizon = clone $now;
+        $horizon->modify('+' . (int) $settings['booking_horizon_days'] . ' days');
+        $appointments = $this->getBookedPhoneScreenAppointments($excludePhoneScreenID);
+        $slots = array();
+
+        $day = new DateTime($now->format('Y-m-d 00:00:00'), $tz);
+        while ($day <= $horizon && count($slots) < 80)
+        {
+            $dateKey = $day->format('Y-m-d');
+            if (!isset($blackoutMap[$dateKey]))
+            {
+                $weekday = (int) $day->format('w');
+                foreach ($blocks as $block)
+                {
+                    if ((int) $block['weekday'] !== $weekday || (int) $block['is_available'] !== 1)
+                    {
+                        continue;
+                    }
+                    $cursor = new DateTime($dateKey . ' ' . $block['start_time'], $tz);
+                    $end = new DateTime($dateKey . ' ' . $block['end_time'], $tz);
+                    while ($cursor < $end)
+                    {
+                        if ($cursor >= $earliest
+                            && $cursor->format('H:i') >= $settings['earliest_call_time']
+                            && $cursor->format('H:i') <= $settings['latest_call_time'])
+                        {
+                            $utc = clone $cursor;
+                            $utc->setTimezone(new DateTimeZone('UTC'));
+                            $utcValue = $utc->format('Y-m-d H:i:s');
+                            if ($this->isSlotWithinCapacity($utcValue, $appointments, $settings))
+                            {
+                                $slots[] = array(
+                                    'value' => $utcValue,
+                                    'label' => $cursor->format('D, M j, Y g:i A') . ' ET'
+                                );
+                            }
+                        }
+                        $cursor->modify('+' . (int) $settings['slot_minutes'] . ' minutes');
+                    }
+                }
+            }
+            $day->modify('+1 day');
+        }
+
+        return $slots;
+    }
+
+    private function getBookedPhoneScreenAppointments($excludePhoneScreenID = 0)
+    {
+        return $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT vapi_phone_screen_id, scheduled_start_at_utc
+                 FROM nesp_vapi_phone_screen
+                 WHERE scheduled_start_at_utc IS NOT NULL
+                   AND status_key IN ("phone_screen_scheduled", "call_due", "call_started", "ringing", "in_progress")
+                   AND vapi_phone_screen_id <> %s',
+                $this->_db->makeQueryInteger($excludePhoneScreenID)
+            )
+        );
+    }
+
+    private function isSlotAvailable($slotStartUTC, $excludePhoneScreenID = 0)
+    {
+        $settings = $this->getPhoneScreenAvailabilitySettings();
+        $appointments = $this->getBookedPhoneScreenAppointments($excludePhoneScreenID);
+        return $this->isSlotWithinCapacity($slotStartUTC, $appointments, $settings);
+    }
+
+    private function isSlotWithinCapacity($slotStartUTC, $appointments, $settings)
+    {
+        if (NESPVapiIntegration::slotConflictsWithAppointments($slotStartUTC, $appointments, $settings))
+        {
+            return false;
+        }
+
+        $slot = strtotime($slotStartUTC);
+        $hourStart = strtotime(date('Y-m-d H:00:00', $slot));
+        $hourEnd = $hourStart + 3600;
+        $dayStart = strtotime(date('Y-m-d 00:00:00', $slot));
+        $dayEnd = $dayStart + 86400;
+        $hourCount = 0;
+        $dayCount = 0;
+        foreach ($appointments as $appointment)
+        {
+            $existing = strtotime($appointment['scheduled_start_at_utc']);
+            if ($existing >= $hourStart && $existing < $hourEnd)
+            {
+                $hourCount++;
+            }
+            if ($existing >= $dayStart && $existing < $dayEnd)
+            {
+                $dayCount++;
+            }
+        }
+
+        return $hourCount < (int) $settings['max_screens_per_hour']
+            && $dayCount < (int) $settings['max_screens_per_day'];
+    }
+
+    private function candidateSchedulingStatusChange($token, $statusKey, $activityKey)
+    {
+        $page = $this->getSchedulingPageByToken($token);
+        if (empty($page['ok']))
+        {
+            return $page;
+        }
+
+        $screen = $page['screen'];
+        if (!in_array($screen['status_key'], array('scheduling_link_ready', 'waiting_for_candidate_to_schedule', 'phone_screen_scheduled', 'reschedule_requested')))
+        {
+            return array('ok' => false, 'state' => 'not_schedulable');
+        }
+
+        $tokenHash = NESPVapiIntegration::schedulingTokenHash($token);
+        $cancelledAtSQL = $statusKey === 'cancelled' ? 'NOW()' : 'cancelled_at';
+        $revokedAtSQL = in_array($statusKey, array('cancelled', 'human_follow_up_requested')) ? 'UTC_TIMESTAMP()' : 'scheduling_token_revoked_at';
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_vapi_phone_screen
+                 SET status_key = %s,
+                     scheduled_start_at_utc = NULL,
+                     scheduled_end_at_utc = NULL,
+                     scheduled_start_et = NULL,
+                     scheduling_token_revoked_at = %s,
+                     cancelled_at = %s,
+                     date_modified = NOW()
+                 WHERE vapi_phone_screen_id = %s
+                   AND scheduling_token_hash = %s',
+                $this->_db->makeQueryString($statusKey),
+                $revokedAtSQL,
+                $cancelledAtSQL,
+                $this->_db->makeQueryInteger($screen['vapi_phone_screen_id']),
+                $this->_db->makeQueryString($tokenHash)
+            )
+        );
+        $this->logSchedulingActivity($screen['vapi_phone_screen_id'], $tokenHash, $activityKey, array());
+        $this->logAuditEvent(null, 'vapi_phone_screen_' . $activityKey, 'vapi_phone_screen', $screen['vapi_phone_screen_id'], array());
+        return array('ok' => true, 'state' => $statusKey);
+    }
+
+    private function isSchedulingRateLimited($phoneScreenID, $tokenHash)
+    {
+        $ipHash = $this->schedulingIPHash();
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT COUNT(*) AS total
+                 FROM nesp_vapi_scheduling_activity
+                 WHERE scheduling_token_hash = %s
+                   AND ip_hash = %s
+                   AND date_created >= DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+                $this->_db->makeQueryString($tokenHash),
+                $this->_db->makeQueryString($ipHash)
+            )
+        );
+        return !empty($row) && (int) $row['total'] > 60;
+    }
+
+    private function logSchedulingActivity($phoneScreenID, $tokenHash, $activityKey, $metadata)
+    {
+        $metadataJSON = json_encode($metadata);
+        if ($metadataJSON === false)
+        {
+            $metadataJSON = '{}';
+        }
+        $this->_db->query(
+            sprintf(
+                'INSERT INTO nesp_vapi_scheduling_activity
+                    (vapi_phone_screen_id, scheduling_token_hash, activity_key, ip_hash, user_agent_hash, metadata_json, date_created)
+                 VALUES
+                    (%s, %s, %s, %s, %s, %s, NOW())',
+                $phoneScreenID === null ? 'NULL' : $this->_db->makeQueryInteger($phoneScreenID),
+                $this->_db->makeQueryString($tokenHash),
+                $this->_db->makeQueryString($activityKey),
+                $this->_db->makeQueryString($this->schedulingIPHash()),
+                $this->_db->makeQueryString(hash('sha256', isset($_SERVER['HTTP_USER_AGENT']) ? substr($_SERVER['HTTP_USER_AGENT'], 0, 255) : '')),
+                $this->_db->makeQueryString($metadataJSON)
+            )
+        );
+    }
+
+    private function schedulingIPHash()
+    {
+        return hash('sha256', isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '');
+    }
+
+    private function getDestinationPhoneForScreen($candidateID)
+    {
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT phone_cell, phone_home, phone_work
+                 FROM candidate
+                 WHERE candidate_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($candidateID)
+            )
+        );
+        if (empty($row))
+        {
+            return '';
+        }
+        if (trim($row['phone_cell']) !== '')
+        {
+            return $row['phone_cell'];
+        }
+        if (trim($row['phone_home']) !== '')
+        {
+            return $row['phone_home'];
+        }
+        return $row['phone_work'];
+    }
+
+    private function updatePhoneScreenStatus($phoneScreenID, $statusKey, $providerCallID, $providerEndReason)
+    {
+        $sql = sprintf(
+            'UPDATE nesp_vapi_phone_screen
+             SET status_key = %s,
+                 provider_call_id = CASE WHEN %s = "" THEN provider_call_id ELSE %s END,
+                 provider_end_reason = %s,
+                 date_modified = NOW()
+             WHERE vapi_phone_screen_id = %s',
+            $this->_db->makeQueryString($statusKey),
+            $this->_db->makeQueryString($providerCallID),
+            $this->_db->makeQueryString($providerCallID),
+            $this->_db->makeQueryString($providerEndReason),
+            $this->_db->makeQueryInteger($phoneScreenID)
+        );
+        $this->_db->query($sql);
+    }
+
+    private function claimPhoneScreenForStart($phoneScreenID)
+    {
+        $claimKey = hash('sha256', gethostname() . '|' . microtime(true) . '|' . mt_rand());
+        $sql = sprintf(
+            'UPDATE nesp_vapi_phone_screen
+             SET status_key = "call_started",
+                 call_claimed_at = UTC_TIMESTAMP(),
+                 call_attempted_at = UTC_TIMESTAMP(),
+                 call_attempt_count = call_attempt_count + 1,
+                 scheduler_claim_key = %s,
+                 date_modified = NOW()
+             WHERE vapi_phone_screen_id = %s
+               AND status_key IN ("call_due", "phone_screen_scheduled")
+               AND scheduled_start_at_utc <= UTC_TIMESTAMP()
+               AND scheduling_token_revoked_at IS NULL
+               AND call_attempt_count = 0
+               AND provider_call_id IS NULL',
+            $this->_db->makeQueryString($claimKey),
+            $this->_db->makeQueryInteger($phoneScreenID)
+        );
+        $this->_db->query($sql);
+        return $this->_db->getAffectedRows() === 1;
+    }
+
+    private function applyPhoneScreenWebhookUpdate($phoneScreenID, $validation, $update)
+    {
+        $completedAt = in_array($update['status_key'], array('completed', 'no_answer', 'provider_error', 'cancelled', 'consent_refused')) ? 'NOW()' : 'completed_at';
+        $startedAt = $update['status_key'] === 'in_progress' ? 'NOW()' : 'started_at';
+        $consentAcceptedAt = $update['consent_accepted'] ? 'NOW()' : 'consent_accepted_at';
+        $statusKey = $update['consent_status'] === 'refused' ? 'consent_refused' : $update['status_key'];
+
+        $sql = sprintf(
+            'UPDATE nesp_vapi_phone_screen
+             SET status_key = %s,
+                 consent_status = %s,
+                 consent_response_raw = %s,
+                 consent_accepted_at = %s,
+                 transcript_text = CASE WHEN %s = "" THEN transcript_text ELSE %s END,
+                 structured_result_json = CASE WHEN %s = "{}" THEN structured_result_json ELSE %s END,
+                 provider_end_reason = %s,
+                 last_webhook_event_id = %s,
+                 last_webhook_at = %s,
+                 started_at = %s,
+                 completed_at = %s,
+                 date_modified = NOW()
+             WHERE vapi_phone_screen_id = %s',
+            $this->_db->makeQueryString($statusKey),
+            $this->_db->makeQueryString($update['consent_status']),
+            $this->_db->makeQueryString(substr($update['consent_response_raw'], 0, 255)),
+            $consentAcceptedAt,
+            $this->_db->makeQueryString($update['transcript_text']),
+            $this->_db->makeQueryString($update['transcript_text']),
+            $this->_db->makeQueryString($update['structured_result_json']),
+            $this->_db->makeQueryString($update['structured_result_json']),
+            $this->_db->makeQueryString($update['provider_end_reason']),
+            $this->_db->makeQueryString($validation['event_id']),
+            $this->_db->makeQueryString($validation['event_timestamp']),
+            $startedAt,
+            $completedAt,
+            $this->_db->makeQueryInteger($phoneScreenID)
+        );
+        $this->_db->query($sql);
+    }
+
+    private function postVapiCall($payload)
+    {
+        if (!function_exists('curl_init'))
+        {
+            return array('ok' => false, 'error' => 'curl_unavailable');
+        }
+
+        $json = json_encode($payload);
+        if ($json === false)
+        {
+            return array('ok' => false, 'error' => 'payload_encode_failed');
+        }
+
+        $ch = curl_init('https://api.vapi.ai/call');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'Authorization: Bearer ' . getenv('VAPI_API_KEY'),
+            'Content-Type: application/json'
+        ));
+        $body = curl_exec($ch);
+        $error = curl_error($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($body === false || $status < 200 || $status >= 300)
+        {
+            return array('ok' => false, 'error' => $error !== '' ? $error : 'provider_http_' . $status);
+        }
+
+        $decoded = json_decode($body, true);
+        return array('ok' => true, 'body' => is_array($decoded) ? $decoded : array());
     }
 
     private function normalizeDashboardCard($row)
@@ -2956,6 +4447,216 @@ class NESPWorkflow
         );
 
         return true;
+    }
+
+    private function createOrResetInterviewerUser($interviewerProfileID, $displayName, $email, $temporaryPassword, $active, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $email = trim((string) $email);
+        $temporaryPassword = (string) $temporaryPassword;
+        if ($interviewerProfileID <= 0 || $email === '' || strlen($temporaryPassword) < 8)
+        {
+            return false;
+        }
+
+        $profile = $this->_db->getAssoc(
+            sprintf(
+                'SELECT user_id, display_name, email
+                 FROM nesp_interviewer_profile
+                 WHERE interviewer_profile_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+        if (empty($profile))
+        {
+            return false;
+        }
+
+        $username = $this->interviewerUsernameFromEmail($email);
+        $names = $this->splitDisplayName($displayName === '' ? $profile['display_name'] : $displayName);
+        $accessLevel = $active ? ACCESS_LEVEL_READ : ACCESS_LEVEL_DISABLED;
+        $userID = (int) $profile['user_id'];
+        if ($userID <= 0)
+        {
+            $existing = $this->_db->getAssoc(
+                sprintf(
+                    'SELECT user_id
+                     FROM user
+                     WHERE user_name = %s OR email = %s
+                     ORDER BY user_id ASC
+                     LIMIT 1',
+                    $this->_db->makeQueryString($username),
+                    $this->_db->makeQueryString($email)
+                )
+            );
+            if (!empty($existing))
+            {
+                return false;
+            }
+            else
+            {
+                $this->_db->query(
+                    sprintf(
+                        'INSERT INTO user
+                            (user_name, password, access_level, can_change_password, is_test_user, email, first_name, last_name, can_see_eeo_info)
+                         VALUES
+                            (%s, %s, %s, 1, 0, %s, %s, %s, 0)',
+                        $this->_db->makeQueryString($username),
+                        $this->_db->makeQueryString($this->hashTemporaryInterviewerPassword($temporaryPassword)),
+                        $this->_db->makeQueryInteger($accessLevel),
+                        $this->_db->makeQueryString($email),
+                        $this->_db->makeQueryString($names['first_name']),
+                        $this->_db->makeQueryString($names['last_name'])
+                    )
+                );
+                $userID = (int) $this->_db->getLastInsertID();
+                if ($userID <= 0)
+                {
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            $linkedUser = $this->_db->getAssoc(
+                sprintf(
+                    'SELECT access_level
+                     FROM user
+                     WHERE user_id = %s
+                     LIMIT 1',
+                    $this->_db->makeQueryInteger($userID)
+                )
+            );
+            if (empty($linkedUser) || (int) $linkedUser['access_level'] >= ACCESS_LEVEL_SA)
+            {
+                return false;
+            }
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE user
+                 SET user_name = %s,
+                     email = %s,
+                     first_name = %s,
+                     last_name = %s,
+                     password = %s,
+                     access_level = %s,
+                     can_change_password = 1
+                 WHERE user_id = %s',
+                $this->_db->makeQueryString($username),
+                $this->_db->makeQueryString($email),
+                $this->_db->makeQueryString($names['first_name']),
+                $this->_db->makeQueryString($names['last_name']),
+                $this->_db->makeQueryString($this->hashTemporaryInterviewerPassword($temporaryPassword)),
+                $this->_db->makeQueryInteger($accessLevel),
+                $this->_db->makeQueryInteger($userID)
+            )
+        );
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_interviewer_profile
+                 SET user_id = %s,
+                     account_state_key = %s,
+                     date_modified = NOW()
+                 WHERE interviewer_profile_id = %s',
+                $this->_db->makeQueryInteger($userID),
+                $this->_db->makeQueryString($active ? 'temporary_password_set' : 'account_prepared'),
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_login_prepared',
+            'interviewer_profile',
+            $interviewerProfileID,
+            array('user_id' => $userID, 'access_enabled' => $active ? 1 : 0, 'temporary_password_length' => strlen($temporaryPassword))
+        );
+
+        return array(
+            'user_id' => $userID,
+            'username' => $username,
+            'temporary_login_message' => $this->buildTemporaryLoginMessage($displayName, $username, $active)
+        );
+    }
+
+    private function syncInterviewerUserAccess($interviewerProfileID, $active, $actorUserID)
+    {
+        $profile = $this->_db->getAssoc(
+            sprintf(
+                'SELECT user_id
+                 FROM nesp_interviewer_profile
+                 WHERE interviewer_profile_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger((int) $interviewerProfileID)
+            )
+        );
+        if (empty($profile) || (int) $profile['user_id'] <= 0)
+        {
+            return false;
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE user
+                 SET access_level = %s
+                 WHERE user_id = %s
+                   AND access_level < %s',
+                $this->_db->makeQueryInteger($active ? ACCESS_LEVEL_READ : ACCESS_LEVEL_DISABLED),
+                $this->_db->makeQueryInteger((int) $profile['user_id']),
+                $this->_db->makeQueryInteger(ACCESS_LEVEL_SA)
+            )
+        );
+        $this->logAuditEvent(
+            $actorUserID,
+            $active ? 'interviewer_login_enabled' : 'interviewer_login_disabled',
+            'interviewer_profile',
+            (int) $interviewerProfileID,
+            array('user_id' => (int) $profile['user_id'])
+        );
+        return true;
+    }
+
+    private function interviewerUsernameFromEmail($email)
+    {
+        $email = strtolower(trim($email));
+        $local = preg_replace('/[^a-z0-9._-]+/', '.', preg_replace('/@.*/', '', $email));
+        $local = trim($local, '.-_');
+        if ($local === '')
+        {
+            $local = 'interviewer';
+        }
+        return substr('nesp.' . $local, 0, 64);
+    }
+
+    private function hashTemporaryInterviewerPassword($temporaryPassword)
+    {
+        return password_hash((string) $temporaryPassword, PASSWORD_DEFAULT);
+    }
+
+    private function splitDisplayName($displayName)
+    {
+        $parts = preg_split('/\s+/', trim((string) $displayName));
+        if (!$parts || !count($parts))
+        {
+            return array('first_name' => 'NESP', 'last_name' => 'Interviewer');
+        }
+        $first = array_shift($parts);
+        $last = count($parts) ? implode(' ', $parts) : 'Interviewer';
+        return array(
+            'first_name' => substr($first, 0, 40),
+            'last_name' => substr($last, 0, 40)
+        );
+    }
+
+    private function buildTemporaryLoginMessage($displayName, $username, $active)
+    {
+        return 'Copy-only login details prepared for ' . trim((string) $displayName) . ': username '
+            . $username
+            . '. Share the temporary password manually and ask the interviewer to change it after first login. Account access is '
+            . ($active ? 'enabled.' : 'disabled until Craig activates it.');
     }
 
     private function normalizeInterviewerSettingsOptions($options)

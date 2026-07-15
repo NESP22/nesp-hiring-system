@@ -13,6 +13,12 @@
                 Turning on a flag here changes only database feature state. It does not deploy, run migrations, create Zoom meetings, initiate Vapi calls, send messages, or run AI review.
             </div>
 
+            <?php if (trim($this->temporaryLoginMessage) !== ''): ?>
+                <div class="nesp-confirm-box">
+                    <?php $this->_($this->temporaryLoginMessage); ?>
+                </div>
+            <?php endif; ?>
+
             <div class="nesp-dashboard-nav">
                 <?php foreach ($this->dashboardNavigation as $navItem): ?>
                     <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
@@ -91,6 +97,11 @@
                         <label>
                             Email
                             <input type="text" name="email" />
+                        </label>
+                        <label>
+                            Temporary password
+                            <input type="password" name="temporaryPassword" autocomplete="new-password" />
+                            <span class="nesp-help-text">Optional. If entered, an OpenCATS login is prepared but remains disabled until Craig activates the interviewer.</span>
                         </label>
                         <label>
                             Role
@@ -189,6 +200,21 @@
             </div>
 
             <div class="nesp-panel">
+                <h3>Vapi Configuration Status</h3>
+                <p class="nesp-help-text">This panel shows only presence and safety state. It never reveals secret values or full provider IDs.</p>
+                <div class="nesp-card-grid nesp-card-grid-tight">
+                    <div class="nesp-card"><span class="nesp-card-label">Vapi API Configured</span><strong><?php echo($this->vapiConfiguration['api_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Hiring Phone Configured</span><strong><?php echo($this->vapiConfiguration['hiring_phone_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Hiring Assistant Configured</span><strong><?php echo($this->vapiConfiguration['hiring_assistant_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Webhook Secret Configured</span><strong><?php echo($this->vapiConfiguration['webhook_secret_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Recording Disabled</span><strong><?php echo($this->vapiConfiguration['recording_disabled'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Feature Enabled</span><strong><?php echo($this->vapiConfiguration['feature_enabled'] ? 'Yes' : 'No'); ?></strong></div>
+                </div>
+                <p class="nesp-help-text">Webhook URL after deployment: <?php $this->_($this->vapiConfiguration['webhook_url']); ?></p>
+                <p><a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=phoneScreenAvailability">Edit Phone Screen Availability</a></p>
+            </div>
+
+            <div class="nesp-panel">
                 <h3>Interviewer Profiles</h3>
                 <table class="nesp-table">
                     <tr>
@@ -247,6 +273,11 @@
                             <input type="text" name="email" value="<?php echo(htmlspecialchars($profile['email'], ENT_QUOTES, 'UTF-8')); ?>" />
                         </label>
                         <label>
+                            New temporary password
+                            <input type="password" name="temporaryPassword" autocomplete="new-password" />
+                            <span class="nesp-help-text">Leave blank to keep the current password. Enter a new value to reset it and show one copy-only login message.</span>
+                        </label>
+                        <label>
                             Linked OpenCATS user ID
                             <input type="text" name="linkedUserID" value="<?php echo((int) $profile['user_id']); ?>" />
                         </label>
@@ -260,7 +291,7 @@
                         </label>
                         <label class="nesp-checkbox-row">
                             <input type="checkbox" name="isActive"<?php if ((int) $profile['is_active'] === 1): ?> checked="checked"<?php endif; ?> />
-                            Active account access
+                            Active account access. Uncheck to revoke interviewer login access.
                         </label>
                         <fieldset class="nesp-fieldset">
                             <legend>Approved job roles</legend>
