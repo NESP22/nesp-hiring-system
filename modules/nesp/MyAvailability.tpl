@@ -86,7 +86,7 @@
                             <select name="overrideTypeKey">
                                 <option value="available">Available custom hours</option>
                                 <option value="available_all_day">Available all day</option>
-                                <option value="unavailable">Unavailable</option>
+                                <option value="unavailable_all_day">Unavailable all day</option>
                             </select>
                         </label>
                         <label>

@@ -141,6 +141,10 @@
                             <input type="text" name="maxInterviewsPerWeek" value="12" />
                         </label>
                         <label>
+                            Min notice minutes
+                            <input type="text" name="minNoticeMinutes" value="1440" />
+                        </label>
+                        <label>
                             Default interview minutes
                             <input type="text" name="defaultInterviewMinutes" value="30" />
                         </label>
@@ -328,6 +332,10 @@
                         <label>
                             Max interviews/week
                             <input type="text" name="maxInterviewsPerWeek" value="<?php echo((int) $profile['max_interviews_per_week']); ?>" />
+                        </label>
+                        <label>
+                            Min notice minutes
+                            <input type="text" name="minNoticeMinutes" value="<?php echo((int) $profile['min_notice_minutes']); ?>" />
                         </label>
                         <label>
                             Default duration
@@ -588,7 +596,7 @@
                             <select name="overrideTypeKey">
                                 <option value="available">Available custom hours</option>
                                 <option value="available_all_day">Available all day</option>
-                                <option value="unavailable">Unavailable</option>
+                                <option value="unavailable_all_day">Unavailable all day</option>
                             </select>
                         </label>
                         <label>

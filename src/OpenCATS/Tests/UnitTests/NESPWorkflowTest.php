@@ -14,7 +14,7 @@ class NESPWorkflowTest extends TestCase
         $flags = NESPWorkflow::getDefaultFeatureFlags();
         $keys = array();
 
-        $this->assertCount(8, $flags);
+        $this->assertCount(9, $flags);
         foreach ($flags as $flag)
         {
             $keys[] = $flag[0];
@@ -62,6 +62,8 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreenAvailability'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('markPhoneScreenInvitationCopied'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('allowPhoneScreenReschedule'));
+        $this->assertSame('NESP_INTERVIEWER_AVAILABILITY_ENABLED', NESPWorkflow::getFeatureFlagForAction('myAvailability'));
+        $this->assertSame('NESP_INTERVIEWER_AVAILABILITY_ENABLED', NESPWorkflow::getFeatureFlagForAction('createInterviewerBlackout'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('unexpectedAction'));
     }
 
@@ -412,9 +414,120 @@ class NESPWorkflowTest extends TestCase
         );
 
         $this->assertContains('Interviewer is closed for interviews.', $conflicts);
-        $this->assertContains('Requested time overlaps a blackout date.', $conflicts);
+        $this->assertContains('Requested time overlaps blocked time.', $conflicts);
         $this->assertContains('Maximum daily interviews would be exceeded.', $conflicts);
         $this->assertContains('Maximum weekly interviews would be exceeded.', $conflicts);
+    }
+
+    public function testSchedulingConflictsRespectDSTAndTimezone()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'open',
+            'timezone' => 'America/New_York',
+            'max_interviews_per_day' => 3,
+            'max_interviews_per_week' => 12,
+            'buffer_minutes' => 15
+        );
+        $blocks = array(
+            array('weekday_key' => 'Sunday', 'start_time' => '01:00:00', 'end_time' => '03:00:00', 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+
+        $fallBack = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), array(), 41002, '2026-11-01 01:30:00', '2026-11-01 02:00:00');
+        $springForward = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), array(), 41002, '2026-03-08 02:30:00', '2026-03-08 03:00:00');
+
+        $this->assertSame(array(), $fallBack);
+        $this->assertSame(array('Invalid interview time.'), $springForward);
+    }
+
+    public function testSchedulingConflictsDetectBuffersAndOutsideAvailability()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'open',
+            'timezone' => 'America/New_York',
+            'max_interviews_per_day' => 3,
+            'max_interviews_per_week' => 12,
+            'buffer_minutes' => 15
+        );
+        $blocks = array(
+            array('weekday_key' => 'Tuesday', 'start_time' => '09:00:00', 'end_time' => '17:00:00', 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+        $existing = array(
+            array('scheduled_start' => '2026-07-14 10:00:00', 'scheduled_end' => '2026-07-14 10:30:00', 'timezone' => 'America/New_York')
+        );
+
+        $bufferConflicts = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), $existing, 41002, '2026-07-14 10:40:00', '2026-07-14 11:00:00');
+        $outsideConflicts = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), array(), 41002, '2026-07-14 08:30:00', '2026-07-14 09:00:00');
+
+        $this->assertContains('Requested time overlaps an existing interview or buffer.', $bufferConflicts);
+        $this->assertContains('Requested time is outside available blocks.', $outsideConflicts);
+    }
+
+    public function testSchedulingConflictsUseOverridesAndMinimumNotice()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'open',
+            'timezone' => 'America/New_York',
+            'max_interviews_per_day' => 3,
+            'max_interviews_per_week' => 12,
+            'min_notice_minutes' => 120,
+            'buffer_minutes' => 15
+        );
+        $overrides = array(
+            array('override_date' => '2026-07-14', 'override_type_key' => 'available', 'start_time' => '12:00:00', 'end_time' => '13:00:00', 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+        $unavailable = array(
+            array('override_date' => '2026-07-14', 'override_type_key' => 'unavailable_all_day', 'start_time' => null, 'end_time' => null, 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+
+        $available = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), array(), array(), array(), 41002, '2026-07-14 12:00:00', '2026-07-14 12:30:00', $overrides, '2026-07-14 09:00:00');
+        $tooSoon = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), array(), array(), array(), 41002, '2026-07-14 12:00:00', '2026-07-14 12:30:00', $overrides, '2026-07-14 11:00:00');
+        $blocked = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), array(), array(), array(), 41002, '2026-07-14 12:00:00', '2026-07-14 12:30:00', $unavailable, '2026-07-14 09:00:00');
+
+        $this->assertSame(array(), $available);
+        $this->assertContains('Requested time is inside the minimum notice window.', $tooSoon);
+        $this->assertContains('Requested date is marked unavailable.', $blocked);
+    }
+
+    public function testSchedulingConflictsAcceptPerInterviewerExternalBusyWindows()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'open',
+            'timezone' => 'America/New_York',
+            'max_interviews_per_day' => 3,
+            'max_interviews_per_week' => 12,
+            'buffer_minutes' => 15
+        );
+        $blocks = array(
+            array('weekday_key' => 'Tuesday', 'start_time' => '09:00:00', 'end_time' => '17:00:00', 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+        $externalBusy = array(
+            array('interviewer_profile_id' => 88, 'starts_at' => '2026-07-14 13:00:00', 'ends_at' => '2026-07-14 13:30:00', 'timezone' => 'America/New_York', 'source_key' => 'external_calendar')
+        );
+
+        $conflicts = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), array(), 41002, '2026-07-14 13:15:00', '2026-07-14 13:45:00', array(), null, $externalBusy);
+
+        $this->assertContains('Requested time overlaps interviewer external busy time.', $conflicts);
+    }
+
+    public function testManualInterviewAvailabilityOverrideRequiresAuditAndProtectedPost()
+    {
+        $workflowSource = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $uiSource = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $templateSource = file_get_contents(LEGACY_ROOT . '/modules/nesp/ScheduleInterview.tpl');
+
+        $this->assertStringContainsString('manual_interview_availability_override_used', $workflowSource);
+        $this->assertStringContainsString("case 'saveManualInterview'", $uiSource);
+        $this->assertStringContainsString('$this->adminOnly();', $uiSource);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $uiSource);
+        $this->assertStringContainsString('name="adminOverrideAvailability"', $templateSource);
+        $this->assertStringContainsString('name="availabilityOverrideReason"', $templateSource);
+        $this->assertStringContainsString('unavailable_all_day', $workflowSource);
+        $this->assertStringContainsString('getExternalBusyWindowsForInterviewer', $workflowSource);
+        $this->assertStringContainsString('getDefaultParticipantJoinURLForInterviewer', $workflowSource);
     }
 
     public function testAvailabilityTimeValidationRejectsImpossibleTimes()

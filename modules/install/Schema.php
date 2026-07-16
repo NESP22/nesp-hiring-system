@@ -2718,6 +2718,11 @@ class CATSSchema
 
                 INSERT INTO nesp_feature_flag
                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'NESP_INTERVIEWER_AVAILABILITY_ENABLED', 'Interviewer Availability', 'Interviewer availability windows, block time, and schedule conflict checks.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_INTERVIEWER_AVAILABILITY_ENABLED');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
                 SELECT 'NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW()
                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_PRESCREEN_ENABLED');
 
@@ -2941,6 +2946,21 @@ class CATSSchema
                 SELECT 'email', 'Applicant Email', 'disabled', 'Disabled in Phase 1. No outbound applicant email can be sent.', NOW(), NOW()
                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_integration_status WHERE integration_key = 'email');
             ",
+            '395' => '
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                VALUES
+                    (\'NESP_INTERVIEWER_AVAILABILITY_ENABLED\', \'Interviewer Availability\', \'Interviewer availability windows, block time, and schedule conflict checks.\', 0, 1, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE
+                    display_name = VALUES(display_name),
+                    description = VALUES(description),
+                    is_enabled = 0,
+                    requires_admin_approval = 1,
+                    date_modified = NOW();
+
+                ALTER TABLE `nesp_interviewer_profile`
+                    ADD COLUMN IF NOT EXISTS `min_notice_minutes` INT(11) NOT NULL DEFAULT \'1440\';
+            ',
 
         );
     }
