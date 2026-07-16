@@ -72,6 +72,35 @@ class NESPQuestionnaireTemplateTest extends TestCase
         $this->assertStringContainsString('.nesp-workflow .nesp-table', $source);
     }
 
+    public function testNespWorkflowCssKeepsDashboardHeadersOnDarkTheme()
+    {
+        $source = file_get_contents('modules/nesp/nespWorkflow.css');
+        $darkThemeSelectors = array(
+            '.nesp-workflow #contents',
+            '.nesp-workflow .nesp-page-title',
+            '.nesp-workflow .nesp-dashboard-nav a',
+            '.nesp-workflow .nesp-card',
+            '.nesp-workflow .nesp-panel',
+            '.nesp-workflow .nesp-task-card',
+            '.nesp-workflow .nesp-empty',
+            '.nesp-workflow .nesp-table th'
+        );
+
+        foreach ($darkThemeSelectors as $selector)
+        {
+            $this->assertMatchesRegularExpression(
+                '/' . preg_quote($selector, '/') . '[^{]*\{[^}]*background:\s*(?!#fff(?:fff)?\b|#f[0-9a-f]{5}\b|white\b)[^;}]+;/is',
+                $source,
+                sprintf('Expected %s to define a non-white dashboard background.', $selector)
+            );
+        }
+
+        $this->assertStringContainsString('--nesp-dashboard-bg: #061f46;', $source);
+        $this->assertStringContainsString('--nesp-dashboard-panel: #0b2b57;', $source);
+        $this->assertStringContainsString('--nesp-dashboard-text: #eef5ff;', $source);
+        $this->assertMatchesRegularExpression('/\.nesp-workflow \.nesp-secondary-action:focus\s*\{?|\b\.nesp-workflow \.nesp-secondary-action:hover,/s', $source);
+    }
+
     public function testLegacyNavigationCssCentersOpenCatsTabs()
     {
         $source = file_get_contents('main.css');

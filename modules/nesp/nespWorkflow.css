@@ -1,15 +1,38 @@
+.nesp-workflow {
+    --nesp-dashboard-bg: #061f46;
+    --nesp-dashboard-panel: #0b2b57;
+    --nesp-dashboard-panel-strong: #102f5f;
+    --nesp-dashboard-panel-soft: #123866;
+    --nesp-dashboard-line: #315f93;
+    --nesp-dashboard-line-soft: #234b7c;
+    --nesp-dashboard-text: #eef5ff;
+    --nesp-dashboard-muted: #c5d4e6;
+    --nesp-dashboard-link: #9fc9ff;
+    --nesp-dashboard-red: #cf001c;
+    --nesp-dashboard-focus: rgba(159, 201, 255, .34);
+}
+
 .nesp-workflow #contents {
     max-width: 1160px;
     margin: 0 auto;
     padding: 18px 18px 32px;
     font-family: Arial, Helvetica, sans-serif;
-    color: #1b2733;
+    background: var(--nesp-dashboard-bg);
+    color: var(--nesp-dashboard-text);
+}
+
+.nesp-workflow p,
+.nesp-workflow li,
+.nesp-workflow dd,
+.nesp-workflow td {
+    color: var(--nesp-dashboard-text);
 }
 
 .nesp-workflow .nesp-page-title {
     margin: 0 0 16px;
-    border-bottom: 4px solid #cf001c;
-    background: #ffffff;
+    border: 1px solid var(--nesp-dashboard-line);
+    border-bottom: 4px solid var(--nesp-dashboard-red);
+    background: var(--nesp-dashboard-panel);
     padding: 16px;
 }
 
@@ -27,7 +50,7 @@
 }
 
 .nesp-workflow .nesp-kicker {
-    color: #cf001c;
+    color: #ff8a9a;
     display: block;
     font-size: 11px;
     font-weight: bold;
@@ -39,7 +62,7 @@
 
 .nesp-workflow .nesp-page-title h2 {
     margin: 0 0 6px;
-    color: #061f46;
+    color: #ffffff;
     font-size: 25px;
     font-weight: bold;
     line-height: 1.18;
@@ -47,16 +70,16 @@
 
 .nesp-workflow .nesp-page-title p {
     margin: 0;
-    color: #4f5e70;
+    color: var(--nesp-dashboard-muted);
     font-size: 13px;
     line-height: 1.5;
 }
 
 .nesp-workflow .nesp-safety-banner {
     margin: 0 0 16px;
-    border: 1px solid #d6b256;
-    background: #fff7df;
-    color: #4c3b0f;
+    border: 1px solid #c99a35;
+    background: #33280f;
+    color: #ffe7a6;
     padding: 11px 13px;
     font-size: 13px;
     font-weight: bold;
@@ -71,9 +94,9 @@
 
 .nesp-workflow .nesp-step {
     align-items: center;
-    background: #ffffff;
-    border: 1px solid #d7dee8;
-    color: #536579;
+    background: var(--nesp-dashboard-panel);
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    color: var(--nesp-dashboard-muted);
     display: flex;
     gap: 8px;
     min-width: 0;
@@ -82,7 +105,7 @@
 
 .nesp-workflow .nesp-step span {
     align-items: center;
-    background: #061f46;
+    background: var(--nesp-dashboard-red);
     color: #ffffff;
     display: inline-flex;
     flex: 0 0 24px;
@@ -93,14 +116,14 @@
 }
 
 .nesp-workflow .nesp-step strong {
-    color: #253647;
+    color: var(--nesp-dashboard-text);
     font-size: 12px;
     line-height: 1.25;
 }
 
 .nesp-workflow .nesp-step.is-current {
-    border-color: #315f93;
-    box-shadow: inset 3px 0 0 #cf001c;
+    border-color: #75a7df;
+    box-shadow: inset 3px 0 0 var(--nesp-dashboard-red);
 }
 
 .nesp-workflow .nesp-card-grid {
@@ -120,29 +143,30 @@
 
 .nesp-workflow .nesp-card,
 .nesp-workflow .nesp-panel {
-    border: 1px solid #d7dee8;
-    background: #ffffff;
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    background: var(--nesp-dashboard-panel);
+    color: var(--nesp-dashboard-text);
     padding: 14px;
     overflow-x: auto;
 }
 
 .nesp-workflow .nesp-card-label {
     display: block;
-    color: #536579;
+    color: var(--nesp-dashboard-muted);
     font-size: 12px;
     line-height: 1.4;
 }
 
 .nesp-workflow .nesp-card strong {
     display: block;
-    color: #061f46;
+    color: #ffffff;
     font-size: 30px;
     line-height: 1.2;
     margin-top: 4px;
 }
 
 .nesp-workflow .nesp-card-hint {
-    color: #cf001c;
+    color: #ff8a9a;
     display: block;
     font-size: 11px;
     font-weight: bold;
@@ -157,13 +181,13 @@
 
 .nesp-workflow .nesp-panel h3 {
     margin: 0 0 10px;
-    color: #061f46;
+    color: #ffffff;
     font-size: 17px;
 }
 
 .nesp-workflow .nesp-panel h4 {
     margin: 0 0 8px;
-    color: #1b2733;
+    color: var(--nesp-dashboard-text);
     font-size: 14px;
 }
 
@@ -175,9 +199,9 @@
 }
 
 .nesp-workflow .nesp-dashboard-nav a {
-    border: 1px solid #b9c5d3;
-    background: #f7f9fc;
-    color: #24384d;
+    border: 1px solid var(--nesp-dashboard-line);
+    background: var(--nesp-dashboard-panel);
+    color: var(--nesp-dashboard-text);
     padding: 7px 10px;
     text-decoration: none;
     font-size: 12px;
@@ -185,10 +209,12 @@
 }
 
 .nesp-workflow .nesp-dashboard-nav a.active,
-.nesp-workflow .nesp-dashboard-nav a:hover {
-    border-color: #315f93;
-    background: #315f93;
+.nesp-workflow .nesp-dashboard-nav a:hover,
+.nesp-workflow .nesp-dashboard-nav a:focus {
+    border-color: #9fc9ff;
+    background: var(--nesp-dashboard-panel-soft);
     color: #ffffff;
+    outline: 3px solid var(--nesp-dashboard-focus);
 }
 
 .nesp-workflow .nesp-queue-section {
@@ -197,7 +223,7 @@
 
 .nesp-workflow .nesp-queue-section h3 {
     margin: 0 0 10px;
-    color: #071e41;
+    color: #ffffff;
     font-size: 18px;
 }
 
@@ -208,8 +234,9 @@
 }
 
 .nesp-workflow .nesp-task-card {
-    border: 1px solid #cfd8e4;
-    background: #ffffff;
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    background: var(--nesp-dashboard-panel);
+    color: var(--nesp-dashboard-text);
     padding: 12px;
     min-height: 210px;
     display: flex;
@@ -225,28 +252,28 @@
 }
 
 .nesp-workflow .nesp-task-topline strong {
-    color: #071e41;
+    color: #ffffff;
     font-size: 15px;
     line-height: 1.25;
 }
 
 .nesp-workflow .nesp-task-topline span {
     flex: 0 0 auto;
-    background: #edf1f6;
-    color: #425466;
+    background: var(--nesp-dashboard-panel-soft);
+    color: var(--nesp-dashboard-text);
     font-size: 11px;
     padding: 3px 6px;
 }
 
 .nesp-workflow .nesp-task-role,
 .nesp-workflow .nesp-muted {
-    color: #596b7d;
+    color: var(--nesp-dashboard-muted);
     font-size: 12px;
     line-height: 1.35;
 }
 
 .nesp-workflow .nesp-task-card p {
-    color: #283747;
+    color: var(--nesp-dashboard-text);
     font-size: 13px;
     line-height: 1.45;
     margin: 10px 0;
@@ -262,13 +289,13 @@
 }
 
 .nesp-workflow .nesp-task-card dt {
-    color: #66778a;
+    color: var(--nesp-dashboard-muted);
     font-weight: bold;
 }
 
 .nesp-workflow .nesp-task-card dd {
     margin: 0;
-    color: #1b2733;
+    color: var(--nesp-dashboard-text);
 }
 
 .nesp-workflow .nesp-primary-action,
@@ -291,8 +318,32 @@
 .nesp-workflow .nesp-primary-button:hover,
 .nesp-workflow .nesp-primary-button:focus,
 .nesp-workflow .nesp-secondary-button:hover,
-.nesp-workflow .nesp-secondary-button:focus {
-    outline: 3px solid rgba(49, 95, 147, .22);
+.nesp-workflow .nesp-secondary-button:focus,
+.nesp-workflow .nesp-secondary-action:hover,
+.nesp-workflow .nesp-secondary-action:focus,
+.nesp-workflow .nesp-secondary-actions a:hover,
+.nesp-workflow .nesp-secondary-actions a:focus {
+    outline: 3px solid var(--nesp-dashboard-focus);
+}
+
+.nesp-workflow .nesp-primary-action:active,
+.nesp-workflow .nesp-primary-button:active,
+.nesp-workflow .nesp-secondary-button:active,
+.nesp-workflow .nesp-secondary-action:active,
+.nesp-workflow .nesp-secondary-actions a:active {
+    background: var(--nesp-dashboard-panel-soft);
+    color: #ffffff;
+}
+
+.nesp-workflow .nesp-primary-action:disabled,
+.nesp-workflow .nesp-primary-button:disabled,
+.nesp-workflow .nesp-secondary-button:disabled,
+.nesp-workflow .nesp-secondary-action:disabled {
+    background: #334960;
+    border-color: #4f6578;
+    color: #b8c6d7;
+    cursor: not-allowed;
+    opacity: .72;
 }
 
 .nesp-workflow .nesp-secondary-button {
@@ -320,9 +371,9 @@
 .nesp-workflow .nesp-copy-box {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid #b9c5d3;
-    background: #f8fafc;
-    color: #1b2733;
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    background: #081d39;
+    color: var(--nesp-dashboard-text);
     padding: 10px;
     font-family: Arial, Helvetica, sans-serif;
     font-size: 13px;
@@ -331,17 +382,23 @@
 
 .nesp-workflow .nesp-secondary-action,
 .nesp-workflow .nesp-secondary-actions a {
-    color: #315f93;
+    color: var(--nesp-dashboard-link);
     font-size: 12px;
     font-weight: bold;
     text-decoration: none;
 }
 
 .nesp-workflow button.nesp-secondary-action {
-    background: #ffffff;
-    border: 1px solid #315f93;
+    background: transparent;
+    border: 1px solid var(--nesp-dashboard-link);
     padding: 8px 11px;
     cursor: pointer;
+}
+
+.nesp-workflow button.nesp-secondary-action:hover,
+.nesp-workflow button.nesp-secondary-action:focus {
+    background: var(--nesp-dashboard-panel-soft);
+    color: #ffffff;
 }
 
 .nesp-workflow .nesp-secondary-actions {
@@ -362,17 +419,17 @@
 
 .nesp-workflow .nesp-help-text {
     margin: 0 0 10px;
-    color: #536579;
+    color: var(--nesp-dashboard-muted);
     font-size: 12px;
     line-height: 1.45;
 }
 
 .nesp-workflow .nesp-reference-list {
     margin-top: 12px;
-    border: 1px solid #d7dee8;
-    background: #f7f9fc;
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    background: #081d39;
     padding: 10px;
-    color: #394b5f;
+    color: var(--nesp-dashboard-text);
     font-size: 12px;
     line-height: 1.45;
 }
@@ -383,9 +440,9 @@
 }
 
 .nesp-workflow .nesp-empty {
-    border: 1px dashed #c9d3df;
-    background: #f7f9fc;
-    color: #536579;
+    border: 1px dashed #6f95bf;
+    background: #081d39;
+    color: var(--nesp-dashboard-muted);
     padding: 14px;
     font-size: 13px;
 }
@@ -401,7 +458,7 @@
 .nesp-workflow .nesp-scorecard-form label {
     display: grid;
     gap: 5px;
-    color: #253647;
+    color: var(--nesp-dashboard-text);
     font-size: 12px;
     font-weight: bold;
 }
@@ -413,20 +470,33 @@
 .nesp-workflow .nesp-scorecard-form textarea {
     box-sizing: border-box;
     width: 100%;
-    border: 1px solid #b8c5d3;
+    border: 1px solid #7996b6;
+    background: #081d39;
+    color: var(--nesp-dashboard-text);
     padding: 7px;
     font-size: 13px;
 }
 
+.nesp-workflow .nesp-form input:focus,
+.nesp-workflow .nesp-form select:focus,
+.nesp-workflow .nesp-form textarea:focus,
+.nesp-workflow .nesp-scorecard-form select:focus,
+.nesp-workflow .nesp-scorecard-form textarea:focus,
+.nesp-workflow textarea[readonly]:focus {
+    border-color: #9fc9ff;
+    outline: 3px solid var(--nesp-dashboard-focus);
+}
+
 .nesp-workflow .nesp-fieldset {
-    border: 1px solid #d8dee8;
+    border: 1px solid var(--nesp-dashboard-line-soft);
     border-radius: 6px;
     margin: 0;
     padding: 10px 12px;
 }
 
 .nesp-workflow .nesp-fieldset legend {
-    color: #475569;
+    background: var(--nesp-dashboard-bg);
+    color: var(--nesp-dashboard-text);
     font-weight: 700;
     padding: 0 4px;
 }
@@ -455,10 +525,10 @@
 }
 
 .nesp-workflow .nesp-confirm-box {
-    background: #fff7ed;
-    border: 1px solid #fed7aa;
+    background: #33200f;
+    border: 1px solid #c77731;
     border-radius: 6px;
-    color: #9a3412;
+    color: #ffd2a6;
     padding: 10px 12px;
 }
 
@@ -466,7 +536,8 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
-    background: #ffffff;
+    background: var(--nesp-dashboard-panel);
+    color: var(--nesp-dashboard-text);
 }
 
 .nesp-workflow .nesp-table caption {
@@ -479,7 +550,7 @@
 
 .nesp-workflow .nesp-table th,
 .nesp-workflow .nesp-table td {
-    border: 1px solid #d7dee8;
+    border: 1px solid var(--nesp-dashboard-line-soft);
     padding: 8px;
     text-align: left;
     vertical-align: top;
@@ -487,8 +558,8 @@
 }
 
 .nesp-workflow .nesp-table th {
-    background: #f0f4f9;
-    color: #061f46;
+    background: var(--nesp-dashboard-panel-strong);
+    color: #ffffff;
 }
 
 .nesp-workflow .nesp-status {
@@ -501,13 +572,13 @@
 }
 
 .nesp-workflow .nesp-status-off {
-    background: #edf1f6;
-    color: #4a5968;
+    background: #24384d;
+    color: #dce8f6;
 }
 
 .nesp-workflow .nesp-status-on {
-    background: #e5f5ec;
-    color: #166335;
+    background: #143c2a;
+    color: #b8f3cd;
 }
 
 .nesp-workflow .nesp-list {
@@ -526,7 +597,7 @@
 }
 
 .nesp-workflow .nesp-detail-list dt {
-    color: #4a5968;
+    color: var(--nesp-dashboard-muted);
     font-weight: bold;
 }
 
@@ -537,7 +608,7 @@
 }
 
 .nesp-workflow .nesp-field-label {
-    color: #253647;
+    color: var(--nesp-dashboard-text);
     display: block;
     font-size: 12px;
     font-weight: bold;
@@ -547,9 +618,9 @@
 .nesp-workflow .nesp-script-preview {
     margin: 0;
     padding: 12px;
-    background: #f8fafc;
-    border: 1px solid #d7dee8;
-    color: #1b2733;
+    background: #081d39;
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    color: var(--nesp-dashboard-text);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-size: 12px;
@@ -617,21 +688,21 @@
     }
 
     .nesp-workflow .nesp-table tr {
-        border: 1px solid #d7dee8;
+        border: 1px solid var(--nesp-dashboard-line-soft);
         box-sizing: border-box;
         margin: 0 0 10px;
     }
 
     .nesp-workflow .nesp-table td {
         border: 0;
-        border-bottom: 1px solid #edf1f6;
+        border-bottom: 1px solid var(--nesp-dashboard-line-soft);
         box-sizing: border-box;
         padding: 8px 8px 8px 108px;
         position: relative;
     }
 
     .nesp-workflow .nesp-table td:before {
-        color: #536579;
+        color: var(--nesp-dashboard-muted);
         content: attr(data-label);
         font-weight: bold;
         left: 8px;
