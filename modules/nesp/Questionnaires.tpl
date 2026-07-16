@@ -5,12 +5,18 @@
         <?php TemplateUtility::printQuickSearch(); ?>
         <div id="contents">
             <div class="nesp-page-title">
-                <h2>Screening Questionnaires</h2>
-                <p>Launch-safe applicant screening that uses copy-only invitations and human review.</p>
+                <div class="nesp-brand-lockup">
+                    <img src="images/nesp-logo.png" alt="New England Sports Photo" />
+                    <div>
+                        <span class="nesp-kicker">New England Sports Photo</span>
+                        <h2>Screening Questionnaires</h2>
+                        <p>Track secure applicant questionnaires from invite through human review.</p>
+                    </div>
+                </div>
             </div>
 
             <div class="nesp-safety-banner">
-                Questionnaires do not rank, reject, approve, hire, email, text, call, publish ads, or move candidates automatically.
+                Human-reviewed only: questionnaires do not rank, reject, approve, hire, email, text, call, publish ads, or move candidates automatically.
             </div>
 
             <div class="nesp-dashboard-nav">
@@ -40,6 +46,7 @@
                 <div class="nesp-card">
                     <span class="nesp-card-label"><?php $this->_($queueLabel); ?></span>
                     <strong><?php echo(count($this->questionnaireQueues[$queueKey])); ?></strong>
+                    <span class="nesp-card-hint">Current queue</span>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -48,6 +55,7 @@
             <div class="nesp-panel">
                 <h3><?php $this->_($queueLabel); ?></h3>
                 <table class="nesp-table">
+                    <caption><?php $this->_($queueLabel); ?> applicant questionnaire queue</caption>
                     <tr>
                         <th>Candidate</th>
                         <th>Role</th>
@@ -58,17 +66,17 @@
                     </tr>
                     <?php foreach ($this->questionnaireQueues[$queueKey] as $questionnaire): ?>
                     <tr>
-                        <td><?php $this->_($questionnaire['candidate_name']); ?></td>
-                        <td><?php $this->_($questionnaire['role_title']); ?></td>
-                        <td><?php $this->_($questionnaire['status_label']); ?></td>
-                        <td><?php $this->_($questionnaire['reviewer_name']); ?></td>
-                        <td><?php $this->_(empty($questionnaire['submitted_at']) ? 'Not submitted' : $questionnaire['submitted_at']); ?></td>
-                        <td><a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=reviewQuestionnaire&amp;questionnaireID=<?php echo((int) $questionnaire['screening_questionnaire_id']); ?>">Review</a></td>
+                        <td data-label="Candidate"><?php $this->_($questionnaire['candidate_name']); ?></td>
+                        <td data-label="Role"><?php $this->_($questionnaire['role_title']); ?></td>
+                        <td data-label="Status"><?php $this->_($questionnaire['status_label']); ?></td>
+                        <td data-label="Reviewer"><?php $this->_($questionnaire['reviewer_name']); ?></td>
+                        <td data-label="Submitted"><?php $this->_(empty($questionnaire['submitted_at']) ? 'Not submitted' : $questionnaire['submitted_at']); ?></td>
+                        <td data-label="Action"><a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=reviewQuestionnaire&amp;questionnaireID=<?php echo((int) $questionnaire['screening_questionnaire_id']); ?>">Review</a></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (!count($this->questionnaireQueues[$queueKey])): ?>
                     <tr>
-                        <td colspan="6">No items in this queue.</td>
+                        <td data-label="Queue" colspan="6">No items in this queue.</td>
                     </tr>
                     <?php endif; ?>
                 </table>

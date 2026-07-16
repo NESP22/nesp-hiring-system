@@ -5,12 +5,24 @@
         <?php TemplateUtility::printQuickSearch(); ?>
         <div id="contents">
             <div class="nesp-page-title">
-                <h2>Invite to Screening Questionnaire</h2>
-                <p>Prepare a secure questionnaire link. Nothing is sent automatically.</p>
+                <div class="nesp-brand-lockup">
+                    <img src="images/nesp-logo.png" alt="New England Sports Photo" />
+                    <div>
+                        <span class="nesp-kicker">New England Sports Photo</span>
+                        <h2>Invite to Screening Questionnaire</h2>
+                        <p>Prepare a polished, secure applicant questionnaire invitation. Nothing is sent automatically.</p>
+                    </div>
+                </div>
             </div>
 
             <div class="nesp-safety-banner">
-                This action creates copy-only invitation text. It does not email, text, call, rank, reject, approve, hire, or change stage.
+                This creates copy-only invitation text for Craig to review. It does not email, text, call, rank, reject, approve, hire, or change stage.
+            </div>
+
+            <div class="nesp-step-row" aria-label="Questionnaire invitation steps">
+                <div class="nesp-step is-current"><span>1</span><strong>Review candidate</strong></div>
+                <div class="nesp-step"><span>2</span><strong>Generate link</strong></div>
+                <div class="nesp-step"><span>3</span><strong>Copy invitation</strong></div>
             </div>
 
             <div class="nesp-panel">
@@ -23,7 +35,7 @@
                     <dt>Question set</dt>
                     <dd><?php $this->_($this->preview['question_set_label']); ?></dd>
                     <dt>Estimated time</dt>
-                    <dd>Approximately <?php $this->_($this->preview['estimated_minutes']); ?></dd>
+                    <dd><strong>Approximately <?php $this->_($this->preview['estimated_minutes']); ?></strong></dd>
                 </dl>
             </div>
 
@@ -36,7 +48,7 @@
                 </ol>
             </div>
 
-            <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=requestQuestionnaire">
+            <form class="nesp-action-form" method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=requestQuestionnaire" aria-label="Generate secure questionnaire link">
                 <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                 <input type="hidden" name="candidateID" value="<?php echo((int) $this->preview['candidate_id']); ?>" />
                 <input type="hidden" name="jobOrderID" value="<?php echo((int) $this->preview['joborder_id']); ?>" />
