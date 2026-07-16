@@ -297,6 +297,12 @@ class NESPUI extends UserInterface
                 $this->createStaffingRecommendation();
                 break;
 
+            case 'dryRunStaffingImport':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->dryRunStaffingImport();
+                break;
+
             case 'staffingForecast':
                 $this->adminOnly();
                 $this->staffingForecast();
@@ -1032,6 +1038,49 @@ class NESPUI extends UserInterface
         $this->_template->assign('viewKey', 'staffingForecast');
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('forecast', $this->_workflow->getStaffingForecast());
+        $this->_template->assign('dryRunResult', null);
+        $this->_template->display('./modules/nesp/StaffingForecast.tpl');
+    }
+
+    private function dryRunStaffingImport()
+    {
+        $dryRunResult = array(
+            'error' => '',
+            'result' => null
+        );
+
+        if (!isset($_FILES['staffingWorkbook']) || !is_uploaded_file($_FILES['staffingWorkbook']['tmp_name']))
+        {
+            $dryRunResult['error'] = 'Choose an exported Fall schedule workbook before running the dry-run.';
+        }
+        else
+        {
+            $fileName = isset($_FILES['staffingWorkbook']['name']) ? $_FILES['staffingWorkbook']['name'] : 'uploaded workbook';
+            $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+            if (!in_array($extension, array('xlsx', 'csv'), true))
+            {
+                $dryRunResult['error'] = 'Use an exported .xlsx or .csv file for the dry-run.';
+            }
+            else if ($extension === 'xlsx')
+            {
+                $dryRunResult['result'] = NESPWorkflow::parseFallStaffingWorkbookXLSXFile(
+                    $_FILES['staffingWorkbook']['tmp_name'],
+                    $fileName
+                );
+            }
+            else
+            {
+                $csv = file_get_contents($_FILES['staffingWorkbook']['tmp_name']);
+                $dryRunResult['result'] = NESPWorkflow::parseStaffingCSVText($csv === false ? '' : $csv, $fileName);
+            }
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Staffing Forecast');
+        $this->_template->assign('viewKey', 'staffingForecast');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('forecast', $this->_workflow->getStaffingForecast());
+        $this->_template->assign('dryRunResult', $dryRunResult);
         $this->_template->display('./modules/nesp/StaffingForecast.tpl');
     }
 

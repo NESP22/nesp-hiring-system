@@ -32,6 +32,7 @@ WHERE `stage_key` IN (
 
 DROP TABLE IF EXISTS `nesp_staffing_forecast`;
 DROP TABLE IF EXISTS `nesp_staffing_recommendation`;
+DROP TABLE IF EXISTS `nesp_historical_job_staffing`;
 DROP TABLE IF EXISTS `nesp_staffing_import_issue`;
 DROP TABLE IF EXISTS `nesp_staffing_import_row`;
 DROP TABLE IF EXISTS `nesp_staffing_import_batch`;

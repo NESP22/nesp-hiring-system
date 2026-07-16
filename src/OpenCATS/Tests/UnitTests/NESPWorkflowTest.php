@@ -457,6 +457,119 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('needs_review', $result['rows'][1]['status_key']);
     }
 
+    public function testFallStaffingWorkbookParserHandlesDateRowsAndStaffingText()
+    {
+        $sheets = array(
+            '9/19-9/25' => array(
+                $this->fallScheduleHeader(),
+                array('Saturday 9/19/2026'),
+                $this->fallScheduleRow('Fixture Soccer League', '1P/1T/1A', 'OUT', 'TRADITIONAL', 'Fixture Field, Boston MA', '08:00', '12:00')
+            )
+        );
+
+        $result = NESPWorkflow::parseFallStaffingWorkbookRows($sheets, 'unit fall workbook');
+
+        $this->assertCount(3, $result['rows']);
+        $this->assertSame('2026-09-19', $result['rows'][0]['event_date']);
+        $this->assertSame('photographer', $result['rows'][0]['role_key']);
+        $this->assertSame(1, $result['rows'][0]['staff_count']);
+        $this->assertSame('table_staff', $result['rows'][1]['role_key']);
+        $this->assertSame('assistant', $result['rows'][2]['role_key']);
+        $this->assertSame(array('2026'), $result['dry_run']['source_summary']['years_found']);
+        $this->assertTrue($result['dry_run']['source_summary']['requires_additional_historical_workbooks']);
+    }
+
+    public function testFallStaffingWorkbookParserFlagsIncompleteRows()
+    {
+        $sheets = array(
+            '10/3-10/9' => array(
+                $this->fallScheduleHeader(),
+                array('Saturday 10/3/2026'),
+                $this->fallScheduleRow('Fixture Missing Details', '', 'OUT', 'TRADITIONAL', '', '', '')
+            )
+        );
+
+        $result = NESPWorkflow::parseFallStaffingWorkbookRows($sheets, 'unit fall workbook');
+        $issueKeys = array_map(
+            function ($issue) {
+                return $issue['issue_key'];
+            },
+            $result['issues']
+        );
+
+        $this->assertContains('missing_location', $issueKeys);
+        $this->assertContains('missing_start_or_end_time', $issueKeys);
+        $this->assertContains('missing_or_invalid_staffing', $issueKeys);
+        $this->assertSame(1, $result['dry_run']['quality']['ambiguous_rows']);
+        $this->assertSame('needs_review', $result['rows'][0]['status_key']);
+        $this->assertSame('unresolved', $result['rows'][0]['role_key']);
+    }
+
+    public function testFallStaffingWorkbookParserDetectsPriorHistoricalYears()
+    {
+        $sheets = array(
+            '9/21-9/27 2024' => array(
+                $this->fallScheduleHeader(),
+                array('Saturday 9/21/2024'),
+                $this->fallScheduleRow('Fixture Older League', '2P/1T/2A', 'OUT', 'TRADITIONAL', 'Older Field, Providence RI', '09:00', '13:00')
+            ),
+            '9/19-9/25 2026' => array(
+                $this->fallScheduleHeader(),
+                array('Saturday 9/19/2026'),
+                $this->fallScheduleRow('Fixture Current League', '1P/1T/1A', 'OUT', 'TRADITIONAL', 'Current Field, Boston MA', '08:00', '12:00')
+            )
+        );
+
+        $result = NESPWorkflow::parseFallStaffingWorkbookRows($sheets, 'unit fall workbook');
+
+        $this->assertSame(array('2024', '2026'), $result['dry_run']['source_summary']['years_found']);
+        $this->assertTrue($result['dry_run']['source_summary']['prior_fall_years_present']);
+        $this->assertFalse($result['dry_run']['source_summary']['requires_additional_historical_workbooks']);
+    }
+
+    private function fallScheduleHeader()
+    {
+        $row = array_fill(0, 35, '');
+        $row[0] = 'Column 1';
+        $row[2] = 'IMP';
+        $row[3] = 'STAFFING';
+        $row[4] = 'IN/OUT';
+        $row[5] = 'Column 1';
+        $row[9] = 'Lead (or No lead)';
+        $row[11] = 'Photog1';
+        $row[13] = 'Photog2';
+        $row[21] = 'Table';
+        $row[23] = 'TABLE 2';
+        $row[25] = 'Train';
+        $row[26] = 'LOCATION';
+        $row[27] = 'START';
+        $row[28] = 'END';
+        $row[31] = 'SCHED';
+        $row[32] = 'FORM';
+        $row[33] = 'OL';
+        $row[34] = 'Notes';
+
+        return $row;
+    }
+
+    private function fallScheduleRow($eventName, $staffing, $indoorOutdoor, $jobType, $location, $start, $end)
+    {
+        $row = array_fill(0, 35, '');
+        $row[0] = $eventName;
+        $row[2] = '1';
+        $row[3] = $staffing;
+        $row[4] = $indoorOutdoor;
+        $row[5] = $jobType;
+        $row[26] = $location;
+        $row[27] = $start;
+        $row[28] = $end;
+        $row[31] = 'https://docs.google.com/spreadsheets/d/fixture/edit';
+        $row[32] = '10MH';
+        $row[33] = 'F2600';
+
+        return $row;
+    }
+
     public function testVapiWebhookRejectsMissingSecret()
     {
         $result = NESPVapiIntegration::validateWebhookRequest(

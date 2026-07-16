@@ -274,6 +274,46 @@ CREATE TABLE IF NOT EXISTS `nesp_staffing_import_issue` (
   KEY `IDX_status_key` (`status_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `nesp_historical_job_staffing` (
+  `historical_staffing_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `import_batch_id` INT(11) NOT NULL,
+  `source_year` INT(4) NOT NULL,
+  `source_tab_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `source_row_number` INT(11) NOT NULL DEFAULT '0',
+  `source_row_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `event_date` DATE,
+  `job_name` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `location` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `state` VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `indoor_outdoor` VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `job_type` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `importance` VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `start_time` TIME,
+  `end_time` TIME,
+  `expected_duration` DECIMAL(6,2) NOT NULL DEFAULT '0.00',
+  `required_leads` INT(11) NOT NULL DEFAULT '0',
+  `required_photographers` INT(11) NOT NULL DEFAULT '0',
+  `required_table_staff` INT(11) NOT NULL DEFAULT '0',
+  `required_assistants` INT(11) NOT NULL DEFAULT '0',
+  `required_trainers` INT(11) NOT NULL DEFAULT '0',
+  `total_required_staff` INT(11) NOT NULL DEFAULT '0',
+  `assigned_lead_count` INT(11) NOT NULL DEFAULT '0',
+  `assigned_photographer_count` INT(11) NOT NULL DEFAULT '0',
+  `assigned_table_count` INT(11) NOT NULL DEFAULT '0',
+  `assigned_assistant_count` INT(11) NOT NULL DEFAULT '0',
+  `actual_total_assigned` INT(11) NOT NULL DEFAULT '0',
+  `staffing_text_original` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `notes_sanitized` TEXT COLLATE utf8mb4_unicode_ci,
+  `data_quality_status` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending_review',
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`historical_staffing_id`),
+  UNIQUE KEY `IDX_nesp_historical_source` (`import_batch_id`, `source_tab_name`, `source_row_number`, `source_row_hash`),
+  KEY `IDX_nesp_historical_event_date` (`event_date`),
+  KEY `IDX_nesp_historical_year` (`source_year`),
+  KEY `IDX_nesp_historical_quality` (`data_quality_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `nesp_staffing_forecast` (
   `staffing_forecast_id` INT(11) NOT NULL AUTO_INCREMENT,
   `forecast_year` INT(4) NOT NULL,

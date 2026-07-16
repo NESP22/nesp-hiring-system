@@ -831,6 +831,286 @@ class NESPWorkflow
         return $result;
     }
 
+    public static function parseFallStaffingWorkbookXLSXFile($filePath, $sourceLabel = 'Fall schedule workbook')
+    {
+        if (!class_exists('ZipArchive'))
+        {
+            return array(
+                'rows' => array(),
+                'issues' => array(
+                    array('row_number' => 0, 'issue_key' => 'xlsx_unavailable', 'message' => 'XLSX parsing requires the PHP ZipArchive extension.')
+                ),
+                'checksum' => is_file($filePath) ? hash_file('sha256', $filePath) : '',
+                'source_label' => $sourceLabel,
+                'source_type' => 'fall_schedule_xlsx',
+                'dry_run' => self::emptyFallStaffingDryRun()
+            );
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($filePath) !== true)
+        {
+            return array(
+                'rows' => array(),
+                'issues' => array(
+                    array('row_number' => 0, 'issue_key' => 'xlsx_open_failed', 'message' => 'The XLSX file could not be opened.')
+                ),
+                'checksum' => is_file($filePath) ? hash_file('sha256', $filePath) : '',
+                'source_label' => $sourceLabel,
+                'source_type' => 'fall_schedule_xlsx',
+                'dry_run' => self::emptyFallStaffingDryRun()
+            );
+        }
+
+        $sheets = self::readXLSXWorkbookSheets($zip);
+        $zip->close();
+
+        $result = self::parseFallStaffingWorkbookRows($sheets, $sourceLabel);
+        $result['checksum'] = is_file($filePath) ? hash_file('sha256', $filePath) : hash('sha256', json_encode($sheets));
+        return $result;
+    }
+
+    public static function parseFallStaffingWorkbookRows($sheets, $sourceLabel = 'Fall schedule workbook')
+    {
+        $dryRun = self::emptyFallStaffingDryRun();
+        $dryRun['source_label'] = $sourceLabel;
+        $rows = array();
+        $issues = array();
+        $seenContent = array();
+
+        foreach ($sheets as $sheetName => $sheetRows)
+        {
+            $sheetSummary = array(
+                'tab_name' => $sheetName,
+                'source_rows' => count($sheetRows),
+                'recognized_job_rows' => 0,
+                'staffing_rows' => 0,
+                'assignment_rows' => 0,
+                'ambiguous_rows' => 0,
+                'years_found' => array()
+            );
+            $dryRun['source_summary']['total_tabs']++;
+            $dryRun['source_summary']['tabs'][] = $sheetName;
+
+            $headers = isset($sheetRows[0]) ? self::normalizeHeader($sheetRows[0]) : array();
+            if (!self::fallScheduleHeaderLooksUsable($headers))
+            {
+                $dryRun['quality']['skipped_non_schedule_tabs']++;
+                $dryRun['tab_summaries'][] = $sheetSummary;
+                continue;
+            }
+
+            $currentDate = '';
+            for ($rowIndex = 1; $rowIndex < count($sheetRows); $rowIndex++)
+            {
+                $sourceRowNumber = $rowIndex + 1;
+                $sourceRow = $sheetRows[$rowIndex];
+                $rawText = implode(' | ', array_map('trim', $sourceRow));
+                if (!self::fallScheduleRowHasMeaningfulValue($sourceRow))
+                {
+                    $dryRun['quality']['skipped_blank_rows']++;
+                    continue;
+                }
+
+                if (self::fallScheduleRowIsHeader($sourceRow))
+                {
+                    $dryRun['quality']['skipped_header_rows']++;
+                    continue;
+                }
+
+                $firstCell = self::fallScheduleCell($sourceRow, 0);
+                $rowDate = self::parseStaffingDate($firstCell);
+                if ($rowDate !== '' && !self::fallScheduleRowLooksLikeJob($sourceRow))
+                {
+                    $currentDate = $rowDate;
+                    $dryRun['quality']['skipped_date_rows']++;
+                    $year = substr($rowDate, 0, 4);
+                    $sheetSummary['years_found'][$year] = true;
+                    $dryRun['source_summary']['years_found'][$year] = true;
+                    continue;
+                }
+
+                if (!self::fallScheduleRowLooksLikeJob($sourceRow))
+                {
+                    $dryRun['quality']['skipped_separator_rows']++;
+                    continue;
+                }
+
+                $sheetSummary['recognized_job_rows']++;
+                $dryRun['quality']['recognized_job_rows']++;
+                $dryRun['quality']['total_source_rows']++;
+
+                $eventName = $firstCell;
+                $staffingText = self::fallScheduleCell($sourceRow, 3);
+                $indoorOutdoor = self::fallScheduleCell($sourceRow, 4);
+                $jobType = self::fallScheduleCell($sourceRow, 5);
+                $importance = self::fallScheduleCell($sourceRow, 2);
+                $location = self::fallScheduleCell($sourceRow, 26);
+                $startTime = self::parseStaffingTime(self::fallScheduleCell($sourceRow, 27));
+                $endTime = self::parseStaffingTime(self::fallScheduleCell($sourceRow, 28));
+                $notes = trim(self::fallScheduleCell($sourceRow, 6) . ' ' . self::fallScheduleCell($sourceRow, 7) . ' ' . self::fallScheduleCell($sourceRow, 34));
+                $rowIssues = array();
+
+                if ($currentDate === '')
+                {
+                    $rowIssues[] = 'missing_or_malformed_date';
+                    $dryRun['quality']['rows_missing_dates']++;
+                }
+                else
+                {
+                    $year = substr($currentDate, 0, 4);
+                    $sheetSummary['years_found'][$year] = true;
+                    $dryRun['source_summary']['years_found'][$year] = true;
+                    if (!isset($dryRun['quality']['records_by_year'][$year]))
+                    {
+                        $dryRun['quality']['records_by_year'][$year] = 0;
+                    }
+                    $dryRun['quality']['records_by_year'][$year]++;
+                }
+
+                if ($eventName === '' || in_array(strtolower($eventName), array('true', 'false'), true))
+                {
+                    $rowIssues[] = 'missing_event_name';
+                }
+                if ($location === '')
+                {
+                    $rowIssues[] = 'missing_location';
+                    $dryRun['quality']['rows_missing_location']++;
+                }
+                if ($startTime === null || $endTime === null)
+                {
+                    $rowIssues[] = 'missing_start_or_end_time';
+                    $dryRun['quality']['rows_missing_start_or_end']++;
+                }
+
+                $requiredRoles = self::parseFallStaffingRequirementText($staffingText);
+                if (empty($requiredRoles))
+                {
+                    $rowIssues[] = 'missing_or_invalid_staffing';
+                    $dryRun['quality']['invalid_staffing_rows']++;
+                }
+                else
+                {
+                    $sheetSummary['staffing_rows']++;
+                }
+
+                $assignmentCounts = self::countFallScheduleAssignments($sourceRow);
+                if (array_sum($assignmentCounts) > 0)
+                {
+                    $sheetSummary['assignment_rows']++;
+                    $dryRun['quality']['rows_with_assignments']++;
+                    $requiredTotal = array_sum($requiredRoles);
+                    $assignedTotal = array_sum($assignmentCounts);
+                    if ($requiredTotal > 0 && $assignedTotal !== $requiredTotal)
+                    {
+                        $rowIssues[] = 'assigned_required_conflict';
+                        $dryRun['quality']['conflicting_assigned_vs_required_rows']++;
+                    }
+                }
+
+                $contentKey = strtolower($currentDate . '|' . $eventName . '|' . $location . '|' . $staffingText);
+                if ($contentKey !== '|||' && isset($seenContent[$contentKey]))
+                {
+                    $rowIssues[] = 'duplicate_source_row';
+                    $dryRun['quality']['duplicate_rows']++;
+                }
+                $seenContent[$contentKey] = true;
+
+                $statusKey = empty($rowIssues) ? 'normalized' : 'needs_review';
+                if ($statusKey === 'needs_review')
+                {
+                    $sheetSummary['ambiguous_rows']++;
+                    $dryRun['quality']['ambiguous_rows']++;
+                }
+
+                foreach ($rowIssues as $issueKey)
+                {
+                    $issues[] = array(
+                        'row_number' => $sourceRowNumber,
+                        'issue_key' => $issueKey,
+                        'message' => self::fallScheduleIssueMessage($issueKey, $sheetName, $sourceRowNumber)
+                    );
+                }
+
+                if (empty($requiredRoles))
+                {
+                    $requiredRoles = array('unresolved' => 0);
+                }
+
+                foreach ($requiredRoles as $roleKey => $staffCount)
+                {
+                    $unresolved = array(
+                        'source_label' => $sourceLabel,
+                        'source_year' => $currentDate === '' ? '' : substr($currentDate, 0, 4),
+                        'source_tab_name' => $sheetName,
+                        'indoor_outdoor' => $indoorOutdoor,
+                        'job_type' => $jobType,
+                        'importance' => $importance,
+                        'location' => $location,
+                        'staffing_text_original' => $staffingText,
+                        'notes_sanitized' => self::sanitizeStaffingNote($notes),
+                        'assignment_counts' => $assignmentCounts,
+                        'quality_issues' => $rowIssues,
+                        'dry_run_only' => true
+                    );
+                    $row = array(
+                        'source_sheet_name' => $sheetName,
+                        'source_row_number' => $sourceRowNumber,
+                        'event_date' => $currentDate,
+                        'event_start_time' => $startTime,
+                        'event_end_time' => $endTime,
+                        'state' => self::inferStateFromLocation($location),
+                        'sport' => self::inferSportFromEventName($eventName),
+                        'event_name' => $eventName,
+                        'role_key' => $roleKey,
+                        'staff_name' => '',
+                        'staff_count' => (int) $staffCount,
+                        'staff_hours' => self::calculateStaffHours($startTime, $endTime, max(0, (int) $staffCount)),
+                        'raw_source_text' => $rawText,
+                        'unresolved_json' => json_encode($unresolved),
+                        'issue_count' => count($rowIssues),
+                        'status_key' => $statusKey
+                    );
+                    $row['source_row_hash'] = hash('sha256', $sheetName . '|' . $sourceRowNumber . '|' . $currentDate . '|' . $eventName . '|' . $location . '|' . $roleKey . '|' . $staffingText . '|' . $rawText);
+                    $rows[] = $row;
+                }
+            }
+
+            $sheetSummary['years_found'] = array_map('strval', array_keys($sheetSummary['years_found']));
+            sort($sheetSummary['years_found']);
+            if ($sheetSummary['recognized_job_rows'] > 0)
+            {
+                $dryRun['source_summary']['tabs_with_jobs'][] = $sheetName;
+            }
+            if ($sheetSummary['assignment_rows'] > 0)
+            {
+                $dryRun['source_summary']['tabs_with_assignments'][] = $sheetName;
+            }
+            $dryRun['tab_summaries'][] = $sheetSummary;
+        }
+
+        $dryRun['source_summary']['years_found'] = array_map('strval', array_keys($dryRun['source_summary']['years_found']));
+        sort($dryRun['source_summary']['years_found']);
+        $dryRun['source_summary']['prior_fall_years_present'] = count(array_filter(
+            $dryRun['source_summary']['years_found'],
+            function ($year) {
+                return (int) $year < 2026;
+            }
+        )) > 0;
+        $dryRun['source_summary']['requires_additional_historical_workbooks'] = !$dryRun['source_summary']['prior_fall_years_present'];
+        $dryRun['quality']['normalized_role_rows'] = count($rows);
+        $dryRun['quality']['issue_count'] = count($issues);
+
+        return array(
+            'rows' => $rows,
+            'issues' => $issues,
+            'checksum' => hash('sha256', json_encode($sheets)),
+            'source_label' => $sourceLabel,
+            'source_type' => 'fall_schedule_workbook',
+            'dry_run' => $dryRun
+        );
+    }
+
     public static function normalizeStaffingRows($rows, $sourceLabel, $sourceType = 'CSV')
     {
         $normalized = array();
@@ -1079,6 +1359,7 @@ class NESPWorkflow
             'nesp_staffing_import_batch',
             'nesp_staffing_import_row',
             'nesp_staffing_import_issue',
+            'nesp_historical_job_staffing',
             'nesp_staffing_forecast',
             'nesp_staffing_recommendation'
         );
@@ -5668,6 +5949,431 @@ class NESPWorkflow
         return (int) $rs['total'];
     }
 
+    private static function emptyFallStaffingDryRun()
+    {
+        return array(
+            'source_label' => '',
+            'source_summary' => array(
+                'total_tabs' => 0,
+                'tabs' => array(),
+                'tabs_with_jobs' => array(),
+                'tabs_with_assignments' => array(),
+                'years_found' => array(),
+                'prior_fall_years_present' => false,
+                'requires_additional_historical_workbooks' => true
+            ),
+            'quality' => array(
+                'total_source_rows' => 0,
+                'recognized_job_rows' => 0,
+                'normalized_role_rows' => 0,
+                'skipped_blank_rows' => 0,
+                'skipped_header_rows' => 0,
+                'skipped_date_rows' => 0,
+                'skipped_separator_rows' => 0,
+                'skipped_non_schedule_tabs' => 0,
+                'rows_missing_dates' => 0,
+                'rows_missing_location' => 0,
+                'rows_missing_start_or_end' => 0,
+                'invalid_staffing_rows' => 0,
+                'conflicting_assigned_vs_required_rows' => 0,
+                'duplicate_rows' => 0,
+                'ambiguous_rows' => 0,
+                'rows_with_assignments' => 0,
+                'records_by_year' => array(),
+                'issue_count' => 0
+            ),
+            'tab_summaries' => array()
+        );
+    }
+
+    private static function readXLSXWorkbookSheets($zip)
+    {
+        $sharedStrings = self::readXLSXSharedStrings($zip);
+        $sheetTargets = self::readXLSXSheetTargets($zip);
+        if (empty($sheetTargets))
+        {
+            $sheetTargets = array('Sheet1' => 'xl/worksheets/sheet1.xml');
+        }
+
+        $sheets = array();
+        foreach ($sheetTargets as $sheetName => $target)
+        {
+            $target = ltrim($target, '/');
+            if (strpos($target, 'xl/') !== 0)
+            {
+                $target = 'xl/' . $target;
+            }
+
+            $sheetXML = $zip->getFromName($target);
+            if ($sheetXML === false)
+            {
+                continue;
+            }
+
+            $xml = @simplexml_load_string($sheetXML);
+            if ($xml === false)
+            {
+                continue;
+            }
+
+            $rows = array();
+            foreach ($xml->sheetData->row as $row)
+            {
+                $values = array();
+                foreach ($row->c as $cell)
+                {
+                    $reference = (string) $cell['r'];
+                    $columnIndex = self::xlsxColumnIndexFromReference($reference);
+                    if ($columnIndex < 1)
+                    {
+                        $columnIndex = count($values) + 1;
+                    }
+                    $values[$columnIndex - 1] = self::normalizeFallXLSXCellValue(
+                        self::xlsxCellValue($cell, $sharedStrings),
+                        $columnIndex
+                    );
+                }
+
+                if (!empty($values))
+                {
+                    ksort($values);
+                    $max = max(array_keys($values));
+                    for ($i = 0; $i <= $max; $i++)
+                    {
+                        if (!isset($values[$i]))
+                        {
+                            $values[$i] = '';
+                        }
+                    }
+                    ksort($values);
+                    $rows[] = array_values($values);
+                }
+            }
+
+            $sheets[$sheetName] = $rows;
+        }
+
+        return $sheets;
+    }
+
+    private static function readXLSXSharedStrings($zip)
+    {
+        $strings = array();
+        $sharedXML = $zip->getFromName('xl/sharedStrings.xml');
+        if ($sharedXML === false)
+        {
+            return $strings;
+        }
+
+        $xml = @simplexml_load_string($sharedXML);
+        if ($xml === false)
+        {
+            return $strings;
+        }
+
+        foreach ($xml->si as $stringItem)
+        {
+            $parts = array();
+            if (isset($stringItem->t))
+            {
+                $parts[] = (string) $stringItem->t;
+            }
+            foreach ($stringItem->r as $run)
+            {
+                if (isset($run->t))
+                {
+                    $parts[] = (string) $run->t;
+                }
+            }
+            $strings[] = implode('', $parts);
+        }
+
+        return $strings;
+    }
+
+    private static function readXLSXSheetTargets($zip)
+    {
+        $workbookXML = $zip->getFromName('xl/workbook.xml');
+        $relsXML = $zip->getFromName('xl/_rels/workbook.xml.rels');
+        if ($workbookXML === false || $relsXML === false)
+        {
+            return array();
+        }
+
+        $workbook = @simplexml_load_string($workbookXML);
+        $rels = @simplexml_load_string($relsXML);
+        if ($workbook === false || $rels === false)
+        {
+            return array();
+        }
+
+        $targetsByID = array();
+        foreach ($rels->Relationship as $relationship)
+        {
+            $targetsByID[(string) $relationship['Id']] = (string) $relationship['Target'];
+        }
+
+        $sheets = array();
+        foreach ($workbook->sheets->sheet as $sheet)
+        {
+            $attributes = $sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+            $relationshipID = isset($attributes['id']) ? (string) $attributes['id'] : '';
+            if ($relationshipID !== '' && isset($targetsByID[$relationshipID]))
+            {
+                $sheets[(string) $sheet['name']] = $targetsByID[$relationshipID];
+            }
+        }
+
+        return $sheets;
+    }
+
+    private static function xlsxCellValue($cell, $sharedStrings)
+    {
+        $type = (string) $cell['t'];
+        if ($type === 'inlineStr')
+        {
+            return isset($cell->is->t) ? (string) $cell->is->t : '';
+        }
+
+        $value = isset($cell->v) ? (string) $cell->v : '';
+        if ($type === 's')
+        {
+            $index = (int) $value;
+            return isset($sharedStrings[$index]) ? $sharedStrings[$index] : '';
+        }
+        if ($type === 'b')
+        {
+            return $value === '1' ? 'TRUE' : 'FALSE';
+        }
+
+        return $value;
+    }
+
+    private static function xlsxColumnIndexFromReference($reference)
+    {
+        if (!preg_match('/^([A-Z]+)/i', $reference, $matches))
+        {
+            return 0;
+        }
+
+        $letters = strtoupper($matches[1]);
+        $index = 0;
+        for ($i = 0; $i < strlen($letters); $i++)
+        {
+            $index = ($index * 26) + (ord($letters[$i]) - 64);
+        }
+
+        return $index;
+    }
+
+    private static function normalizeFallXLSXCellValue($value, $columnIndex)
+    {
+        $value = trim((string) $value);
+        if ($value === '')
+        {
+            return '';
+        }
+
+        if (is_numeric($value))
+        {
+            $numeric = (float) $value;
+            if ($columnIndex === 1 && $numeric > 20000 && $numeric < 60000)
+            {
+                return gmdate('Y-m-d', (int) round(($numeric - 25569) * 86400));
+            }
+            if (in_array($columnIndex, array(28, 29), true) && $numeric >= 0 && $numeric < 1)
+            {
+                $seconds = (int) round($numeric * 86400);
+                return sprintf('%02d:%02d:%02d', floor($seconds / 3600), floor(($seconds % 3600) / 60), $seconds % 60);
+            }
+        }
+
+        return $value;
+    }
+
+    private static function fallScheduleHeaderLooksUsable($headers)
+    {
+        return in_array('staffing', $headers, true)
+            && in_array('in_out', $headers, true)
+            && in_array('location', $headers, true)
+            && in_array('start', $headers, true)
+            && in_array('end', $headers, true);
+    }
+
+    private static function fallScheduleRowIsHeader($row)
+    {
+        $headers = self::normalizeHeader($row);
+        return in_array('staffing', $headers, true) && in_array('location', $headers, true);
+    }
+
+    private static function fallScheduleRowLooksLikeJob($row)
+    {
+        $eventName = self::fallScheduleCell($row, 0);
+        if ($eventName === '' || self::parseStaffingDate($eventName) !== '')
+        {
+            return false;
+        }
+
+        $markers = array(
+            self::fallScheduleCell($row, 3),
+            self::fallScheduleCell($row, 4),
+            self::fallScheduleCell($row, 5),
+            self::fallScheduleCell($row, 26),
+            self::fallScheduleCell($row, 27),
+            self::fallScheduleCell($row, 28)
+        );
+        foreach ($markers as $marker)
+        {
+            if ($marker !== '' && $marker !== '.')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function fallScheduleCell($row, $index)
+    {
+        return isset($row[$index]) ? trim((string) $row[$index]) : '';
+    }
+
+    private static function fallScheduleRowHasMeaningfulValue($row)
+    {
+        foreach ($row as $cell)
+        {
+            $value = trim((string) $cell);
+            if ($value !== '' && $value !== '.')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function parseFallStaffingRequirementText($staffingText)
+    {
+        $staffingText = strtoupper(trim($staffingText));
+        if ($staffingText === '')
+        {
+            return array();
+        }
+
+        $roles = array();
+        $parts = preg_split('/\s*\/\s*/', $staffingText);
+        foreach ($parts as $part)
+        {
+            if (!preg_match('/^(\d+)\s*([A-Z]+)/', trim($part), $matches))
+            {
+                return array();
+            }
+
+            $count = (int) $matches[1];
+            $roleCode = $matches[2][0];
+            switch ($roleCode)
+            {
+                case 'P':
+                    $roleKey = 'photographer';
+                    break;
+                case 'T':
+                    $roleKey = 'table_staff';
+                    break;
+                case 'A':
+                    $roleKey = 'assistant';
+                    break;
+                case 'L':
+                    $roleKey = 'lead';
+                    break;
+                default:
+                    return array();
+            }
+
+            if (!isset($roles[$roleKey]))
+            {
+                $roles[$roleKey] = 0;
+            }
+            $roles[$roleKey] += $count;
+        }
+
+        return $roles;
+    }
+
+    private static function countFallScheduleAssignments($row)
+    {
+        $columnsByRole = array(
+            'lead' => array(9),
+            'photographer' => array(11, 13, 15, 17, 19),
+            'table_staff' => array(21, 23),
+            'trainer' => array(25)
+        );
+        $counts = array('lead' => 0, 'photographer' => 0, 'table_staff' => 0, 'trainer' => 0);
+        foreach ($columnsByRole as $role => $columns)
+        {
+            foreach ($columns as $columnIndex)
+            {
+                $value = self::fallScheduleCell($row, $columnIndex);
+                if ($value !== '' && $value !== '.' && stripos($value, 'no lead') === false)
+                {
+                    $counts[$role]++;
+                }
+            }
+        }
+
+        return $counts;
+    }
+
+    private static function fallScheduleIssueMessage($issueKey, $sheetName, $rowNumber)
+    {
+        $messages = array(
+            'missing_or_malformed_date' => 'No usable date row was found before this job row.',
+            'missing_event_name' => 'The job or league name is missing or appears to be a template placeholder.',
+            'missing_location' => 'The location cell is empty.',
+            'missing_start_or_end_time' => 'Start or end time is missing.',
+            'missing_or_invalid_staffing' => 'The STAFFING cell is empty or not in a recognized pattern such as 1P/1T/1A.',
+            'assigned_required_conflict' => 'Assigned role columns do not match the required staffing count.',
+            'duplicate_source_row' => 'This job row appears to duplicate an earlier source row.'
+        );
+        $message = isset($messages[$issueKey]) ? $messages[$issueKey] : 'This row requires review.';
+
+        return $sheetName . ' row ' . $rowNumber . ': ' . $message;
+    }
+
+    private static function sanitizeStaffingNote($note)
+    {
+        $note = trim(preg_replace('/\s+/', ' ', $note));
+        return substr($note, 0, 500);
+    }
+
+    private static function inferStateFromLocation($location)
+    {
+        if (preg_match('/\b(MA|RI|CT|NH|ME|VT)\b/i', $location, $matches))
+        {
+            return strtoupper($matches[1]);
+        }
+
+        return '';
+    }
+
+    private static function inferSportFromEventName($eventName)
+    {
+        $eventName = strtolower($eventName);
+        if (strpos($eventName, 'soccer') !== false || strpos($eventName, 'ysl') !== false)
+        {
+            return 'Soccer';
+        }
+        if (strpos($eventName, 'hockey') !== false || strpos($eventName, 'yhl') !== false)
+        {
+            return 'Hockey';
+        }
+        if (strpos($eventName, 'football') !== false || strpos($eventName, 'cheer') !== false)
+        {
+            return 'Football/Cheer';
+        }
+
+        return '';
+    }
+
     private static function normalizeHeader($headerRow)
     {
         $headers = array();
@@ -5867,6 +6573,11 @@ class NESPWorkflow
 
     private static function calculateStaffHours($startTime, $endTime, $staffCount)
     {
+        if ((int) $staffCount <= 0)
+        {
+            return 0.0;
+        }
+
         if ($startTime === null || $endTime === null)
         {
             return 0.0;
