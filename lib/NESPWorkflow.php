@@ -695,12 +695,12 @@ class NESPWorkflow
             ),
             array(
                 'display_name' => 'Brandon',
-                'email' => 'brandon@sportsphoto.com',
+                'email' => 'brandon@nesportsphoto.com',
                 'role_group' => 'Table, greeter, and field-support interviews',
                 'account_state_key' => 'email_needs_confirmation',
                 'is_active' => 0,
                 'approved_joborder_ids' => array(41005),
-                'email_warning' => 'Please confirm that brandon@sportsphoto.com is the correct email address.'
+                'email_warning' => 'Please confirm that brandon@nesportsphoto.com is the correct email address.'
             ),
             array(
                 'display_name' => 'Nate',
