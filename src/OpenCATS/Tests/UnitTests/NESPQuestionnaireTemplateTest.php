@@ -72,16 +72,70 @@ class NESPQuestionnaireTemplateTest extends TestCase
         $this->assertStringContainsString('.nesp-workflow .nesp-table', $source);
     }
 
+    public function testNespWorkflowCssKeepsDashboardHeadersOnDarkTheme()
+    {
+        $source = file_get_contents('modules/nesp/nespWorkflow.css');
+        $darkThemeSelectors = array(
+            '.nesp-workflow #contents',
+            '.nesp-workflow .nesp-page-title',
+            '.nesp-workflow .nesp-dashboard-nav a',
+            '.nesp-workflow .nesp-card',
+            '.nesp-workflow .nesp-panel',
+            '.nesp-workflow .nesp-task-card',
+            '.nesp-workflow .nesp-empty',
+            '.nesp-workflow .nesp-table th'
+        );
+
+        foreach ($darkThemeSelectors as $selector)
+        {
+            $this->assertMatchesRegularExpression(
+                '/' . preg_quote($selector, '/') . '[^{]*\{[^}]*background:\s*(?!#fff(?:fff)?\b|#f[0-9a-f]{5}\b|white\b)[^;}]+;/is',
+                $source,
+                sprintf('Expected %s to define a non-white dashboard background.', $selector)
+            );
+        }
+
+        $this->assertStringContainsString('--nesp-dashboard-bg: #061f46;', $source);
+        $this->assertStringContainsString('--nesp-dashboard-panel: #0b2b57;', $source);
+        $this->assertStringContainsString('--nesp-dashboard-text: #eef5ff;', $source);
+        $this->assertMatchesRegularExpression('/\.nesp-workflow \.nesp-secondary-action:focus\s*\{?|\b\.nesp-workflow \.nesp-secondary-action:hover,/s', $source);
+    }
+
     public function testLegacyNavigationCssCentersOpenCatsTabs()
     {
         $source = file_get_contents('main.css');
 
+        $this->assertMatchesRegularExpression('/#header\s*\{[^}]*clear:\s*both;/s', $source);
+        $this->assertMatchesRegularExpression('/#header\s*\{[^}]*height:\s*auto;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary\s*\{[^}]*position:\s*static;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary\s*\{[^}]*display:\s*flex;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary\s*\{[^}]*flex-wrap:\s*wrap;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary\s*\{[^}]*width:\s*auto;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary > li\s*\{[^}]*display:\s*contents;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*display:\s*flex;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*align-items:\s*center;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*float:\s*none;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*width:\s*auto;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*min-width:\s*70px;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*background:\s*#E2E2E2;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*display:\s*flex;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*line-height:\s*normal;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*float:\s*none;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*width:\s*auto;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*background:\s*#6c94eb;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive:focus,\s*#header ul#primary a\.active:focus\s*\{[^}]*outline:\s*2px solid #315f93;/s', $source);
+        $this->assertDoesNotMatchRegularExpression('/#header ul#primary a\.(?:inactive|active)\s*\{[^}]*url\(images\/tabs\//s', $source);
+        $this->assertDoesNotMatchRegularExpression('/#header ul#primary a\.(?:inactive|active)\s*\{[^}]*width:\s*81px;/s', $source);
+        $this->assertDoesNotMatchRegularExpression('/#header ul#primary a\.(?:inactive|active)\s*\{[^}]*float:\s*left;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*position:\s*static;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*display:\s*flex;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*flex-wrap:\s*wrap;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*width:\s*100%;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*min-height:\s*24px;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary li a\s*\{[^}]*float:\s*none;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#secondary li a\s*\{[^}]*white-space:\s*nowrap;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary li span\s*\{[^}]*float:\s*none;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#secondary li span\s*\{[^}]*white-space:\s*nowrap;/s', $source);
+        $this->assertMatchesRegularExpression('/#main\s*\{[^}]*padding-top:\s*0px;/s', $source);
     }
 }
