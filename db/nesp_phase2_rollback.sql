@@ -19,8 +19,12 @@ WHERE `flag_key` IN (
     'NESP_INTERVIEWER_ZOOM_LINKS_ENABLED',
     'NESP_AI_REVIEW_ENABLED',
     'NESP_STAFFING_FORECAST_ENABLED',
-    'NESP_STAFFING_DRIVE_IMPORT_ENABLED'
+    'NESP_STAFFING_DRIVE_IMPORT_ENABLED',
+    'NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED'
 );
+
+DELETE FROM `nesp_integration_status`
+WHERE `integration_key` = 'google_calendar_freebusy';
 
 DELETE FROM `nesp_workflow_stage`
 WHERE `stage_key` IN (
@@ -42,6 +46,7 @@ DROP TABLE IF EXISTS `nesp_staffing_schedule_history`;
 DROP TABLE IF EXISTS `nesp_interview_slot`;
 DROP TABLE IF EXISTS `nesp_interviewer_availability`;
 DROP TABLE IF EXISTS `nesp_interviewer_role_rule`;
+DROP TABLE IF EXISTS `nesp_google_calendar_connection`;
 DROP TABLE IF EXISTS `nesp_session_security_event`;
 
 ALTER TABLE `nesp_scorecard_response`
