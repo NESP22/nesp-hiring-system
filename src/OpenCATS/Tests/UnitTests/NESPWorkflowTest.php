@@ -14,7 +14,7 @@ class NESPWorkflowTest extends TestCase
         $flags = NESPWorkflow::getDefaultFeatureFlags();
         $keys = array();
 
-        $this->assertCount(8, $flags);
+        $this->assertCount(9, $flags);
         foreach ($flags as $flag)
         {
             $keys[] = $flag[0];
@@ -47,6 +47,32 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'NESP_VAPI_ENABLED'));
     }
 
+    public function testInterviewerZoomLinksEnvDefaultIsDisabled()
+    {
+        putenv('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
+        $this->assertFalse(NESPWorkflow::isInterviewerZoomLinksEnabledByDefault());
+
+        putenv('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED=true');
+        $this->assertTrue(NESPWorkflow::isInterviewerZoomLinksEnabledByDefault());
+
+        putenv('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
+    }
+
+    public function testZoomParticipantLinkValidationRejectsHostLinks()
+    {
+        $valid = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?pwd=abc');
+        $http = NESPWorkflow::validateZoomApplicantJoinURL('http://nesp.zoom.us/j/123456789');
+        $startPath = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/start/123456789');
+        $startURL = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?start_url=https%3A%2F%2Fexample.test');
+        $zak = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?zak=secret');
+
+        $this->assertTrue($valid['ok']);
+        $this->assertFalse($http['ok']);
+        $this->assertFalse($startPath['ok']);
+        $this->assertFalse($startURL['ok']);
+        $this->assertFalse($zak['ok']);
+    }
+
     public function testFeatureGateMappingKeepsSettingsOpen()
     {
         $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('settings'));
@@ -62,6 +88,7 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreenAvailability'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('markPhoneScreenInvitationCopied'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('allowPhoneScreenReschedule'));
+        $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('updateInterviewerZoomLink'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('unexpectedAction'));
     }
 

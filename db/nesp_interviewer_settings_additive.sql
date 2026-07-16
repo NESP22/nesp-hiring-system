@@ -24,6 +24,7 @@ ALTER TABLE `nesp_interviewer_profile`
     ADD COLUMN IF NOT EXISTS `private_admin_notes` TEXT COLLATE utf8mb4_unicode_ci,
     ADD COLUMN IF NOT EXISTS `last_login_at` DATETIME,
     ADD COLUMN IF NOT EXISTS `email_warning` TEXT COLLATE utf8mb4_unicode_ci,
+    ADD COLUMN IF NOT EXISTS `default_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
     ADD INDEX IF NOT EXISTS `IDX_account_state_key` (`account_state_key`),
     ADD INDEX IF NOT EXISTS `IDX_availability_status_key` (`availability_status_key`);
 

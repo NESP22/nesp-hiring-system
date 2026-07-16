@@ -15,6 +15,7 @@ WHERE `flag_key` IN (
     'NESP_PRESCREEN_ENABLED',
     'NESP_VAPI_ENABLED',
     'NESP_ZOOM_ENABLED',
+    'NESP_INTERVIEWER_ZOOM_LINKS_ENABLED',
     'NESP_AI_REVIEW_ENABLED',
     'NESP_STAFFING_FORECAST_ENABLED',
     'NESP_STAFFING_DRIVE_IMPORT_ENABLED'
@@ -68,7 +69,8 @@ ALTER TABLE `nesp_interview`
 
 ALTER TABLE `nesp_interviewer_profile`
     DROP COLUMN IF EXISTS `can_add_notes`,
-    DROP COLUMN IF EXISTS `can_submit_scorecard`;
+    DROP COLUMN IF EXISTS `can_submit_scorecard`,
+    DROP COLUMN IF EXISTS `default_zoom_join_url`;
 
 ALTER TABLE `nesp_candidate_workflow`
     DROP INDEX IF EXISTS `IDX_nesp_dashboard_due`,

@@ -26,4 +26,5 @@ ALTER TABLE `nesp_interviewer_profile`
     DROP COLUMN IF EXISTS `may_recommend`,
     DROP COLUMN IF EXISTS `private_admin_notes`,
     DROP COLUMN IF EXISTS `last_login_at`,
-    DROP COLUMN IF EXISTS `email_warning`;
+    DROP COLUMN IF EXISTS `email_warning`,
+    DROP COLUMN IF EXISTS `default_zoom_join_url`;

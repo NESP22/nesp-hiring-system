@@ -15,6 +15,7 @@ VALUES
     ('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW()),
     ('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0, 1, NOW(), NOW()),
     ('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0, 1, NOW(), NOW()),
+    ('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED', 'Interviewer Zoom Links', 'Disabled participant-link helper. No Zoom API, OAuth, meeting creation, cancellation, rescheduling, or invitations are sent.', 0, 1, NOW(), NOW()),
     ('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0, 1, NOW(), NOW()),
     ('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0, 1, NOW(), NOW()),
     ('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0, 1, NOW(), NOW())
@@ -54,7 +55,8 @@ ALTER TABLE `nesp_candidate_workflow`
 
 ALTER TABLE `nesp_interviewer_profile`
     ADD COLUMN IF NOT EXISTS `can_add_notes` TINYINT(1) NOT NULL DEFAULT '1',
-    ADD COLUMN IF NOT EXISTS `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1';
+    ADD COLUMN IF NOT EXISTS `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1',
+    ADD COLUMN IF NOT EXISTS `default_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '';
 
 ALTER TABLE `nesp_candidate_workflow`
     ADD INDEX IF NOT EXISTS `IDX_nesp_dashboard_due` (`due_at`),

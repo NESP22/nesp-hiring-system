@@ -6,7 +6,7 @@
         <div id="contents">
             <div class="nesp-page-title">
                 <h2><?php echo(empty($this->interview) ? 'Schedule Interview' : 'Reschedule Interview'); ?></h2>
-                <p>Manual Zoom tracking only. Create or update the meeting in Zoom yourself, then paste only the applicant join link here.</p>
+                <p>Manual Zoom tracking only. Create or update the meeting in Zoom yourself, then use only the applicant participant link here.</p>
             </div>
 
             <div class="nesp-safety-banner">
@@ -47,8 +47,8 @@
                     <h3>Manual Zoom Rule</h3>
                     <ul class="nesp-list">
                         <li>Create the Zoom meeting outside this app.</li>
-                        <li>Paste only the applicant join link.</li>
-                        <li>Never paste the host/start URL.</li>
+                        <li>Use only the applicant participant link.</li>
+                        <li>Never paste the host/start URL, start_url, /start/, or zak value.</li>
                         <li>Review the invitation copy before sending anything.</li>
                     </ul>
                 </div>
@@ -59,6 +59,16 @@
                 $startDate = !empty($existing['scheduled_start']) ? date('Y-m-d', strtotime($existing['scheduled_start'])) : '';
                 $startTime = !empty($existing['scheduled_start']) ? date('H:i', strtotime($existing['scheduled_start'])) : '';
                 $duration = (!empty($existing['scheduled_start']) && !empty($existing['scheduled_end'])) ? (int) ((strtotime($existing['scheduled_end']) - strtotime($existing['scheduled_start'])) / 60) : $this->preview['default_duration_minutes'];
+                $selectedInterviewerID = !empty($existing['interviewer_profile_id']) ? (int) $existing['interviewer_profile_id'] : 0;
+                $defaultZoomJoinURL = '';
+                foreach ($this->preview['interviewer_profiles'] as $profile)
+                {
+                    if ($selectedInterviewerID > 0 && (int) $profile['interviewer_profile_id'] === $selectedInterviewerID)
+                    {
+                        $defaultZoomJoinURL = $profile['default_zoom_join_url'];
+                    }
+                }
+                $zoomJoinURL = !empty($existing['manual_zoom_join_url']) ? $existing['manual_zoom_join_url'] : $defaultZoomJoinURL;
             ?>
             <div class="nesp-panel">
                 <h3>Interview Details</h3>
@@ -103,8 +113,9 @@
                     </label>
 
                     <label>
-                        Applicant Zoom join URL
-                        <input type="url" name="zoomJoinURL" value="<?php echo(htmlspecialchars(!empty($existing['manual_zoom_join_url']) ? $existing['manual_zoom_join_url'] : '', ENT_QUOTES, 'UTF-8')); ?>" placeholder="https://*.zoom.us/j/..." required />
+                        Applicant Zoom participant link
+                        <input type="url" name="zoomJoinURL" value="<?php echo(htmlspecialchars($zoomJoinURL, ENT_QUOTES, 'UTF-8')); ?>" placeholder="https://*.zoom.us/j/..."<?php if (!$this->preview['interviewer_zoom_links_enabled']): ?> required<?php endif; ?> />
+                        <span class="nesp-help-text"><?php echo($this->preview['interviewer_zoom_links_enabled'] ? 'Leave blank to use the selected interviewer default participant link, or paste a per-interview replacement participant link.' : 'Paste a per-interview participant link. Interviewer default participant links are disabled by feature flag.'); ?></span>
                     </label>
 
                     <label>
