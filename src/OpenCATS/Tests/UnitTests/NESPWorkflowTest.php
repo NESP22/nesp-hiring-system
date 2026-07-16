@@ -325,6 +325,9 @@ class NESPWorkflowTest extends TestCase
         }
 
         $this->assertSame(array(41002, 41003), $byName['Suthir']['approved_joborder_ids']);
+        $this->assertSame('brandon@nesportsphoto.com', $byName['Brandon']['email']);
+        $this->assertStringNotContainsString('brandon@sportsphoto.com', $byName['Brandon']['email']);
+        $this->assertStringNotContainsString('brandon@sportsphoto.com', $byName['Brandon']['email_warning']);
         $this->assertSame(array(41005), $byName['Brandon']['approved_joborder_ids']);
         $this->assertSame('email_needs_confirmation', $byName['Brandon']['account_state_key']);
         $this->assertStringContainsString('Please confirm', $byName['Brandon']['email_warning']);

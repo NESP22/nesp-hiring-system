@@ -34,6 +34,14 @@ FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `nesp_interviewer_profile` WHERE email = 'suthir@nesportsphoto.com');
 
 UPDATE `nesp_interviewer_profile`
+SET email = 'brandon@nesportsphoto.com',
+    email_warning = 'Please confirm that brandon@nesportsphoto.com is the correct email address.',
+    date_modified = NOW()
+WHERE display_name = 'Brandon'
+  AND email = 'brandon@sportsphoto.com'
+  AND is_active = 0;
+
+UPDATE `nesp_interviewer_profile`
 SET display_name = 'Brandon',
     role_key = 'field_support_interviewer',
     is_active = 0,
@@ -48,15 +56,15 @@ SET display_name = 'Brandon',
     latest_time = '17:00:00',
     may_recommend = 0,
     private_admin_notes = 'Approved for Field Assistant interviews after Craig confirms email address and activation.',
-    email_warning = 'Please confirm that brandon@sportsphoto.com is the correct email address.',
+    email_warning = 'Please confirm that brandon@nesportsphoto.com is the correct email address.',
     date_modified = NOW()
-WHERE email = 'brandon@sportsphoto.com';
+WHERE email = 'brandon@nesportsphoto.com';
 
 INSERT INTO `nesp_interviewer_profile`
     (`user_id`, `display_name`, `email`, `role_key`, `is_active`, `can_view_resume`, `can_add_notes`, `can_submit_scorecard`, `account_state_key`, `timezone`, `availability_status_key`, `max_interviews_per_day`, `max_interviews_per_week`, `default_interview_minutes`, `buffer_minutes`, `earliest_time`, `latest_time`, `craig_must_attend`, `may_recommend`, `private_admin_notes`, `email_warning`, `date_created`, `date_modified`)
-SELECT NULL, 'Brandon', 'brandon@sportsphoto.com', 'field_support_interviewer', 0, 1, 1, 1, 'email_needs_confirmation', 'America/New_York', 'open', 3, 12, 20, 15, '09:00:00', '17:00:00', 0, 0, 'Approved for Field Assistant interviews after Craig confirms email address and activation.', 'Please confirm that brandon@sportsphoto.com is the correct email address.', NOW(), NOW()
+SELECT NULL, 'Brandon', 'brandon@nesportsphoto.com', 'field_support_interviewer', 0, 1, 1, 1, 'email_needs_confirmation', 'America/New_York', 'open', 3, 12, 20, 15, '09:00:00', '17:00:00', 0, 0, 'Approved for Field Assistant interviews after Craig confirms email address and activation.', 'Please confirm that brandon@nesportsphoto.com is the correct email address.', NOW(), NOW()
 FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM `nesp_interviewer_profile` WHERE email = 'brandon@sportsphoto.com');
+WHERE NOT EXISTS (SELECT 1 FROM `nesp_interviewer_profile` WHERE email = 'brandon@nesportsphoto.com');
 
 UPDATE `nesp_interviewer_profile`
 SET display_name = 'Nate',
@@ -90,7 +98,7 @@ FROM `nesp_interviewer_profile` ip
 INNER JOIN (
     SELECT 'suthir@nesportsphoto.com' AS email, 41002 AS joborder_id, 'staff_photographer' AS role_key
     UNION ALL SELECT 'suthir@nesportsphoto.com', 41003, 'freelance_photographer'
-    UNION ALL SELECT 'brandon@sportsphoto.com', 41005, 'field_assistant'
+    UNION ALL SELECT 'brandon@nesportsphoto.com', 41005, 'field_assistant'
     UNION ALL SELECT 'nate@nesportsphoto.com', 41002, 'staff_photographer'
     UNION ALL SELECT 'nate@nesportsphoto.com', 41003, 'freelance_photographer'
     UNION ALL SELECT 'nate@nesportsphoto.com', 41005, 'field_assistant'

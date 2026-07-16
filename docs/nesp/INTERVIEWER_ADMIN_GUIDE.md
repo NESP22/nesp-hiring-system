@@ -27,7 +27,7 @@ These real interviewer profiles are approved to be staged inactive. Staging does
 | --- | --- | --- | --- | --- |
 | Craig | Existing admin account | All jobs | Active admin | Craig remains the only default Customer Service interviewer for job `41001`. |
 | Suthir | `suthir@nesportsphoto.com` | `41002`, `41003` | Ready for Account Creation | Photographer interviews only. No Customer Service or Field Assistant access. |
-| Brandon | `brandon@sportsphoto.com` | `41005` | Email Needs Confirmation | Show this warning before activation: `Please confirm that brandon@sportsphoto.com is the correct email address.` |
+| Brandon | `brandon@nesportsphoto.com` | `41005` | Email Needs Confirmation | Show this warning before activation: `Please confirm that brandon@nesportsphoto.com is the correct email address.` |
 | Nate | `nate@nesportsphoto.com` | `41002`, `41003`, `41005` | Ready for Account Creation | Customer Service job `41001` is explicitly forbidden and enforced server-side. |
 
 Run `db/nesp_real_interviewer_profile_seed.sql` only after `db/nesp_interviewer_settings_additive.sql`, and only after Craig approves staging these inactive profiles in the target environment.
