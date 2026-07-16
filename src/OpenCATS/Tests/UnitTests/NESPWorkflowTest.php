@@ -15,7 +15,7 @@ class NESPWorkflowTest extends TestCase
         $flags = NESPWorkflow::getDefaultFeatureFlags();
         $keys = array();
 
-        $this->assertCount(9, $flags);
+        $this->assertCount(11, $flags);
         foreach ($flags as $flag)
         {
             $keys[] = $flag[0];
