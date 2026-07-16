@@ -56,6 +56,8 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('assignedCandidate'));
         $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('submitScorecard'));
         $this->assertSame('NESP_STAFFING_FORECAST_ENABLED', NESPWorkflow::getFeatureFlagForAction('staffingForecast'));
+        $this->assertSame('NESP_STAFFING_FORECAST_ENABLED', NESPWorkflow::getFeatureFlagForAction('dryRunStaffingImport'));
+        $this->assertSame('NESP_STAFFING_FORECAST_ENABLED', NESPWorkflow::getFeatureFlagForAction('importApprovedStaffingRows'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreens'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreenAvailability'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('markPhoneScreenInvitationCopied'));
@@ -527,6 +529,81 @@ class NESPWorkflowTest extends TestCase
         $this->assertTrue($result['dry_run']['source_summary']['requires_additional_historical_workbooks']);
     }
 
+    public function testStaffingDryRunReviewRowsGroupRolesAndApproveOnlyValidRows()
+    {
+        $sheets = array(
+            '9/19-9/25' => array(
+                $this->fallScheduleHeader(),
+                array('Saturday 9/19/2026'),
+                $this->fallScheduleRow('Fixture Soccer League', '2P/1T/1A', 'OUT', 'TRADITIONAL', 'Fixture Field, Boston MA', '08:00', '12:00'),
+                $this->fallScheduleRow('Fixture Missing Details', '', 'OUT', 'TRADITIONAL', '', '', '')
+            )
+        );
+
+        $result = NESPWorkflow::parseFallStaffingWorkbookRows($sheets, 'unit fall workbook');
+        $reviewRows = NESPWorkflow::buildStaffingDryRunReviewRows($result);
+
+        $this->assertCount(2, $reviewRows);
+        $this->assertTrue($reviewRows[0]['is_valid']);
+        $this->assertSame(2, $reviewRows[0]['photographers']);
+        $this->assertSame(1, $reviewRows[0]['table_staff']);
+        $this->assertSame(1, $reviewRows[0]['assistants']);
+        $this->assertSame(4, $reviewRows[0]['total_required_staff']);
+        $this->assertFalse($reviewRows[1]['is_valid']);
+
+        $plan = NESPWorkflow::buildApprovedStaffingImportPlan($result, array($reviewRows[0]['review_key']));
+        $this->assertTrue($plan['ok']);
+        $this->assertCount(3, $plan['rows']);
+
+        $rejected = NESPWorkflow::buildApprovedStaffingImportPlan($result, array($reviewRows[1]['review_key']));
+        $this->assertFalse($rejected['ok']);
+        $this->assertStringContainsString('Ambiguous', $rejected['error']);
+    }
+
+    public function testApprovedStaffingImportPlanRejectsZeroAndAlteredSelections()
+    {
+        $sheets = array(
+            '9/19-9/25' => array(
+                $this->fallScheduleHeader(),
+                array('Saturday 9/19/2026'),
+                $this->fallScheduleRow('Fixture Soccer League', '1P/1T/1A', 'OUT', 'TRADITIONAL', 'Fixture Field, Boston MA', '08:00', '12:00')
+            )
+        );
+
+        $result = NESPWorkflow::parseFallStaffingWorkbookRows($sheets, 'unit fall workbook');
+
+        $zero = NESPWorkflow::buildApprovedStaffingImportPlan($result, array());
+        $this->assertFalse($zero['ok']);
+
+        $altered = NESPWorkflow::buildApprovedStaffingImportPlan($result, array('not-from-this-batch'));
+        $this->assertFalse($altered['ok']);
+        $this->assertStringContainsString('do not match', $altered['error']);
+    }
+
+    public function testApprovedStaffingRowsRemovePersonalAssignmentData()
+    {
+        $sheets = array(
+            '9/19-9/25' => array(
+                $this->fallScheduleHeader(),
+                array('Saturday 9/19/2026'),
+                $this->fallScheduleRowWithAssignments('Fixture Soccer League', '1P/1T/1A', 'OUT', 'TRADITIONAL', 'Fixture Field, Boston MA', '08:00', '12:00')
+            )
+        );
+
+        $result = NESPWorkflow::parseFallStaffingWorkbookRows($sheets, 'unit fall workbook');
+        $reviewRows = NESPWorkflow::buildStaffingDryRunReviewRows($result);
+        $plan = NESPWorkflow::buildApprovedStaffingImportPlan($result, array($reviewRows[0]['review_key']));
+
+        $this->assertTrue($plan['ok']);
+        foreach ($plan['rows'] as $row)
+        {
+            $this->assertSame('', $row['staff_name']);
+            $this->assertStringNotContainsString('Alex Fixture', $row['raw_source_text']);
+            $this->assertStringNotContainsString('Sam Fixture', $row['unresolved_json']);
+            $this->assertStringContainsString('Fixture Soccer League', $row['raw_source_text']);
+        }
+    }
+
     public function testFallStaffingWorkbookParserFlagsIncompleteRows()
     {
         $sheets = array(
@@ -614,6 +691,16 @@ class NESPWorkflowTest extends TestCase
         $row[31] = 'https://docs.google.com/spreadsheets/d/fixture/edit';
         $row[32] = '10MH';
         $row[33] = 'F2600';
+
+        return $row;
+    }
+
+    private function fallScheduleRowWithAssignments($eventName, $staffing, $indoorOutdoor, $jobType, $location, $start, $end)
+    {
+        $row = $this->fallScheduleRow($eventName, $staffing, $indoorOutdoor, $jobType, $location, $start, $end);
+        $row[11] = 'Alex Fixture';
+        $row[21] = 'Sam Fixture';
+        $row[25] = 'Jordan Fixture';
 
         return $row;
     }

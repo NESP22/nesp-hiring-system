@@ -153,7 +153,7 @@ class NESPWorkflow
             return 'NESP_INTERVIEWER_POOL_ENABLED';
         }
 
-        if (in_array($action, array('staffingForecast', 'createStaffingRecommendation')))
+        if (in_array($action, array('staffingForecast', 'dryRunStaffingImport', 'importApprovedStaffingRows', 'createStaffingRecommendation')))
         {
             return 'NESP_STAFFING_FORECAST_ENABLED';
         }
@@ -1233,6 +1233,199 @@ class NESPWorkflow
             'source_type' => 'fall_schedule_workbook',
             'dry_run' => $dryRun
         );
+    }
+
+    public static function buildStaffingDryRunReviewRows($parseResult)
+    {
+        $groups = array();
+        $issuesByRow = array();
+        if (isset($parseResult['issues']) && is_array($parseResult['issues']))
+        {
+            foreach ($parseResult['issues'] as $issue)
+            {
+                $rowNumber = isset($issue['row_number']) ? (int) $issue['row_number'] : 0;
+                if (!isset($issuesByRow[$rowNumber]))
+                {
+                    $issuesByRow[$rowNumber] = array();
+                }
+                $issuesByRow[$rowNumber][] = isset($issue['issue_key']) ? $issue['issue_key'] : 'review_required';
+            }
+        }
+
+        $rows = isset($parseResult['rows']) && is_array($parseResult['rows']) ? $parseResult['rows'] : array();
+        foreach ($rows as $row)
+        {
+            $unresolved = array();
+            if (isset($row['unresolved_json']) && $row['unresolved_json'] !== '')
+            {
+                $decoded = json_decode($row['unresolved_json'], true);
+                if (is_array($decoded))
+                {
+                    $unresolved = $decoded;
+                }
+            }
+
+            $groupKey = self::staffingReviewRowKey($row);
+            if (!isset($groups[$groupKey]))
+            {
+                $rowIssues = isset($issuesByRow[(int) $row['source_row_number']]) ? $issuesByRow[(int) $row['source_row_number']] : array();
+                $groups[$groupKey] = array(
+                    'review_key' => $groupKey,
+                    'source_sheet_name' => $row['source_sheet_name'],
+                    'source_row_number' => (int) $row['source_row_number'],
+                    'event_date' => $row['event_date'],
+                    'event_start_time' => $row['event_start_time'],
+                    'event_end_time' => $row['event_end_time'],
+                    'event_name' => $row['event_name'],
+                    'location' => isset($unresolved['location']) ? $unresolved['location'] : '',
+                    'indoor_outdoor' => isset($unresolved['indoor_outdoor']) ? $unresolved['indoor_outdoor'] : '',
+                    'job_type' => isset($unresolved['job_type']) ? $unresolved['job_type'] : '',
+                    'staffing_text_original' => isset($unresolved['staffing_text_original']) ? $unresolved['staffing_text_original'] : '',
+                    'photographers' => 0,
+                    'leads' => 0,
+                    'table_staff' => 0,
+                    'assistants' => 0,
+                    'total_required_staff' => 0,
+                    'warnings' => $rowIssues,
+                    'duplicate_status' => in_array('duplicate_source_row', $rowIssues, true) ? 'possible duplicate in source' : 'new',
+                    'is_valid' => empty($rowIssues) && (int) $row['issue_count'] === 0,
+                    'role_hashes' => array()
+                );
+            }
+
+            $staffCount = max(0, (int) $row['staff_count']);
+            switch ($row['role_key'])
+            {
+                case 'photographer':
+                    $groups[$groupKey]['photographers'] += $staffCount;
+                    break;
+                case 'lead':
+                    $groups[$groupKey]['leads'] += $staffCount;
+                    break;
+                case 'table_staff':
+                    $groups[$groupKey]['table_staff'] += $staffCount;
+                    break;
+                case 'assistant':
+                    $groups[$groupKey]['assistants'] += $staffCount;
+                    break;
+                default:
+                    $groups[$groupKey]['is_valid'] = false;
+                    if (!in_array('unrecognized_role', $groups[$groupKey]['warnings'], true))
+                    {
+                        $groups[$groupKey]['warnings'][] = 'unrecognized_role';
+                    }
+                    break;
+            }
+            $groups[$groupKey]['total_required_staff'] += $staffCount;
+            $groups[$groupKey]['role_hashes'][] = $row['source_row_hash'];
+        }
+
+        return array_values($groups);
+    }
+
+    public static function buildApprovedStaffingImportPlan($parseResult, $approvedReviewKeys)
+    {
+        $approved = array();
+        foreach ((array) $approvedReviewKeys as $key)
+        {
+            $key = trim((string) $key);
+            if ($key !== '')
+            {
+                $approved[$key] = true;
+            }
+        }
+
+        if (empty($approved))
+        {
+            return array('ok' => false, 'error' => 'Select at least one valid staffing row before importing.', 'rows' => array(), 'review_rows' => array());
+        }
+
+        $reviewRows = self::buildStaffingDryRunReviewRows($parseResult);
+        $validReviewRows = array();
+        foreach ($reviewRows as $reviewRow)
+        {
+            $validReviewRows[$reviewRow['review_key']] = $reviewRow;
+        }
+
+        $unknownKeys = array_diff(array_keys($approved), array_keys($validReviewRows));
+        if (!empty($unknownKeys))
+        {
+            return array('ok' => false, 'error' => 'The selected staffing rows do not match the reviewed dry-run batch.', 'rows' => array(), 'review_rows' => $reviewRows);
+        }
+
+        foreach (array_keys($approved) as $key)
+        {
+            if (empty($validReviewRows[$key]['is_valid']))
+            {
+                return array('ok' => false, 'error' => 'Ambiguous or invalid staffing rows must be corrected and re-reviewed before import.', 'rows' => array(), 'review_rows' => $reviewRows);
+            }
+        }
+
+        $selectedRows = array();
+        $rows = isset($parseResult['rows']) && is_array($parseResult['rows']) ? $parseResult['rows'] : array();
+        foreach ($rows as $row)
+        {
+            if (isset($approved[self::staffingReviewRowKey($row)]) && (int) $row['issue_count'] === 0)
+            {
+                $selectedRows[] = self::sanitizeApprovedStaffingRowForImport($row);
+            }
+        }
+
+        if (empty($selectedRows))
+        {
+            return array('ok' => false, 'error' => 'No importable role rows were found for the approved staffing rows.', 'rows' => array(), 'review_rows' => $reviewRows);
+        }
+
+        return array('ok' => true, 'error' => '', 'rows' => $selectedRows, 'review_rows' => $reviewRows);
+    }
+
+    private static function staffingReviewRowKey($row)
+    {
+        return hash(
+            'sha256',
+            implode('|', array(
+                isset($row['source_sheet_name']) ? $row['source_sheet_name'] : '',
+                isset($row['source_row_number']) ? $row['source_row_number'] : '',
+                isset($row['event_date']) ? $row['event_date'] : '',
+                isset($row['event_name']) ? $row['event_name'] : ''
+            ))
+        );
+    }
+
+    public static function sanitizeApprovedStaffingRowForImport($row)
+    {
+        $unresolved = array();
+        if (isset($row['unresolved_json']) && $row['unresolved_json'] !== '')
+        {
+            $decoded = json_decode($row['unresolved_json'], true);
+            if (is_array($decoded))
+            {
+                $unresolved = $decoded;
+            }
+        }
+
+        unset($unresolved['assignment_counts']);
+        unset($unresolved['dry_run_only']);
+        $safeLocation = isset($unresolved['location']) ? $unresolved['location'] : '';
+        $safeStaffing = isset($unresolved['staffing_text_original']) ? $unresolved['staffing_text_original'] : '';
+        $safeRawText = trim(sprintf(
+            'Tab %s row %s | %s | %s | %s',
+            isset($row['source_sheet_name']) ? $row['source_sheet_name'] : '',
+            isset($row['source_row_number']) ? $row['source_row_number'] : '',
+            isset($row['event_name']) ? $row['event_name'] : '',
+            $safeLocation,
+            $safeStaffing
+        ));
+
+        $row['staff_name'] = '';
+        $row['raw_source_text'] = $safeRawText;
+        $row['unresolved_json'] = json_encode($unresolved);
+        if ($row['unresolved_json'] === false)
+        {
+            $row['unresolved_json'] = '{}';
+        }
+
+        return $row;
     }
 
     public static function normalizeStaffingRows($rows, $sourceLabel, $sourceType = 'CSV')
@@ -3959,6 +4152,226 @@ class NESPWorkflow
         );
 
         return array('import_batch_id' => (int) $batchID, 'status' => 'imported');
+    }
+
+    public function saveApprovedStaffingImport($actorUserID, $sourceType, $sourceIdentifier, $sourceLabel, $parseResult, $approvedReviewKeys, $backupReference)
+    {
+        $backupReference = trim((string) $backupReference);
+        if ($backupReference === '')
+        {
+            return array('ok' => false, 'status' => 'backup_required', 'error' => 'Verify the encrypted production backup before importing approved staffing rows.');
+        }
+
+        $plan = self::buildApprovedStaffingImportPlan($parseResult, $approvedReviewKeys);
+        if (empty($plan['ok']))
+        {
+            return array('ok' => false, 'status' => 'invalid_selection', 'error' => $plan['error']);
+        }
+
+        $rows = $plan['rows'];
+        $hashes = array();
+        foreach ($rows as $row)
+        {
+            $hashes[] = $row['source_row_hash'];
+        }
+        $existingHashes = $this->getExistingStaffingRowHashes($hashes);
+
+        $rowsToImport = array();
+        $alreadyImported = 0;
+        foreach ($rows as $row)
+        {
+            if (isset($existingHashes[$row['source_row_hash']]))
+            {
+                $alreadyImported++;
+                continue;
+            }
+            $rowsToImport[] = $row;
+        }
+
+        if (empty($rowsToImport))
+        {
+            return array(
+                'ok' => true,
+                'status' => 'duplicate_skipped',
+                'import_batch_id' => null,
+                'rows_imported' => 0,
+                'already_imported' => $alreadyImported,
+                'skipped' => $alreadyImported,
+                'forecast' => $this->getStaffingForecast()
+            );
+        }
+
+        $checksum = isset($parseResult['checksum']) ? $parseResult['checksum'] : '';
+        $transactionStarted = $this->_db->beginTransaction();
+
+        try
+        {
+            $sql = sprintf(
+                'INSERT INTO nesp_staffing_import_batch
+                    (source_type, source_identifier, source_checksum, source_label, status_key, discovered_file_count, imported_file_count, rows_imported, rows_requiring_review, created_by_user_id, last_imported_at, date_created, date_modified)
+                 VALUES
+                    (%s, %s, %s, %s, "imported", 1, 1, %s, 0, %s, NOW(), NOW(), NOW())',
+                $this->_db->makeQueryString($sourceType),
+                $this->_db->makeQueryString($sourceIdentifier),
+                $this->_db->makeQueryString($checksum),
+                $this->_db->makeQueryString($sourceLabel),
+                $this->_db->makeQueryInteger(count($rowsToImport)),
+                $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+            );
+            $this->_db->query($sql);
+            $batchID = $this->_db->getLastInsertID();
+
+            foreach ($rowsToImport as $row)
+            {
+                $rowSQL = sprintf(
+                    'INSERT INTO nesp_staffing_import_row
+                        (import_batch_id, source_row_hash, source_sheet_name, source_row_number, event_date, event_start_time, event_end_time, state, sport, event_name, role_key, staff_name, staff_count, staff_hours, raw_source_text, unresolved_json, issue_count, status_key, date_created)
+                     VALUES
+                        (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, "imported", NOW())',
+                    $this->_db->makeQueryInteger($batchID),
+                    $this->_db->makeQueryString($row['source_row_hash']),
+                    $this->_db->makeQueryString($row['source_sheet_name']),
+                    $this->_db->makeQueryInteger($row['source_row_number']),
+                    $row['event_date'] === '' ? 'NULL' : $this->_db->makeQueryString($row['event_date']),
+                    $row['event_start_time'] === null ? 'NULL' : $this->_db->makeQueryString($row['event_start_time']),
+                    $row['event_end_time'] === null ? 'NULL' : $this->_db->makeQueryString($row['event_end_time']),
+                    $this->_db->makeQueryString($row['state']),
+                    $this->_db->makeQueryString($row['sport']),
+                    $this->_db->makeQueryString($row['event_name']),
+                    $this->_db->makeQueryString($row['role_key']),
+                    $this->_db->makeQueryString($row['staff_name']),
+                    $this->_db->makeQueryInteger($row['staff_count']),
+                    $this->_db->makeQueryString($row['staff_hours']),
+                    $this->_db->makeQueryString($row['raw_source_text']),
+                    $this->_db->makeQueryString($row['unresolved_json'])
+                );
+                $this->_db->query($rowSQL);
+            }
+
+            $this->logAuditEvent(
+                $actorUserID,
+                'staffing_import_approved_rows_completed',
+                'staffing_import_batch',
+                $batchID,
+                array(
+                    'source_type' => $sourceType,
+                    'rows_imported' => count($rowsToImport),
+                    'already_imported' => $alreadyImported,
+                    'backup_verified' => true,
+                    'backup_reference' => self::redactBackupReferenceForAudit($backupReference),
+                    'forecast_recalculated' => true
+                )
+            );
+
+            if ($transactionStarted)
+            {
+                $this->_db->commitTransaction();
+            }
+        }
+        catch (Exception $e)
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            return array('ok' => false, 'status' => 'failed', 'error' => 'Approved staffing import failed and was rolled back.');
+        }
+
+        return array(
+            'ok' => true,
+            'status' => 'imported',
+            'import_batch_id' => (int) $batchID,
+            'rows_imported' => count($rowsToImport),
+            'already_imported' => $alreadyImported,
+            'skipped' => $alreadyImported,
+            'forecast' => $this->getStaffingForecast()
+        );
+    }
+
+    public function markStaffingReviewRowsWithExistingDuplicates($reviewRows)
+    {
+        $hashes = array();
+        foreach ($reviewRows as $reviewRow)
+        {
+            foreach ($reviewRow['role_hashes'] as $hash)
+            {
+                $hashes[] = $hash;
+            }
+        }
+        $existingHashes = $this->getExistingStaffingRowHashes($hashes);
+        foreach ($reviewRows as $index => $reviewRow)
+        {
+            $allImported = true;
+            foreach ($reviewRow['role_hashes'] as $hash)
+            {
+                if (!isset($existingHashes[$hash]))
+                {
+                    $allImported = false;
+                    break;
+                }
+            }
+            if ($allImported && !empty($reviewRow['role_hashes']))
+            {
+                $reviewRows[$index]['duplicate_status'] = 'already imported';
+                $reviewRows[$index]['is_valid'] = false;
+            }
+        }
+
+        return $reviewRows;
+    }
+
+    private function getExistingStaffingRowHashes($hashes)
+    {
+        $hashes = array_values(array_unique(array_filter($hashes)));
+        if (empty($hashes))
+        {
+            return array();
+        }
+
+        $quoted = array();
+        foreach ($hashes as $hash)
+        {
+            $quoted[] = $this->_db->makeQueryString($hash);
+        }
+
+        $rows = $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT source_row_hash
+                 FROM nesp_staffing_import_row
+                 WHERE source_row_hash IN (%s)
+                   AND import_batch_id IN (
+                       SELECT import_batch_id
+                       FROM nesp_staffing_import_batch
+                       WHERE undone_at IS NULL
+                   )',
+                implode(',', $quoted)
+            )
+        );
+
+        $existing = array();
+        foreach ($rows as $row)
+        {
+            $existing[$row['source_row_hash']] = true;
+        }
+
+        return $existing;
+    }
+
+    public static function redactBackupReferenceForAudit($backupReference)
+    {
+        $backupReference = trim((string) $backupReference);
+        if ($backupReference === '')
+        {
+            return '';
+        }
+
+        $backupReference = preg_replace('/[A-Za-z0-9+\/=]{24,}/', '[redacted]', $backupReference);
+        if (strlen($backupReference) > 160)
+        {
+            $backupReference = substr($backupReference, 0, 157) . '...';
+        }
+
+        return $backupReference;
     }
 
     public function undoStaffingImport($actorUserID, $importBatchID)
