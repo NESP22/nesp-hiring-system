@@ -39,6 +39,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_staffing_import_batch',
             'nesp_staffing_import_row',
             'nesp_staffing_import_issue',
+            'nesp_historical_job_staffing',
             'nesp_staffing_forecast',
             'nesp_staffing_recommendation'
         );
@@ -137,6 +138,8 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_batch', 'undone_at'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_row', 'source_row_hash'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_staffing_import_issue', 'status_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_historical_job_staffing', 'total_required_staff'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_historical_job_staffing', 'data_quality_status'));
         $this->assertSame(0, $this->countUniqueIndexes('nesp_staffing_import_batch', 'IDX_nesp_import_source'));
     }
 
