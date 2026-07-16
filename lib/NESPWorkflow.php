@@ -334,7 +334,7 @@ class NESPWorkflow
             . 'Timezone: ' . $timezone . "\n"
             . 'Duration: ' . $durationMinutes . ' minutes' . "\n"
             . 'Zoom link: ' . trim((string) $joinURL) . "\n\n"
-            . 'If you need to reschedule, reply to this message and a member of the NESP team will help. No automated hiring decision will be made from this interview.';
+            . 'If you need to reschedule, reply to this message and a member of the NESP team will help; no automated hiring decision will be made from this interview.';
     }
 
     public static function generateQuestionnaireToken()
