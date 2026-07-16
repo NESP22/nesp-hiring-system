@@ -80,6 +80,13 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse($status['feature_enabled']);
         $this->assertFalse($status['event_creation_enabled']);
         $this->assertSame('disabled', $status['status_key']);
+
+        $this->assertSame(array(
+            'disconnected' => 'Not Connected',
+            'connected' => 'Connected',
+            'reauthorize_required' => 'Reauthorization Required',
+            'error' => 'Error'
+        ), NESPGoogleCalendarFreeBusy::getConnectionStateLabels());
     }
 
     public function testGoogleCalendarFreeBusyAdapterFailsClosedWhenDisabled()

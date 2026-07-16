@@ -1888,7 +1888,7 @@ class NESPWorkflow
 
         $interviewerProfileID = (int) $interviewerProfileID;
         $interviewer = $this->_db->getAssoc(sprintf(
-            'SELECT display_name, email
+            'SELECT display_name, email, user_id
              FROM nesp_interviewer_profile
              WHERE interviewer_profile_id = %s
              LIMIT 1',
@@ -1909,7 +1909,11 @@ class NESPWorkflow
             $this->_db,
             $this->isFeatureFlagEnabled(NESPGoogleCalendarFreeBusy::FEATURE_FLAG)
         );
-        $freeBusy->markAuthorizationRequested($interviewerProfileID, $actorUserID);
+        $freeBusy->markAuthorizationRequested(
+            $interviewerProfileID,
+            $actorUserID,
+            isset($interviewer['user_id']) ? $interviewer['user_id'] : null
+        );
         $this->logAuditEvent(
             $actorUserID,
             'google_calendar_authorization_requested',
@@ -1951,6 +1955,21 @@ class NESPWorkflow
         }
 
         return $result;
+    }
+
+    public function getGoogleCalendarBusyWindowsForInterviewer($interviewerProfileID, $timeMin, $timeMax, $timeZone = 'UTC')
+    {
+        if (!$this->isTableInstalled('nesp_google_calendar_connection'))
+        {
+            return array('status_key' => 'not_connected', 'busy' => array(), 'errors' => array());
+        }
+
+        $freeBusy = new NESPGoogleCalendarFreeBusy(
+            $this->_db,
+            $this->isFeatureFlagEnabled(NESPGoogleCalendarFreeBusy::FEATURE_FLAG)
+        );
+
+        return $freeBusy->queryFreeBusyForInterviewer($interviewerProfileID, $timeMin, $timeMax, $timeZone);
     }
 
     public function getInterviewerAccessSummary()

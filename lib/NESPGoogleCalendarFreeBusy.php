@@ -48,6 +48,16 @@ class NESPGoogleCalendarFreeBusy
         return array(self::MINIMUM_SCOPE);
     }
 
+    public static function getConnectionStateLabels()
+    {
+        return array(
+            'disconnected' => 'Not Connected',
+            'connected' => 'Connected',
+            'reauthorize_required' => 'Reauthorization Required',
+            'error' => 'Error'
+        );
+    }
+
     public static function getConfigurationStatus($featureEnabled = false)
     {
         $clientID = trim((string) getenv('NESP_GOOGLE_CALENDAR_CLIENT_ID'));
@@ -285,6 +295,7 @@ class NESPGoogleCalendarFreeBusy
             'SELECT
                 gc.google_calendar_connection_id,
                 gc.interviewer_profile_id,
+                gc.user_id,
                 ip.display_name,
                 ip.email,
                 gc.status_key,
@@ -302,7 +313,78 @@ class NESPGoogleCalendarFreeBusy
         );
     }
 
-    public function markAuthorizationRequested($interviewerProfileID, $actorUserID)
+    public function queryFreeBusyForInterviewer($interviewerProfileID, $timeMin, $timeMax, $timeZone = 'UTC', $httpClient = null)
+    {
+        if (!$this->_featureEnabled)
+        {
+            return array('status_key' => 'disabled', 'busy' => array(), 'errors' => array());
+        }
+        if ($this->_db === null)
+        {
+            return array('status_key' => 'error', 'busy' => array(), 'errors' => array('missing_database_connection'));
+        }
+
+        $connection = $this->_db->getAssoc(sprintf(
+            'SELECT
+                interviewer_profile_id,
+                user_id,
+                status_key,
+                encrypted_access_token,
+                encrypted_calendar_id
+             FROM nesp_google_calendar_connection
+             WHERE interviewer_profile_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($interviewerProfileID)
+        ));
+        if (empty($connection) || $connection['status_key'] === 'disconnected')
+        {
+            return array('status_key' => 'not_connected', 'busy' => array(), 'errors' => array());
+        }
+        if ($connection['status_key'] === 'reauthorize_required')
+        {
+            return array('status_key' => 'reauthorize_required', 'busy' => array(), 'errors' => array('reauthorize_required'));
+        }
+        if ($connection['status_key'] === 'error')
+        {
+            return array('status_key' => 'error', 'busy' => array(), 'errors' => array('connection_error'));
+        }
+
+        $accessToken = self::decryptToken($connection['encrypted_access_token']);
+        if ($accessToken === false || trim((string) $accessToken) === '')
+        {
+            return array('status_key' => 'reauthorize_required', 'busy' => array(), 'errors' => array('missing_access_token'));
+        }
+
+        $calendarID = 'primary';
+        if (trim((string) $connection['encrypted_calendar_id']) !== '')
+        {
+            $decryptedCalendarID = self::decryptToken($connection['encrypted_calendar_id']);
+            if ($decryptedCalendarID !== false && trim((string) $decryptedCalendarID) !== '')
+            {
+                $calendarID = trim((string) $decryptedCalendarID);
+            }
+        }
+
+        $result = $this->queryFreeBusy($accessToken, array($calendarID), $timeMin, $timeMax, $timeZone, $httpClient);
+        if ($result['status_key'] === 'reauthorize_required')
+        {
+            $this->_db->query(sprintf(
+                'UPDATE nesp_google_calendar_connection
+                 SET status_key = %s,
+                     reauthorize_required_at = NOW(),
+                     last_error = %s,
+                     date_modified = NOW()
+                 WHERE interviewer_profile_id = %s',
+                $this->_db->makeQueryString('reauthorize_required'),
+                $this->_db->makeQueryString(implode(',', isset($result['errors']) ? $result['errors'] : array())),
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            ));
+        }
+
+        return $result;
+    }
+
+    public function markAuthorizationRequested($interviewerProfileID, $actorUserID, $interviewerUserID = null)
     {
         if ($this->_db === null)
         {
@@ -317,10 +399,11 @@ class NESPGoogleCalendarFreeBusy
 
         $sql = sprintf(
             'INSERT INTO nesp_google_calendar_connection
-                (interviewer_profile_id, status_key, token_scope, reauthorize_required_at, created_by_user_id, modified_by_user_id, date_created, date_modified)
+                (interviewer_profile_id, user_id, status_key, token_scope, reauthorize_required_at, created_by_user_id, modified_by_user_id, date_created, date_modified)
              VALUES
-                (%s, %s, %s, NOW(), %s, %s, NOW(), NOW())
+                (%s, %s, %s, %s, NOW(), %s, %s, NOW(), NOW())
              ON DUPLICATE KEY UPDATE
+                user_id = VALUES(user_id),
                 status_key = VALUES(status_key),
                 token_scope = VALUES(token_scope),
                 reauthorize_required_at = NOW(),
@@ -329,6 +412,7 @@ class NESPGoogleCalendarFreeBusy
                 modified_by_user_id = VALUES(modified_by_user_id),
                 date_modified = NOW()',
             $this->_db->makeQueryInteger($interviewerProfileID),
+            $interviewerUserID === null ? 'NULL' : $this->_db->makeQueryInteger($interviewerUserID),
             $this->_db->makeQueryString('reauthorize_required'),
             $this->_db->makeQueryString(self::MINIMUM_SCOPE),
             $this->_db->makeQueryInteger($actorUserID),

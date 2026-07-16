@@ -2945,8 +2945,10 @@ class CATSSchema
                 CREATE TABLE IF NOT EXISTS nesp_google_calendar_connection (
                   google_calendar_connection_id INT(11) NOT NULL AUTO_INCREMENT,
                   interviewer_profile_id INT(11) NOT NULL,
+                  user_id INT(11),
                   status_key VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'disconnected\',
                   google_subject_hash CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\',
+                  encrypted_calendar_id MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
                   calendar_id_hash CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\',
                   token_scope VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'https://www.googleapis.com/auth/calendar.freebusy\',
                   encrypted_access_token MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
@@ -2965,6 +2967,7 @@ class CATSSchema
                   date_modified DATETIME NOT NULL DEFAULT \'1000-01-01 00:00:00\',
                   PRIMARY KEY (google_calendar_connection_id),
                   UNIQUE KEY IDX_google_calendar_interviewer (interviewer_profile_id),
+                  KEY IDX_google_calendar_user (user_id),
                   KEY IDX_status_key (status_key),
                   KEY IDX_reauthorize_required_at (reauthorize_required_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

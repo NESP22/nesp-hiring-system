@@ -111,6 +111,12 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'invitation_preview_text'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'outcome_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'cancelled_at'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_google_calendar_connection', 'interviewer_profile_id'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_google_calendar_connection', 'user_id'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_google_calendar_connection', 'encrypted_calendar_id'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_google_calendar_connection', 'encrypted_access_token'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_google_calendar_connection', 'encrypted_refresh_token'));
+        $this->assertSame(1, $this->countUniqueIndexes('nesp_google_calendar_connection', 'IDX_google_calendar_interviewer'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'call_request_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'destination_phone_hash'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_vapi_phone_screen', 'destination_phone_last4'));

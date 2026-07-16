@@ -1,7 +1,7 @@
 # Google Calendar Free/Busy
 
-This is a disabled-by-default scaffold for interviewer availability checks only.
-It is intended for a later handoff to the interviewer conflict engine.
+This is a disabled-by-default scaffold for per-interviewer availability checks
+only. It is intended for a later handoff to the interviewer conflict engine.
 
 ## Safety Defaults
 
@@ -11,7 +11,11 @@ It is intended for a later handoff to the interviewer conflict engine.
 - No production calendars are connected by this migration.
 - No Google Calendar events are created, updated, cancelled, deleted, or invited.
 - Free/busy responses are reduced to busy start/end windows only. Event titles,
-  descriptions, locations, attendees, and calendar names are not stored or shown.
+  descriptions, locations, attendees, private notes, email contents, Drive files,
+  contacts, and calendar names are not stored or shown.
+- There is no shared Craig/NESP Google Calendar used as the default for
+  everyone. Each connection belongs to one interviewer profile and, when linked,
+  that profile's OpenCATS user.
 
 ## OAuth Scope
 
@@ -38,8 +42,11 @@ rendered in templates, or stored unencrypted.
 
 `nesp_google_calendar_connection` stores:
 
+- interviewer profile ID
+- linked interviewer user ID, when the interviewer profile has one
 - encrypted access token
 - encrypted refresh token
+- encrypted selected calendar ID, when a non-primary calendar is selected
 - token fingerprints for audit/debug correlation
 - hashed Google subject and calendar identifiers
 - connection state such as `disconnected`, `reauthorize_required`, `connected`,
@@ -62,3 +69,13 @@ step using the same table and `NESPGoogleCalendarFreeBusy::encryptToken()`.
 
 This adapter is read-only and suitable for Agent 2's future conflict engine to
 call without receiving event details.
+
+For scheduling, use the per-interviewer workflow adapter:
+
+`NESPWorkflow::getGoogleCalendarBusyWindowsForInterviewer($interviewerProfileID, $timeMin, $timeMax, $timeZone)`
+
+That method looks up only the selected interviewer's connection record. If a
+calendar ID has been stored for that interviewer, it decrypts and queries that
+calendar. Otherwise it queries `primary` under that interviewer's OAuth token.
+It does not fall back to Craig's calendar, a shared NESP calendar, or any other
+interviewer's connection.
