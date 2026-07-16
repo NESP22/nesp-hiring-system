@@ -199,6 +199,45 @@ class NESPUI extends UserInterface
                 $this->saveQuestionnaireReview();
                 break;
 
+            case 'scheduleInterview':
+                $this->adminOnly();
+                $this->scheduleInterview();
+                break;
+
+            case 'saveManualInterview':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->saveManualInterview();
+                break;
+
+            case 'cancelInterview':
+                $this->adminOnly();
+                $this->cancelInterview();
+                break;
+
+            case 'confirmCancelInterview':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->confirmCancelInterview();
+                break;
+
+            case 'recordInterviewOutcome':
+                $this->adminOnly();
+                $this->recordInterviewOutcome();
+                break;
+
+            case 'saveInterviewOutcome':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->saveInterviewOutcome();
+                break;
+
+            case 'markManualInterviewInvitationSent':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->markManualInterviewInvitationSent();
+                break;
+
             case 'jobAds':
                 $this->adminOnly();
                 $this->jobAds();
@@ -295,6 +334,12 @@ class NESPUI extends UserInterface
                 $this->adminOnly();
                 $this->requirePostCSRF();
                 $this->createStaffingRecommendation();
+                break;
+
+            case 'dryRunStaffingImport':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->dryRunStaffingImport();
                 break;
 
             case 'staffingForecast':
@@ -1010,6 +1055,129 @@ class NESPUI extends UserInterface
         CATSUtility::transferRelativeURI('m=nesp&a=reviewPhoneScreen&phoneScreenID=' . $phoneScreenID);
     }
 
+    private function scheduleInterview()
+    {
+        $interviewID = isset($_GET['interviewID']) ? (int) $_GET['interviewID'] : 0;
+        if ($interviewID > 0)
+        {
+            $interview = $this->_workflow->getInterviewDetail($interviewID);
+            if (empty($interview))
+            {
+                CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Interview not found.');
+            }
+            $candidateID = (int) $interview['candidate_id'];
+            $jobOrderID = (int) $interview['joborder_id'];
+        }
+        else
+        {
+            $candidateID = isset($_GET['candidateID']) ? (int) $_GET['candidateID'] : 0;
+            $jobOrderID = isset($_GET['jobOrderID']) ? (int) $_GET['jobOrderID'] : 0;
+            $interview = array();
+        }
+
+        $preview = $this->_workflow->getCandidateInterviewPreview($candidateID, $jobOrderID, $interviewID);
+        if (empty($preview))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Candidate is not active or not attached to this role.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Interviews');
+        $this->_template->assign('viewKey', 'interviews');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('preview', $preview);
+        $this->_template->assign('interview', $interview);
+        $this->_template->display('./modules/nesp/ScheduleInterview.tpl');
+    }
+
+    private function saveManualInterview()
+    {
+        $interviewID = isset($_POST['interviewID']) ? (int) $_POST['interviewID'] : 0;
+        $result = $interviewID > 0
+            ? $this->_workflow->updateManualInterview($interviewID, $_POST, $this->_userID)
+            : $this->_workflow->createManualInterview($_POST, $this->_userID);
+
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to save interview.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=recordInterviewOutcome&interviewID=' . (int) $result['interview_id']);
+    }
+
+    private function cancelInterview()
+    {
+        $interviewID = isset($_GET['interviewID']) ? (int) $_GET['interviewID'] : 0;
+        $interview = $this->_workflow->getInterviewDetail($interviewID);
+        if (empty($interview))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Interview not found.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Interviews');
+        $this->_template->assign('viewKey', 'interviews');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('interview', $interview);
+        $this->_template->display('./modules/nesp/CancelInterview.tpl');
+    }
+
+    private function confirmCancelInterview()
+    {
+        $interviewID = isset($_POST['interviewID']) ? (int) $_POST['interviewID'] : 0;
+        $cancelReason = isset($_POST['cancelReason']) ? $_POST['cancelReason'] : '';
+        $result = $this->_workflow->cancelManualInterview($interviewID, $this->_userID, $cancelReason);
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to cancel interview.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=interviews');
+    }
+
+    private function recordInterviewOutcome()
+    {
+        $interviewID = isset($_GET['interviewID']) ? (int) $_GET['interviewID'] : 0;
+        $interview = $this->_workflow->getInterviewDetail($interviewID);
+        if (empty($interview))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Interview not found.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Interviews');
+        $this->_template->assign('viewKey', 'interviews');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('interview', $interview);
+        $this->_template->assign('outcomeLabels', NESPWorkflow::getManualInterviewOutcomeLabels());
+        $this->_template->display('./modules/nesp/InterviewOutcome.tpl');
+    }
+
+    private function saveInterviewOutcome()
+    {
+        $interviewID = isset($_POST['interviewID']) ? (int) $_POST['interviewID'] : 0;
+        $outcomeKey = isset($_POST['outcomeKey']) ? $_POST['outcomeKey'] : '';
+        $outcomeNotes = isset($_POST['outcomeNotes']) ? $_POST['outcomeNotes'] : '';
+        $result = $this->_workflow->saveInterviewOutcome($interviewID, $this->_userID, $outcomeKey, $outcomeNotes);
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to save interview outcome.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=completed');
+    }
+
+    private function markManualInterviewInvitationSent()
+    {
+        $interviewID = isset($_POST['interviewID']) ? (int) $_POST['interviewID'] : 0;
+        if ($this->_workflow->markManualInterviewInvitationSent($interviewID, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to mark the interview invitation sent.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=recordInterviewOutcome&interviewID=' . $interviewID);
+    }
+
     private function createStaffingRecommendation()
     {
         $forecast = $this->_workflow->getStaffingForecast();
@@ -1032,6 +1200,49 @@ class NESPUI extends UserInterface
         $this->_template->assign('viewKey', 'staffingForecast');
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('forecast', $this->_workflow->getStaffingForecast());
+        $this->_template->assign('dryRunResult', null);
+        $this->_template->display('./modules/nesp/StaffingForecast.tpl');
+    }
+
+    private function dryRunStaffingImport()
+    {
+        $dryRunResult = array(
+            'error' => '',
+            'result' => null
+        );
+
+        if (!isset($_FILES['staffingWorkbook']) || !is_uploaded_file($_FILES['staffingWorkbook']['tmp_name']))
+        {
+            $dryRunResult['error'] = 'Choose an exported Fall schedule workbook before running the dry-run.';
+        }
+        else
+        {
+            $fileName = isset($_FILES['staffingWorkbook']['name']) ? $_FILES['staffingWorkbook']['name'] : 'uploaded workbook';
+            $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+            if (!in_array($extension, array('xlsx', 'csv'), true))
+            {
+                $dryRunResult['error'] = 'Use an exported .xlsx or .csv file for the dry-run.';
+            }
+            else if ($extension === 'xlsx')
+            {
+                $dryRunResult['result'] = NESPWorkflow::parseFallStaffingWorkbookXLSXFile(
+                    $_FILES['staffingWorkbook']['tmp_name'],
+                    $fileName
+                );
+            }
+            else
+            {
+                $csv = file_get_contents($_FILES['staffingWorkbook']['tmp_name']);
+                $dryRunResult['result'] = NESPWorkflow::parseStaffingCSVText($csv === false ? '' : $csv, $fileName);
+            }
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Staffing Forecast');
+        $this->_template->assign('viewKey', 'staffingForecast');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('forecast', $this->_workflow->getStaffingForecast());
+        $this->_template->assign('dryRunResult', $dryRunResult);
         $this->_template->display('./modules/nesp/StaffingForecast.tpl');
     }
 

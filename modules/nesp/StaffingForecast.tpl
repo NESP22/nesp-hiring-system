@@ -35,6 +35,96 @@
                 <?php endforeach; ?>
             </div>
 
+            <div class="nesp-import-review">
+                <h3>Controlled Staffing Workbook Dry-Run</h3>
+                <p class="nesp-help-text">Upload an exported Fall staffing workbook to inspect rows and warnings before any database import. This dry-run does not save rows, contact applicants, enable integrations, publish ads, or change candidate records.</p>
+                <form method="post" enctype="multipart/form-data" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=dryRunStaffingImport" class="nesp-inline-form nesp-upload-form">
+                    <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                    <input type="file" name="staffingWorkbook" class="nesp-file-input" accept=".xlsx,.csv" />
+                    <button type="submit" class="nesp-secondary-button">Run Dry-Run</button>
+                </form>
+                <?php if ($this->dryRunResult !== null): ?>
+                    <?php if ($this->dryRunResult['error'] !== ''): ?>
+                        <div class="nesp-empty"><?php $this->_($this->dryRunResult['error']); ?></div>
+                    <?php else: ?>
+                        <?php $dryRun = $this->dryRunResult['result']['dry_run']; ?>
+                        <div class="nesp-card-grid nesp-card-grid-compact">
+                            <div class="nesp-card">
+                                <span class="nesp-card-label">Tabs Inspected</span>
+                                <strong><?php $this->_($dryRun['source_summary']['total_tabs']); ?></strong>
+                            </div>
+                            <div class="nesp-card">
+                                <span class="nesp-card-label">Job Rows Found</span>
+                                <strong><?php $this->_($dryRun['quality']['recognized_job_rows']); ?></strong>
+                            </div>
+                            <div class="nesp-card">
+                                <span class="nesp-card-label">Rows Need Review</span>
+                                <strong><?php $this->_($dryRun['quality']['ambiguous_rows']); ?></strong>
+                            </div>
+                            <div class="nesp-card">
+                                <span class="nesp-card-label">Rows Imported</span>
+                                <strong>0</strong>
+                            </div>
+                        </div>
+                        <div class="nesp-two-column">
+                            <div class="nesp-panel">
+                                <h4>Source Inventory</h4>
+                                <table class="nesp-table">
+                                    <tr><th>Years found</th><td><?php $this->_(count($dryRun['source_summary']['years_found']) ? implode(', ', $dryRun['source_summary']['years_found']) : 'None'); ?></td></tr>
+                                    <tr><th>Prior Fall seasons</th><td><?php echo($dryRun['source_summary']['prior_fall_years_present'] ? 'Yes' : 'No'); ?></td></tr>
+                                    <tr><th>Historical workbooks needed</th><td><?php echo($dryRun['source_summary']['requires_additional_historical_workbooks'] ? 'Yes' : 'No'); ?></td></tr>
+                                    <tr><th>Tabs with jobs</th><td><?php $this->_(count($dryRun['source_summary']['tabs_with_jobs']) ? implode(', ', $dryRun['source_summary']['tabs_with_jobs']) : 'None'); ?></td></tr>
+                                    <tr><th>Tabs with assignments</th><td><?php $this->_(count($dryRun['source_summary']['tabs_with_assignments']) ? implode(', ', $dryRun['source_summary']['tabs_with_assignments']) : 'None'); ?></td></tr>
+                                </table>
+                            </div>
+                            <div class="nesp-panel">
+                                <h4>Quality Review</h4>
+                                <table class="nesp-table">
+                                    <tr><th>Missing dates</th><td><?php $this->_($dryRun['quality']['rows_missing_dates']); ?></td></tr>
+                                    <tr><th>Missing locations</th><td><?php $this->_($dryRun['quality']['rows_missing_location']); ?></td></tr>
+                                    <tr><th>Missing start/end</th><td><?php $this->_($dryRun['quality']['rows_missing_start_or_end']); ?></td></tr>
+                                    <tr><th>Invalid staffing strings</th><td><?php $this->_($dryRun['quality']['invalid_staffing_rows']); ?></td></tr>
+                                    <tr><th>Duplicate rows</th><td><?php $this->_($dryRun['quality']['duplicate_rows']); ?></td></tr>
+                                    <tr><th>Total warnings</th><td><?php $this->_($dryRun['quality']['issue_count']); ?></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="nesp-panel">
+                            <h4>Tab Summary</h4>
+                            <table class="nesp-table">
+                                <tr><th>Tab</th><th>Years</th><th>Jobs</th><th>Staffing Rows</th><th>Assignments</th><th>Review Rows</th></tr>
+                                <?php foreach ($dryRun['tab_summaries'] as $summary): ?>
+                                <tr>
+                                    <td><?php $this->_($summary['tab_name']); ?></td>
+                                    <td><?php $this->_(count($summary['years_found']) ? implode(', ', $summary['years_found']) : '-'); ?></td>
+                                    <td><?php $this->_($summary['recognized_job_rows']); ?></td>
+                                    <td><?php $this->_($summary['staffing_rows']); ?></td>
+                                    <td><?php $this->_($summary['assignment_rows']); ?></td>
+                                    <td><?php $this->_($summary['ambiguous_rows']); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </table>
+                        </div>
+                        <div class="nesp-panel">
+                            <h4>Warnings Preview</h4>
+                            <table class="nesp-table">
+                                <tr><th>Issue</th><th>Message</th></tr>
+                                <?php foreach (array_slice($this->dryRunResult['result']['issues'], 0, 25) as $issue): ?>
+                                <tr>
+                                    <td><?php $this->_($issue['issue_key']); ?></td>
+                                    <td><?php $this->_($issue['message']); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                                <?php if (!count($this->dryRunResult['result']['issues'])): ?>
+                                <tr><td colspan="2">No warnings found in the dry-run.</td></tr>
+                                <?php endif; ?>
+                            </table>
+                            <p class="nesp-help-text">Dry-run complete. No source rows were imported. A controlled import still requires Craig approval, an encrypted backup, additive migrations, and valid-row approval.</p>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
+
             <div class="nesp-card-grid nesp-card-grid-compact">
                 <div class="nesp-card">
                     <span class="nesp-card-label">Source Status</span>

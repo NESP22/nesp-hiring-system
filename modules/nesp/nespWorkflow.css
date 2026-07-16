@@ -407,6 +407,34 @@
     margin-top: 8px;
 }
 
+.nesp-workflow details.nesp-secondary-actions {
+    display: block;
+    border-top: 1px solid var(--nesp-dashboard-line-soft);
+    padding-top: 8px;
+}
+
+.nesp-workflow details.nesp-secondary-actions summary {
+    color: var(--nesp-dashboard-link);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.nesp-workflow details.nesp-secondary-actions[open] {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.nesp-workflow .nesp-task-next {
+    background: #081d39;
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    color: var(--nesp-dashboard-muted);
+    font-size: 12px;
+    line-height: 1.35;
+    margin: 0 0 10px;
+    padding: 8px;
+}
+
 .nesp-workflow .nesp-button-row {
     display: flex;
     flex-wrap: wrap;
@@ -415,6 +443,40 @@
 
 .nesp-workflow .nesp-inline-form {
     margin-top: 10px;
+}
+
+.nesp-workflow .nesp-import-review {
+    display: grid;
+    gap: 14px;
+    margin: 0 0 18px;
+}
+
+.nesp-workflow .nesp-import-review h3 {
+    color: #ffffff;
+    font-size: 17px;
+    line-height: 1.3;
+    margin: 0;
+}
+
+.nesp-workflow .nesp-upload-form {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.nesp-workflow .nesp-file-input {
+    box-sizing: border-box;
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    background: #081d39;
+    color: var(--nesp-dashboard-text);
+    max-width: 100%;
+    padding: 8px;
+}
+
+.nesp-workflow .nesp-file-input:focus {
+    border-color: #9fc9ff;
+    outline: 3px solid var(--nesp-dashboard-focus);
 }
 
 .nesp-workflow .nesp-help-text {
@@ -670,7 +732,9 @@
     }
 
     .nesp-workflow .nesp-action-form .nesp-primary-action,
-    .nesp-workflow .nesp-action-form .nesp-secondary-action {
+    .nesp-workflow .nesp-action-form .nesp-secondary-action,
+    .nesp-workflow .nesp-upload-form .nesp-secondary-button,
+    .nesp-workflow .nesp-file-input {
         box-sizing: border-box;
         width: 100%;
     }

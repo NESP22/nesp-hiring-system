@@ -89,7 +89,7 @@ class NESPWorkflow
     {
         return array(
             array('vapi', 'Vapi Phone Screening', 'disabled', 'Optional automated phone screen — currently disabled pending final test.'),
-            array('zoom', 'Zoom Scheduling', 'disabled', 'Disabled in Phase 2. No meetings can be created.'),
+            array('zoom', 'Manual Zoom Tracking', 'disabled', 'Manual interview tracking only. No Zoom meetings are created, updated, cancelled, or synced by this app.'),
             array('ai_review', 'AI Candidate Review', 'disabled', 'Disabled in Phase 2. No model calls can run.'),
             array('email', 'Applicant Email', 'disabled', 'Disabled in Phase 2. No outbound applicant email can be sent.')
         );
@@ -115,7 +115,20 @@ class NESPWorkflow
             return 'NESP_WORKFLOW_ENABLED';
         }
 
-        if (in_array($action, array('waiting', 'interviews', 'completed', 'auditLog', 'jobAds')))
+        if (in_array($action, array(
+            'waiting',
+            'interviews',
+            'completed',
+            'auditLog',
+            'jobAds',
+            'scheduleInterview',
+            'saveManualInterview',
+            'cancelInterview',
+            'confirmCancelInterview',
+            'recordInterviewOutcome',
+            'saveInterviewOutcome',
+            'markManualInterviewInvitationSent'
+        )))
         {
             return 'NESP_WORKFLOW_ENABLED';
         }
@@ -211,6 +224,117 @@ class NESPWorkflow
     public static function getQuestionnaireDefaultExpirationHours()
     {
         return 168;
+    }
+
+    public static function getManualInterviewStatusLabels()
+    {
+        return array(
+            'requested' => 'Interview Requested',
+            'scheduled' => 'Scheduled',
+            'invitation_pending' => 'Invitation Pending',
+            'invitation_sent' => 'Invitation Sent',
+            'confirmed' => 'Confirmed',
+            'completed' => 'Completed',
+            'cancelled' => 'Cancelled',
+            'reschedule_needed' => 'Reschedule Needed',
+            'no_show' => 'No Show'
+        );
+    }
+
+    public static function getManualInterviewOutcomeLabels()
+    {
+        return array(
+            'completed' => 'Completed',
+            'no_show' => 'No Show',
+            'follow_up_needed' => 'Follow-up Needed',
+            'advance_to_next_step' => 'Advance to Next Step',
+            'declined_by_applicant' => 'Declined by Applicant',
+            'not_moving_forward' => 'Not Moving Forward'
+        );
+    }
+
+    public static function validateZoomApplicantJoinURL($url)
+    {
+        $url = trim((string) $url);
+        if ($url === '' || strlen($url) > 1000)
+        {
+            return array('ok' => false, 'error' => 'Enter the applicant Zoom join link.');
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false || empty($parts['scheme']) || strtolower($parts['scheme']) !== 'https' || empty($parts['host']))
+        {
+            return array('ok' => false, 'error' => 'Use a secure https Zoom join link.');
+        }
+
+        $host = strtolower($parts['host']);
+        if (!preg_match('/(^|\.)zoom\.(us|com)$/', $host))
+        {
+            return array('ok' => false, 'error' => 'Use an official Zoom meeting link.');
+        }
+
+        $path = isset($parts['path']) ? strtolower($parts['path']) : '';
+        $query = isset($parts['query']) ? strtolower($parts['query']) : '';
+        if (strpos($path, '/start') !== false || strpos($query, 'start_url=') !== false || strpos($query, 'zak=') !== false)
+        {
+            return array('ok' => false, 'error' => 'Paste the applicant join link, not the Zoom host/start link.');
+        }
+
+        if (!preg_match('#/(j|my)/#', $path))
+        {
+            return array('ok' => false, 'error' => 'The Zoom link should look like an applicant meeting join URL.');
+        }
+
+        return array('ok' => true, 'url' => $url);
+    }
+
+    public static function maskZoomURLForAudit($url)
+    {
+        $parts = parse_url(trim((string) $url));
+        if ($parts === false || empty($parts['host']))
+        {
+            return '';
+        }
+
+        $path = isset($parts['path']) ? $parts['path'] : '';
+        if (preg_match('#/j/([0-9]{3})([0-9]+)([0-9]{2})#', $path, $matches))
+        {
+            $path = str_replace($matches[1] . $matches[2] . $matches[3], $matches[1] . '...' . $matches[3], $path);
+        }
+
+        return strtolower($parts['host']) . $path;
+    }
+
+    public static function buildManualInterviewInvitationCopy($firstName, $roleTitle, $scheduledStart, $durationMinutes, $timezone, $joinURL)
+    {
+        $firstName = trim((string) $firstName);
+        $roleTitle = trim((string) $roleTitle);
+        $timezone = trim((string) $timezone);
+        if ($firstName === '')
+        {
+            $firstName = '[First Name]';
+        }
+        if ($roleTitle === '')
+        {
+            $roleTitle = '[Role]';
+        }
+        if ($timezone === '')
+        {
+            $timezone = 'America/New_York';
+        }
+
+        $timestamp = strtotime($scheduledStart);
+        $dateText = $timestamp === false ? '[Date]' : date('l, F j, Y', $timestamp);
+        $timeText = $timestamp === false ? '[Time]' : date('g:i A', $timestamp);
+        $durationMinutes = max(5, min(240, (int) $durationMinutes));
+
+        return 'Hi ' . $firstName . ', we would like to schedule your interview for the ' . $roleTitle . ' position with New England Sports Photo.' . "\n\n"
+            . 'Date: ' . $dateText . "\n"
+            . 'Time: ' . $timeText . "\n"
+            . 'Timezone: ' . $timezone . "\n"
+            . 'Duration: ' . $durationMinutes . ' minutes' . "\n"
+            . 'Zoom link: ' . trim((string) $joinURL) . "\n\n"
+            . 'If you need to reschedule, reply to this message and a member of the NESP team will help; no automated hiring decision will be made from this interview.';
     }
 
     public static function generateQuestionnaireToken()
@@ -831,6 +955,286 @@ class NESPWorkflow
         return $result;
     }
 
+    public static function parseFallStaffingWorkbookXLSXFile($filePath, $sourceLabel = 'Fall schedule workbook')
+    {
+        if (!class_exists('ZipArchive'))
+        {
+            return array(
+                'rows' => array(),
+                'issues' => array(
+                    array('row_number' => 0, 'issue_key' => 'xlsx_unavailable', 'message' => 'XLSX parsing requires the PHP ZipArchive extension.')
+                ),
+                'checksum' => is_file($filePath) ? hash_file('sha256', $filePath) : '',
+                'source_label' => $sourceLabel,
+                'source_type' => 'fall_schedule_xlsx',
+                'dry_run' => self::emptyFallStaffingDryRun()
+            );
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($filePath) !== true)
+        {
+            return array(
+                'rows' => array(),
+                'issues' => array(
+                    array('row_number' => 0, 'issue_key' => 'xlsx_open_failed', 'message' => 'The XLSX file could not be opened.')
+                ),
+                'checksum' => is_file($filePath) ? hash_file('sha256', $filePath) : '',
+                'source_label' => $sourceLabel,
+                'source_type' => 'fall_schedule_xlsx',
+                'dry_run' => self::emptyFallStaffingDryRun()
+            );
+        }
+
+        $sheets = self::readXLSXWorkbookSheets($zip);
+        $zip->close();
+
+        $result = self::parseFallStaffingWorkbookRows($sheets, $sourceLabel);
+        $result['checksum'] = is_file($filePath) ? hash_file('sha256', $filePath) : hash('sha256', json_encode($sheets));
+        return $result;
+    }
+
+    public static function parseFallStaffingWorkbookRows($sheets, $sourceLabel = 'Fall schedule workbook')
+    {
+        $dryRun = self::emptyFallStaffingDryRun();
+        $dryRun['source_label'] = $sourceLabel;
+        $rows = array();
+        $issues = array();
+        $seenContent = array();
+
+        foreach ($sheets as $sheetName => $sheetRows)
+        {
+            $sheetSummary = array(
+                'tab_name' => $sheetName,
+                'source_rows' => count($sheetRows),
+                'recognized_job_rows' => 0,
+                'staffing_rows' => 0,
+                'assignment_rows' => 0,
+                'ambiguous_rows' => 0,
+                'years_found' => array()
+            );
+            $dryRun['source_summary']['total_tabs']++;
+            $dryRun['source_summary']['tabs'][] = $sheetName;
+
+            $headers = isset($sheetRows[0]) ? self::normalizeHeader($sheetRows[0]) : array();
+            if (!self::fallScheduleHeaderLooksUsable($headers))
+            {
+                $dryRun['quality']['skipped_non_schedule_tabs']++;
+                $dryRun['tab_summaries'][] = $sheetSummary;
+                continue;
+            }
+
+            $currentDate = '';
+            for ($rowIndex = 1; $rowIndex < count($sheetRows); $rowIndex++)
+            {
+                $sourceRowNumber = $rowIndex + 1;
+                $sourceRow = $sheetRows[$rowIndex];
+                $rawText = implode(' | ', array_map('trim', $sourceRow));
+                if (!self::fallScheduleRowHasMeaningfulValue($sourceRow))
+                {
+                    $dryRun['quality']['skipped_blank_rows']++;
+                    continue;
+                }
+
+                if (self::fallScheduleRowIsHeader($sourceRow))
+                {
+                    $dryRun['quality']['skipped_header_rows']++;
+                    continue;
+                }
+
+                $firstCell = self::fallScheduleCell($sourceRow, 0);
+                $rowDate = self::parseStaffingDate($firstCell);
+                if ($rowDate !== '' && !self::fallScheduleRowLooksLikeJob($sourceRow))
+                {
+                    $currentDate = $rowDate;
+                    $dryRun['quality']['skipped_date_rows']++;
+                    $year = substr($rowDate, 0, 4);
+                    $sheetSummary['years_found'][$year] = true;
+                    $dryRun['source_summary']['years_found'][$year] = true;
+                    continue;
+                }
+
+                if (!self::fallScheduleRowLooksLikeJob($sourceRow))
+                {
+                    $dryRun['quality']['skipped_separator_rows']++;
+                    continue;
+                }
+
+                $sheetSummary['recognized_job_rows']++;
+                $dryRun['quality']['recognized_job_rows']++;
+                $dryRun['quality']['total_source_rows']++;
+
+                $eventName = $firstCell;
+                $staffingText = self::fallScheduleCell($sourceRow, 3);
+                $indoorOutdoor = self::fallScheduleCell($sourceRow, 4);
+                $jobType = self::fallScheduleCell($sourceRow, 5);
+                $importance = self::fallScheduleCell($sourceRow, 2);
+                $location = self::fallScheduleCell($sourceRow, 26);
+                $startTime = self::parseStaffingTime(self::fallScheduleCell($sourceRow, 27));
+                $endTime = self::parseStaffingTime(self::fallScheduleCell($sourceRow, 28));
+                $notes = trim(self::fallScheduleCell($sourceRow, 6) . ' ' . self::fallScheduleCell($sourceRow, 7) . ' ' . self::fallScheduleCell($sourceRow, 34));
+                $rowIssues = array();
+
+                if ($currentDate === '')
+                {
+                    $rowIssues[] = 'missing_or_malformed_date';
+                    $dryRun['quality']['rows_missing_dates']++;
+                }
+                else
+                {
+                    $year = substr($currentDate, 0, 4);
+                    $sheetSummary['years_found'][$year] = true;
+                    $dryRun['source_summary']['years_found'][$year] = true;
+                    if (!isset($dryRun['quality']['records_by_year'][$year]))
+                    {
+                        $dryRun['quality']['records_by_year'][$year] = 0;
+                    }
+                    $dryRun['quality']['records_by_year'][$year]++;
+                }
+
+                if ($eventName === '' || in_array(strtolower($eventName), array('true', 'false'), true))
+                {
+                    $rowIssues[] = 'missing_event_name';
+                }
+                if ($location === '')
+                {
+                    $rowIssues[] = 'missing_location';
+                    $dryRun['quality']['rows_missing_location']++;
+                }
+                if ($startTime === null || $endTime === null)
+                {
+                    $rowIssues[] = 'missing_start_or_end_time';
+                    $dryRun['quality']['rows_missing_start_or_end']++;
+                }
+
+                $requiredRoles = self::parseFallStaffingRequirementText($staffingText);
+                if (empty($requiredRoles))
+                {
+                    $rowIssues[] = 'missing_or_invalid_staffing';
+                    $dryRun['quality']['invalid_staffing_rows']++;
+                }
+                else
+                {
+                    $sheetSummary['staffing_rows']++;
+                }
+
+                $assignmentCounts = self::countFallScheduleAssignments($sourceRow);
+                if (array_sum($assignmentCounts) > 0)
+                {
+                    $sheetSummary['assignment_rows']++;
+                    $dryRun['quality']['rows_with_assignments']++;
+                    $requiredTotal = array_sum($requiredRoles);
+                    $assignedTotal = array_sum($assignmentCounts);
+                    if ($requiredTotal > 0 && $assignedTotal !== $requiredTotal)
+                    {
+                        $rowIssues[] = 'assigned_required_conflict';
+                        $dryRun['quality']['conflicting_assigned_vs_required_rows']++;
+                    }
+                }
+
+                $contentKey = strtolower($currentDate . '|' . $eventName . '|' . $location . '|' . $staffingText);
+                if ($contentKey !== '|||' && isset($seenContent[$contentKey]))
+                {
+                    $rowIssues[] = 'duplicate_source_row';
+                    $dryRun['quality']['duplicate_rows']++;
+                }
+                $seenContent[$contentKey] = true;
+
+                $statusKey = empty($rowIssues) ? 'normalized' : 'needs_review';
+                if ($statusKey === 'needs_review')
+                {
+                    $sheetSummary['ambiguous_rows']++;
+                    $dryRun['quality']['ambiguous_rows']++;
+                }
+
+                foreach ($rowIssues as $issueKey)
+                {
+                    $issues[] = array(
+                        'row_number' => $sourceRowNumber,
+                        'issue_key' => $issueKey,
+                        'message' => self::fallScheduleIssueMessage($issueKey, $sheetName, $sourceRowNumber)
+                    );
+                }
+
+                if (empty($requiredRoles))
+                {
+                    $requiredRoles = array('unresolved' => 0);
+                }
+
+                foreach ($requiredRoles as $roleKey => $staffCount)
+                {
+                    $unresolved = array(
+                        'source_label' => $sourceLabel,
+                        'source_year' => $currentDate === '' ? '' : substr($currentDate, 0, 4),
+                        'source_tab_name' => $sheetName,
+                        'indoor_outdoor' => $indoorOutdoor,
+                        'job_type' => $jobType,
+                        'importance' => $importance,
+                        'location' => $location,
+                        'staffing_text_original' => $staffingText,
+                        'notes_sanitized' => self::sanitizeStaffingNote($notes),
+                        'assignment_counts' => $assignmentCounts,
+                        'quality_issues' => $rowIssues,
+                        'dry_run_only' => true
+                    );
+                    $row = array(
+                        'source_sheet_name' => $sheetName,
+                        'source_row_number' => $sourceRowNumber,
+                        'event_date' => $currentDate,
+                        'event_start_time' => $startTime,
+                        'event_end_time' => $endTime,
+                        'state' => self::inferStateFromLocation($location),
+                        'sport' => self::inferSportFromEventName($eventName),
+                        'event_name' => $eventName,
+                        'role_key' => $roleKey,
+                        'staff_name' => '',
+                        'staff_count' => (int) $staffCount,
+                        'staff_hours' => self::calculateStaffHours($startTime, $endTime, max(0, (int) $staffCount)),
+                        'raw_source_text' => $rawText,
+                        'unresolved_json' => json_encode($unresolved),
+                        'issue_count' => count($rowIssues),
+                        'status_key' => $statusKey
+                    );
+                    $row['source_row_hash'] = hash('sha256', $sheetName . '|' . $sourceRowNumber . '|' . $currentDate . '|' . $eventName . '|' . $location . '|' . $roleKey . '|' . $staffingText . '|' . $rawText);
+                    $rows[] = $row;
+                }
+            }
+
+            $sheetSummary['years_found'] = array_map('strval', array_keys($sheetSummary['years_found']));
+            sort($sheetSummary['years_found']);
+            if ($sheetSummary['recognized_job_rows'] > 0)
+            {
+                $dryRun['source_summary']['tabs_with_jobs'][] = $sheetName;
+            }
+            if ($sheetSummary['assignment_rows'] > 0)
+            {
+                $dryRun['source_summary']['tabs_with_assignments'][] = $sheetName;
+            }
+            $dryRun['tab_summaries'][] = $sheetSummary;
+        }
+
+        $dryRun['source_summary']['years_found'] = array_map('strval', array_keys($dryRun['source_summary']['years_found']));
+        sort($dryRun['source_summary']['years_found']);
+        $dryRun['source_summary']['prior_fall_years_present'] = count(array_filter(
+            $dryRun['source_summary']['years_found'],
+            function ($year) {
+                return (int) $year < 2026;
+            }
+        )) > 0;
+        $dryRun['source_summary']['requires_additional_historical_workbooks'] = !$dryRun['source_summary']['prior_fall_years_present'];
+        $dryRun['quality']['normalized_role_rows'] = count($rows);
+        $dryRun['quality']['issue_count'] = count($issues);
+
+        return array(
+            'rows' => $rows,
+            'issues' => $issues,
+            'checksum' => hash('sha256', json_encode($sheets)),
+            'source_label' => $sourceLabel,
+            'source_type' => 'fall_schedule_workbook',
+            'dry_run' => $dryRun
+        );
+    }
+
     public static function normalizeStaffingRows($rows, $sourceLabel, $sourceType = 'CSV')
     {
         $normalized = array();
@@ -1079,6 +1483,7 @@ class NESPWorkflow
             'nesp_staffing_import_batch',
             'nesp_staffing_import_row',
             'nesp_staffing_import_issue',
+            'nesp_historical_job_staffing',
             'nesp_staffing_forecast',
             'nesp_staffing_recommendation'
         );
@@ -1098,6 +1503,10 @@ class NESPWorkflow
             array('nesp_candidate_workflow', 'summary'),
             array('nesp_candidate_workflow', 'next_action_label'),
             array('nesp_interviewer_profile', 'can_add_notes'),
+            array('nesp_interview', 'manual_zoom_join_url'),
+            array('nesp_interview', 'timezone'),
+            array('nesp_interview', 'invitation_status_key'),
+            array('nesp_interview', 'outcome_key'),
             array('nesp_scorecard_response', 'locked_at'),
             array('nesp_vapi_phone_screen', 'call_request_key'),
             array('nesp_vapi_phone_screen', 'destination_phone_hash'),
@@ -1254,7 +1663,7 @@ class NESPWorkflow
                 'SELECT COUNT(*) AS total FROM nesp_interviewer_candidate_grant WHERE date_revoked IS NULL'
             ),
             'scheduledInterviews' => $this->countRows(
-                "SELECT COUNT(*) AS total FROM nesp_interview WHERE status_key = 'scheduled'"
+                "SELECT COUNT(*) AS total FROM nesp_interview WHERE status_key IN ('scheduled', 'invitation_pending', 'invitation_sent', 'confirmed', 'reschedule_needed')"
             ),
             'pendingScorecards' => $this->countRows(
                 "SELECT COUNT(*) AS total FROM nesp_scorecard_response WHERE status_key = 'draft'"
@@ -1303,7 +1712,7 @@ class NESPWorkflow
                  FROM nesp_interview
                  WHERE scheduled_start >= CURDATE()
                    AND scheduled_start < DATE_ADD(CURDATE(), INTERVAL 7 DAY)
-                   AND status_key IN ("scheduled", "confirmed", "needs_notes")'
+                   AND status_key IN ("scheduled", "invitation_pending", "invitation_sent", "confirmed", "reschedule_needed")'
             ),
             'overdueItems' => $this->countRows(
                 'SELECT COUNT(*) AS total
@@ -1580,7 +1989,7 @@ class NESPWorkflow
 
             if ($row['scheduled_start'] !== null && $row['scheduled_start'] !== ''
                 && strtotime($row['scheduled_start']) >= time()
-                && in_array($row['interview_status_key'], array('scheduled', 'confirmed', 'needs_notes'))
+                && in_array($row['interview_status_key'], array('scheduled', 'invitation_pending', 'invitation_sent', 'confirmed', 'reschedule_needed'))
                 && !isset($seen['upcomingInterviews'][$cardKey]))
             {
                 $queues['upcomingInterviews'][] = $card;
@@ -1632,6 +2041,8 @@ class NESPWorkflow
                     i.scheduled_start,
                     i.scheduled_end,
                     i.status_key AS interview_status_key,
+                    i.invitation_status_key,
+                    i.outcome_key,
                     ip.display_name AS interviewer_name,
                     sr.status_key AS scorecard_status_key,
                     sr.overall_recommendation
@@ -1675,7 +2086,7 @@ class NESPWorkflow
     {
         $limit = max(1, min(100, (int) $limit));
 
-        return $this->_db->getAllAssoc(
+        $rows = $this->_db->getAllAssoc(
             sprintf(
                 'SELECT
                     i.interview_id,
@@ -1687,7 +2098,9 @@ class NESPWorkflow
                     i.scheduled_start,
                     i.scheduled_end,
                     TIMESTAMPDIFF(MINUTE, i.scheduled_start, i.scheduled_end) AS duration_minutes,
-                    i.status_key
+                    i.status_key,
+                    i.invitation_status_key,
+                    i.outcome_key
                 FROM
                     nesp_interview i
                 INNER JOIN candidate c
@@ -1699,13 +2112,20 @@ class NESPWorkflow
                 WHERE
                     i.scheduled_start IS NOT NULL
                     AND i.scheduled_start >= NOW()
-                    AND i.status_key IN ("scheduled", "confirmed", "needs_notes")
+                    AND i.status_key IN ("scheduled", "invitation_pending", "invitation_sent", "confirmed", "reschedule_needed")
                 ORDER BY
                     i.scheduled_start ASC
                 LIMIT %s',
                 $this->_db->makeQueryInteger($limit)
             )
         );
+
+        $labels = self::getManualInterviewStatusLabels();
+        foreach ($rows as $index => $row)
+        {
+            $rows[$index]['status_label'] = isset($labels[$row['status_key']]) ? $labels[$row['status_key']] : $row['status_key'];
+        }
+        return $rows;
     }
 
     public function getInterviewerProfiles()
@@ -1927,6 +2347,307 @@ class NESPWorkflow
         );
 
         return $grantID;
+    }
+
+    public function getCandidateInterviewPreview($candidateID, $jobOrderID, $interviewID = 0)
+    {
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        $interviewID = (int) $interviewID;
+        if ($candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return array();
+        }
+
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    c.candidate_id,
+                    c.first_name,
+                    c.last_name,
+                    jo.joborder_id,
+                    jo.title AS role_title,
+                    cw.candidate_workflow_id,
+                    ws.stage_key,
+                    ws.display_name AS stage_name
+                 FROM candidate c
+                 INNER JOIN candidate_joborder cjo
+                    ON cjo.candidate_id = c.candidate_id
+                    AND cjo.joborder_id = %s
+                 INNER JOIN joborder jo
+                    ON jo.joborder_id = cjo.joborder_id
+                 LEFT JOIN nesp_candidate_workflow cw
+                    ON cw.candidate_id = c.candidate_id
+                    AND cw.joborder_id = jo.joborder_id
+                 LEFT JOIN nesp_workflow_stage ws
+                    ON ws.workflow_stage_id = cw.workflow_stage_id
+                 WHERE c.candidate_id = %s
+                   AND c.is_active = 1
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($jobOrderID),
+                $this->_db->makeQueryInteger($candidateID)
+            )
+        );
+        if (empty($row))
+        {
+            return array();
+        }
+
+        $row['candidate_name'] = trim($row['first_name'] . ' ' . $row['last_name']);
+        $row['interviewer_profiles'] = $this->getInterviewerProfiles();
+        $row['existing_interview'] = $interviewID > 0 ? $this->getInterviewDetail($interviewID) : array();
+        $row['active_interviews'] = $this->getActiveInterviewsForCandidateJob($candidateID, $jobOrderID, $interviewID);
+        $row['default_timezone'] = 'America/New_York';
+        $row['default_duration_minutes'] = 30;
+        return $row;
+    }
+
+    public function getInterviewDetail($interviewID)
+    {
+        $interviewID = (int) $interviewID;
+        if ($interviewID <= 0)
+        {
+            return array();
+        }
+
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    i.*,
+                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                    c.first_name,
+                    jo.title AS role_title,
+                    ip.display_name AS interviewer_name
+                 FROM nesp_interview i
+                 INNER JOIN candidate c
+                    ON c.candidate_id = i.candidate_id
+                 INNER JOIN joborder jo
+                    ON jo.joborder_id = i.joborder_id
+                 LEFT JOIN nesp_interviewer_profile ip
+                    ON ip.interviewer_profile_id = i.interviewer_profile_id
+                 WHERE i.interview_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($interviewID)
+            )
+        );
+
+        return empty($row) ? array() : $this->decorateInterviewRow($row);
+    }
+
+    public function createManualInterview($input, $actorUserID)
+    {
+        $normalized = $this->normalizeManualInterviewInput($input);
+        if (!$normalized['ok'])
+        {
+            return $normalized;
+        }
+
+        $active = $this->getActiveInterviewsForCandidateJob($normalized['candidate_id'], $normalized['joborder_id'], 0);
+        if (!empty($active))
+        {
+            return array('ok' => false, 'error' => 'An active interview already exists for this candidate and role.');
+        }
+
+        $invitationCopy = self::buildManualInterviewInvitationCopy(
+            $normalized['candidate_first_name'],
+            $normalized['role_title'],
+            $normalized['scheduled_start'],
+            $normalized['duration_minutes'],
+            $normalized['timezone'],
+            $normalized['manual_zoom_join_url']
+        );
+
+        $this->_db->query(
+            sprintf(
+                'INSERT INTO nesp_interview
+                    (candidate_id, joborder_id, interviewer_profile_id, workflow_stage_id, scheduled_start, scheduled_end, status_key, manual_zoom_join_url, timezone, invitation_status_key, invitation_preview_text, internal_notes, scheduled_by_user_id, date_created, date_modified)
+                 VALUES
+                    (%s, %s, %s, NULL, %s, %s, "invitation_pending", %s, %s, "pending_human_review", %s, %s, %s, NOW(), NOW())',
+                $this->_db->makeQueryInteger($normalized['candidate_id']),
+                $this->_db->makeQueryInteger($normalized['joborder_id']),
+                $this->_db->makeQueryInteger($normalized['interviewer_profile_id']),
+                $this->_db->makeQueryString($normalized['scheduled_start']),
+                $this->_db->makeQueryString($normalized['scheduled_end']),
+                $this->_db->makeQueryString($normalized['manual_zoom_join_url']),
+                $this->_db->makeQueryString($normalized['timezone']),
+                $this->_db->makeQueryString($invitationCopy),
+                $this->_db->makeQueryString($normalized['internal_notes']),
+                $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+            )
+        );
+        $interviewID = (int) $this->_db->getLastInsertID();
+        $this->setCandidateWorkflowStage($normalized['candidate_id'], $normalized['joborder_id'], 'interview_confirmation_pending', 'Applicant', 'Interview scheduled. Review and send invitation copy.', 'Check interview invitation', $actorUserID);
+        $this->logAuditEvent($actorUserID, 'manual_interview_created', 'nesp_interview', $interviewID, array(
+            'candidate_id' => $normalized['candidate_id'],
+            'joborder_id' => $normalized['joborder_id'],
+            'interviewer_profile_id' => $normalized['interviewer_profile_id'],
+            'zoom_join_url_masked' => self::maskZoomURLForAudit($normalized['manual_zoom_join_url'])
+        ));
+
+        return array('ok' => true, 'interview_id' => $interviewID);
+    }
+
+    public function updateManualInterview($interviewID, $input, $actorUserID)
+    {
+        $interview = $this->getInterviewDetail($interviewID);
+        if (empty($interview) || $interview['status_key'] === 'cancelled')
+        {
+            return array('ok' => false, 'error' => 'Choose an active interview to reschedule.');
+        }
+
+        $input['candidateID'] = $interview['candidate_id'];
+        $input['jobOrderID'] = $interview['joborder_id'];
+        $normalized = $this->normalizeManualInterviewInput($input);
+        if (!$normalized['ok'])
+        {
+            return $normalized;
+        }
+
+        $active = $this->getActiveInterviewsForCandidateJob($normalized['candidate_id'], $normalized['joborder_id'], (int) $interviewID);
+        if (!empty($active))
+        {
+            return array('ok' => false, 'error' => 'Another active interview already exists for this candidate and role.');
+        }
+
+        $invitationCopy = self::buildManualInterviewInvitationCopy(
+            $normalized['candidate_first_name'],
+            $normalized['role_title'],
+            $normalized['scheduled_start'],
+            $normalized['duration_minutes'],
+            $normalized['timezone'],
+            $normalized['manual_zoom_join_url']
+        );
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_interview
+                 SET interviewer_profile_id = %s,
+                     scheduled_start = %s,
+                     scheduled_end = %s,
+                     status_key = "reschedule_needed",
+                     manual_zoom_join_url = %s,
+                     timezone = %s,
+                     invitation_status_key = "pending_human_review",
+                     invitation_preview_text = %s,
+                     internal_notes = %s,
+                     reschedule_count = reschedule_count + 1,
+                     date_modified = NOW()
+                 WHERE interview_id = %s',
+                $this->_db->makeQueryInteger($normalized['interviewer_profile_id']),
+                $this->_db->makeQueryString($normalized['scheduled_start']),
+                $this->_db->makeQueryString($normalized['scheduled_end']),
+                $this->_db->makeQueryString($normalized['manual_zoom_join_url']),
+                $this->_db->makeQueryString($normalized['timezone']),
+                $this->_db->makeQueryString($invitationCopy),
+                $this->_db->makeQueryString($normalized['internal_notes']),
+                $this->_db->makeQueryInteger($interviewID)
+            )
+        );
+        $this->setCandidateWorkflowStage($normalized['candidate_id'], $normalized['joborder_id'], 'interview_confirmation_pending', 'Applicant', 'Interview was rescheduled. Review updated invitation copy.', 'Review updated interview', $actorUserID);
+        $this->logAuditEvent($actorUserID, 'manual_interview_rescheduled', 'nesp_interview', $interviewID, array(
+            'previous_start' => $interview['scheduled_start'],
+            'new_start' => $normalized['scheduled_start'],
+            'zoom_join_url_masked' => self::maskZoomURLForAudit($normalized['manual_zoom_join_url'])
+        ));
+
+        return array('ok' => true, 'interview_id' => (int) $interviewID);
+    }
+
+    public function cancelManualInterview($interviewID, $actorUserID, $cancelReason)
+    {
+        $interview = $this->getInterviewDetail($interviewID);
+        if (empty($interview) || $interview['status_key'] === 'cancelled')
+        {
+            return array('ok' => false, 'error' => 'Choose an active interview to cancel.');
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_interview
+                 SET status_key = "cancelled",
+                     invitation_status_key = "cancellation_pending_human_review",
+                     outcome_key = "cancelled",
+                     outcome_notes = %s,
+                     cancelled_at = NOW(),
+                     date_modified = NOW()
+                 WHERE interview_id = %s',
+                $this->_db->makeQueryString(substr(trim((string) $cancelReason), 0, 1000)),
+                $this->_db->makeQueryInteger($interviewID)
+            )
+        );
+        $this->setCandidateWorkflowStage($interview['candidate_id'], $interview['joborder_id'], 'interview_requested', 'Craig', 'Interview was cancelled. Create a new interview or choose the next human step.', 'Choose next step', $actorUserID);
+        $this->logAuditEvent($actorUserID, 'manual_interview_cancelled', 'nesp_interview', $interviewID, array(
+            'candidate_id' => (int) $interview['candidate_id'],
+            'joborder_id' => (int) $interview['joborder_id'],
+            'manual_zoom_cancel_reminder' => true
+        ));
+
+        return array('ok' => true, 'interview_id' => (int) $interviewID);
+    }
+
+    public function saveInterviewOutcome($interviewID, $actorUserID, $outcomeKey, $outcomeNotes)
+    {
+        $interview = $this->getInterviewDetail($interviewID);
+        $outcomes = self::getManualInterviewOutcomeLabels();
+        if (empty($interview) || !isset($outcomes[$outcomeKey]))
+        {
+            return array('ok' => false, 'error' => 'Choose a valid interview outcome.');
+        }
+
+        $statusKey = $outcomeKey === 'no_show' ? 'no_show' : 'completed';
+        $stageKey = in_array($outcomeKey, array('advance_to_next_step', 'follow_up_needed')) ? 'scorecard_complete' : 'needs_review';
+        $summary = 'Interview outcome recorded: ' . $outcomes[$outcomeKey] . '.';
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_interview
+                 SET status_key = %s,
+                     outcome_key = %s,
+                     outcome_notes = %s,
+                     completed_at = NOW(),
+                     date_modified = NOW()
+                 WHERE interview_id = %s',
+                $this->_db->makeQueryString($statusKey),
+                $this->_db->makeQueryString($outcomeKey),
+                $this->_db->makeQueryString(substr(trim((string) $outcomeNotes), 0, 4000)),
+                $this->_db->makeQueryInteger($interviewID)
+            )
+        );
+        $this->setCandidateWorkflowStage($interview['candidate_id'], $interview['joborder_id'], $stageKey, 'Craig', $summary, 'Review outcome', $actorUserID);
+        $this->logAuditEvent($actorUserID, 'manual_interview_outcome_recorded', 'nesp_interview', $interviewID, array(
+            'outcome_key' => $outcomeKey,
+            'candidate_id' => (int) $interview['candidate_id'],
+            'joborder_id' => (int) $interview['joborder_id']
+        ));
+
+        return array('ok' => true, 'interview_id' => (int) $interviewID);
+    }
+
+    public function markManualInterviewInvitationSent($interviewID, $actorUserID)
+    {
+        $interview = $this->getInterviewDetail($interviewID);
+        if (empty($interview) || $interview['status_key'] === 'cancelled')
+        {
+            return false;
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_interview
+                 SET status_key = "invitation_sent",
+                     invitation_status_key = "sent_manually",
+                     date_modified = NOW()
+                 WHERE interview_id = %s',
+                $this->_db->makeQueryInteger($interviewID)
+            )
+        );
+        $this->setCandidateWorkflowStage($interview['candidate_id'], $interview['joborder_id'], 'interview_confirmation_pending', 'Applicant', 'Interview invitation was marked sent manually. Waiting for applicant confirmation.', 'Check confirmation', $actorUserID);
+        $this->logAuditEvent($actorUserID, 'manual_interview_invitation_marked_sent', 'nesp_interview', $interviewID, array(
+            'candidate_id' => (int) $interview['candidate_id'],
+            'joborder_id' => (int) $interview['joborder_id']
+        ));
+
+        return true;
     }
 
     public function getInterviewerAvailability()
@@ -2153,9 +2874,9 @@ class NESPWorkflow
                 ' . $maxWeekly . ' AS max_interviews_per_week,
                 ' . $roleSelect . '
                 COUNT(DISTINCT cg.grant_id) AS active_grants,
-                COUNT(DISTINCT CASE WHEN i.status_key IN ("scheduled", "confirmed", "needs_notes") THEN i.interview_id END) AS open_interviews,
-                COUNT(DISTINCT CASE WHEN DATE(i.scheduled_start) = CURDATE() AND i.status_key IN ("scheduled", "confirmed", "needs_notes") THEN i.interview_id END) AS interviews_today,
-                COUNT(DISTINCT CASE WHEN i.scheduled_start >= CURDATE() AND i.scheduled_start < DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND i.status_key IN ("scheduled", "confirmed", "needs_notes") THEN i.interview_id END) AS interviews_this_week,
+                COUNT(DISTINCT CASE WHEN i.status_key IN ("scheduled", "invitation_pending", "invitation_sent", "confirmed", "reschedule_needed") THEN i.interview_id END) AS open_interviews,
+                COUNT(DISTINCT CASE WHEN DATE(i.scheduled_start) = CURDATE() AND i.status_key IN ("scheduled", "invitation_pending", "invitation_sent", "confirmed", "reschedule_needed") THEN i.interview_id END) AS interviews_today,
+                COUNT(DISTINCT CASE WHEN i.scheduled_start >= CURDATE() AND i.scheduled_start < DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND i.status_key IN ("scheduled", "invitation_pending", "invitation_sent", "confirmed", "reschedule_needed") THEN i.interview_id END) AS interviews_this_week,
                 COUNT(DISTINCT CASE WHEN cg.grant_id IS NOT NULL AND (sr.scorecard_response_id IS NULL OR sr.status_key = "draft") THEN cg.grant_id END) AS scorecards_due,
                 COUNT(DISTINCT CASE WHEN cw.due_at IS NOT NULL AND cw.due_at < NOW() THEN cw.candidate_workflow_id END) AS overdue_items,
                 COUNT(DISTINCT ia.availability_id) AS availability_blocks
@@ -4663,6 +5384,171 @@ class NESPWorkflow
         return !empty($rs);
     }
 
+    private function getActiveInterviewsForCandidateJob($candidateID, $jobOrderID, $excludeInterviewID)
+    {
+        return $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT interview_id, scheduled_start, scheduled_end, status_key
+                 FROM nesp_interview
+                 WHERE candidate_id = %s
+                   AND joborder_id = %s
+                   AND interview_id <> %s
+                   AND status_key IN ("requested", "scheduled", "invitation_pending", "invitation_sent", "confirmed", "reschedule_needed")
+                 ORDER BY scheduled_start ASC',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID),
+                $this->_db->makeQueryInteger($excludeInterviewID)
+            )
+        );
+    }
+
+    private function normalizeManualInterviewInput($input)
+    {
+        $candidateID = isset($input['candidateID']) ? (int) $input['candidateID'] : 0;
+        $jobOrderID = isset($input['jobOrderID']) ? (int) $input['jobOrderID'] : 0;
+        $interviewerProfileID = isset($input['interviewerProfileID']) ? (int) $input['interviewerProfileID'] : 0;
+        $date = isset($input['interviewDate']) ? trim((string) $input['interviewDate']) : '';
+        $time = isset($input['interviewTime']) ? trim((string) $input['interviewTime']) : '';
+        $durationMinutes = isset($input['durationMinutes']) ? (int) $input['durationMinutes'] : 30;
+        $timezone = isset($input['timezone']) ? trim((string) $input['timezone']) : 'America/New_York';
+        $joinURL = isset($input['zoomJoinURL']) ? trim((string) $input['zoomJoinURL']) : '';
+        $internalNotes = isset($input['internalNotes']) ? substr(trim((string) $input['internalNotes']), 0, 2000) : '';
+
+        if ($candidateID <= 0 || $jobOrderID <= 0 || $interviewerProfileID <= 0)
+        {
+            return array('ok' => false, 'error' => 'Choose a candidate, role, and interviewer.');
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !self::isValidAvailabilityTime($time))
+        {
+            return array('ok' => false, 'error' => 'Choose a valid interview date and time.');
+        }
+        $durationMinutes = max(5, min(240, $durationMinutes));
+        if ($timezone === '')
+        {
+            $timezone = 'America/New_York';
+        }
+
+        $zoomValidation = self::validateZoomApplicantJoinURL($joinURL);
+        if (empty($zoomValidation['ok']))
+        {
+            return $zoomValidation;
+        }
+
+        $preview = $this->getCandidateInterviewPreview($candidateID, $jobOrderID);
+        if (empty($preview))
+        {
+            return array('ok' => false, 'error' => 'Candidate is not active or not attached to this role.');
+        }
+        if (!$this->interviewerCanReceiveAssignment($interviewerProfileID, $jobOrderID))
+        {
+            return array('ok' => false, 'error' => 'Interviewer is inactive, closed, or not approved for this role.');
+        }
+
+        $scheduledStart = $date . ' ' . $time . ':00';
+        $scheduledEnd = date('Y-m-d H:i:s', strtotime($scheduledStart) + ($durationMinutes * 60));
+
+        return array(
+            'ok' => true,
+            'candidate_id' => $candidateID,
+            'joborder_id' => $jobOrderID,
+            'interviewer_profile_id' => $interviewerProfileID,
+            'scheduled_start' => $scheduledStart,
+            'scheduled_end' => $scheduledEnd,
+            'duration_minutes' => $durationMinutes,
+            'timezone' => $timezone,
+            'manual_zoom_join_url' => $zoomValidation['url'],
+            'internal_notes' => $internalNotes,
+            'candidate_first_name' => $preview['first_name'],
+            'role_title' => $preview['role_title']
+        );
+    }
+
+    private function decorateInterviewRow($row)
+    {
+        $statusLabels = self::getManualInterviewStatusLabels();
+        $outcomeLabels = self::getManualInterviewOutcomeLabels();
+        $row['status_label'] = isset($statusLabels[$row['status_key']]) ? $statusLabels[$row['status_key']] : $row['status_key'];
+        $row['outcome_label'] = isset($outcomeLabels[$row['outcome_key']]) ? $outcomeLabels[$row['outcome_key']] : $row['outcome_key'];
+        $row['zoom_join_url_masked'] = self::maskZoomURLForAudit(isset($row['manual_zoom_join_url']) ? $row['manual_zoom_join_url'] : '');
+        return $row;
+    }
+
+    private function setCandidateWorkflowStage($candidateID, $jobOrderID, $stageKey, $waitingOn, $summary, $nextActionLabel, $actorUserID)
+    {
+        $stage = $this->_db->getAssoc(
+            sprintf(
+                'SELECT workflow_stage_id
+                 FROM nesp_workflow_stage
+                 WHERE stage_key = %s
+                 LIMIT 1',
+                $this->_db->makeQueryString($stageKey)
+            )
+        );
+        if (empty($stage))
+        {
+            return false;
+        }
+
+        $existing = $this->_db->getAssoc(
+            sprintf(
+                'SELECT candidate_workflow_id
+                 FROM nesp_candidate_workflow
+                 WHERE candidate_id = %s
+                   AND joborder_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID)
+            )
+        );
+
+        if (empty($existing))
+        {
+            $this->_db->query(
+                sprintf(
+                    'INSERT INTO nesp_candidate_workflow
+                        (candidate_id, joborder_id, workflow_stage_id, priority, waiting_on_key, summary, next_action_label, date_created, date_modified)
+                     VALUES
+                        (%s, %s, %s, 1, %s, %s, %s, NOW(), NOW())',
+                    $this->_db->makeQueryInteger($candidateID),
+                    $this->_db->makeQueryInteger($jobOrderID),
+                    $this->_db->makeQueryInteger($stage['workflow_stage_id']),
+                    $this->_db->makeQueryString($waitingOn),
+                    $this->_db->makeQueryString($summary),
+                    $this->_db->makeQueryString($nextActionLabel)
+                )
+            );
+            $workflowID = (int) $this->_db->getLastInsertID();
+        }
+        else
+        {
+            $workflowID = (int) $existing['candidate_workflow_id'];
+            $this->_db->query(
+                sprintf(
+                    'UPDATE nesp_candidate_workflow
+                     SET workflow_stage_id = %s,
+                         waiting_on_key = %s,
+                         summary = %s,
+                         next_action_label = %s,
+                         date_modified = NOW()
+                     WHERE candidate_workflow_id = %s',
+                    $this->_db->makeQueryInteger($stage['workflow_stage_id']),
+                    $this->_db->makeQueryString($waitingOn),
+                    $this->_db->makeQueryString($summary),
+                    $this->_db->makeQueryString($nextActionLabel),
+                    $this->_db->makeQueryInteger($workflowID)
+                )
+            );
+        }
+
+        $this->logAuditEvent($actorUserID, 'candidate_workflow_stage_changed', 'candidate_workflow', $workflowID, array(
+            'candidate_id' => (int) $candidateID,
+            'joborder_id' => (int) $jobOrderID,
+            'stage_key' => $stageKey
+        ));
+
+        return true;
+    }
+
     private function decorateQuestionnaireRows($rows)
     {
         $decorated = array();
@@ -5166,9 +6052,23 @@ class NESPWorkflow
             $nextAction = $this->inferNextAction($row['stage_key']);
         }
 
+        $candidateURL = CATSUtility::getIndexName() . '?m=candidates&amp;a=show&amp;candidateID=' . (int) $row['candidate_id'];
+        $primaryActionURL = $candidateURL;
+        if ($row['stage_key'] === 'interview_requested')
+        {
+            $primaryActionURL = CATSUtility::getIndexName() . '?m=nesp&amp;a=scheduleInterview&amp;candidateID=' . (int) $row['candidate_id'] . '&amp;jobOrderID=' . (int) $row['joborder_id'];
+        }
+        else if (!empty($row['interview_id']) && in_array($row['interview_status_key'], array('scheduled', 'invitation_pending', 'invitation_sent', 'confirmed', 'reschedule_needed')))
+        {
+            $primaryActionURL = CATSUtility::getIndexName() . '?m=nesp&amp;a=recordInterviewOutcome&amp;interviewID=' . (int) $row['interview_id'];
+        }
+
+        $statusLabels = self::getManualInterviewStatusLabels();
+
         return array(
             'candidate_id' => (int) $row['candidate_id'],
             'joborder_id' => (int) $row['joborder_id'],
+            'interview_id' => isset($row['interview_id']) ? (int) $row['interview_id'] : 0,
             'candidate_name' => $candidateName,
             'role_title' => $row['role_title'],
             'stage_name' => $row['stage_name'],
@@ -5177,12 +6077,16 @@ class NESPWorkflow
             'summary' => $summary,
             'last_activity' => $row['date_modified'],
             'next_action_label' => $nextAction,
-            'candidate_url' => CATSUtility::getIndexName() . '?m=candidates&amp;a=show&amp;candidateID=' . (int) $row['candidate_id'],
+            'primary_action_url' => $primaryActionURL,
+            'candidate_url' => $candidateURL,
             'job_url' => CATSUtility::getIndexName() . '?m=joborders&amp;a=show&amp;jobOrderID=' . (int) $row['joborder_id'],
             'scheduled_start' => $row['scheduled_start'],
             'scheduled_end' => $row['scheduled_end'],
             'interviewer_name' => $row['interviewer_name'],
             'interview_status_key' => $row['interview_status_key'],
+            'interview_status_label' => isset($statusLabels[$row['interview_status_key']]) ? $statusLabels[$row['interview_status_key']] : $row['interview_status_key'],
+            'invitation_status_key' => isset($row['invitation_status_key']) ? $row['invitation_status_key'] : '',
+            'outcome_key' => isset($row['outcome_key']) ? $row['outcome_key'] : '',
             'scorecard_status_key' => $row['scorecard_status_key'],
             'overall_recommendation' => $row['overall_recommendation']
         );
@@ -5210,7 +6114,7 @@ class NESPWorkflow
             'applicant_clarification_requested' => 'Review applicant reply',
             'phone_screen_pending' => 'Review phone screen status',
             'phone_screen_complete' => 'Review phone screen',
-            'interview_requested' => 'Assign interviewer',
+            'interview_requested' => 'Schedule interview',
             'interview_confirmation_pending' => 'Check confirmation',
             'interview_scheduled' => 'Open interview',
             'scorecard_pending' => 'Check scorecard',
@@ -5668,6 +6572,431 @@ class NESPWorkflow
         return (int) $rs['total'];
     }
 
+    private static function emptyFallStaffingDryRun()
+    {
+        return array(
+            'source_label' => '',
+            'source_summary' => array(
+                'total_tabs' => 0,
+                'tabs' => array(),
+                'tabs_with_jobs' => array(),
+                'tabs_with_assignments' => array(),
+                'years_found' => array(),
+                'prior_fall_years_present' => false,
+                'requires_additional_historical_workbooks' => true
+            ),
+            'quality' => array(
+                'total_source_rows' => 0,
+                'recognized_job_rows' => 0,
+                'normalized_role_rows' => 0,
+                'skipped_blank_rows' => 0,
+                'skipped_header_rows' => 0,
+                'skipped_date_rows' => 0,
+                'skipped_separator_rows' => 0,
+                'skipped_non_schedule_tabs' => 0,
+                'rows_missing_dates' => 0,
+                'rows_missing_location' => 0,
+                'rows_missing_start_or_end' => 0,
+                'invalid_staffing_rows' => 0,
+                'conflicting_assigned_vs_required_rows' => 0,
+                'duplicate_rows' => 0,
+                'ambiguous_rows' => 0,
+                'rows_with_assignments' => 0,
+                'records_by_year' => array(),
+                'issue_count' => 0
+            ),
+            'tab_summaries' => array()
+        );
+    }
+
+    private static function readXLSXWorkbookSheets($zip)
+    {
+        $sharedStrings = self::readXLSXSharedStrings($zip);
+        $sheetTargets = self::readXLSXSheetTargets($zip);
+        if (empty($sheetTargets))
+        {
+            $sheetTargets = array('Sheet1' => 'xl/worksheets/sheet1.xml');
+        }
+
+        $sheets = array();
+        foreach ($sheetTargets as $sheetName => $target)
+        {
+            $target = ltrim($target, '/');
+            if (strpos($target, 'xl/') !== 0)
+            {
+                $target = 'xl/' . $target;
+            }
+
+            $sheetXML = $zip->getFromName($target);
+            if ($sheetXML === false)
+            {
+                continue;
+            }
+
+            $xml = @simplexml_load_string($sheetXML);
+            if ($xml === false)
+            {
+                continue;
+            }
+
+            $rows = array();
+            foreach ($xml->sheetData->row as $row)
+            {
+                $values = array();
+                foreach ($row->c as $cell)
+                {
+                    $reference = (string) $cell['r'];
+                    $columnIndex = self::xlsxColumnIndexFromReference($reference);
+                    if ($columnIndex < 1)
+                    {
+                        $columnIndex = count($values) + 1;
+                    }
+                    $values[$columnIndex - 1] = self::normalizeFallXLSXCellValue(
+                        self::xlsxCellValue($cell, $sharedStrings),
+                        $columnIndex
+                    );
+                }
+
+                if (!empty($values))
+                {
+                    ksort($values);
+                    $max = max(array_keys($values));
+                    for ($i = 0; $i <= $max; $i++)
+                    {
+                        if (!isset($values[$i]))
+                        {
+                            $values[$i] = '';
+                        }
+                    }
+                    ksort($values);
+                    $rows[] = array_values($values);
+                }
+            }
+
+            $sheets[$sheetName] = $rows;
+        }
+
+        return $sheets;
+    }
+
+    private static function readXLSXSharedStrings($zip)
+    {
+        $strings = array();
+        $sharedXML = $zip->getFromName('xl/sharedStrings.xml');
+        if ($sharedXML === false)
+        {
+            return $strings;
+        }
+
+        $xml = @simplexml_load_string($sharedXML);
+        if ($xml === false)
+        {
+            return $strings;
+        }
+
+        foreach ($xml->si as $stringItem)
+        {
+            $parts = array();
+            if (isset($stringItem->t))
+            {
+                $parts[] = (string) $stringItem->t;
+            }
+            foreach ($stringItem->r as $run)
+            {
+                if (isset($run->t))
+                {
+                    $parts[] = (string) $run->t;
+                }
+            }
+            $strings[] = implode('', $parts);
+        }
+
+        return $strings;
+    }
+
+    private static function readXLSXSheetTargets($zip)
+    {
+        $workbookXML = $zip->getFromName('xl/workbook.xml');
+        $relsXML = $zip->getFromName('xl/_rels/workbook.xml.rels');
+        if ($workbookXML === false || $relsXML === false)
+        {
+            return array();
+        }
+
+        $workbook = @simplexml_load_string($workbookXML);
+        $rels = @simplexml_load_string($relsXML);
+        if ($workbook === false || $rels === false)
+        {
+            return array();
+        }
+
+        $targetsByID = array();
+        foreach ($rels->Relationship as $relationship)
+        {
+            $targetsByID[(string) $relationship['Id']] = (string) $relationship['Target'];
+        }
+
+        $sheets = array();
+        foreach ($workbook->sheets->sheet as $sheet)
+        {
+            $attributes = $sheet->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+            $relationshipID = isset($attributes['id']) ? (string) $attributes['id'] : '';
+            if ($relationshipID !== '' && isset($targetsByID[$relationshipID]))
+            {
+                $sheets[(string) $sheet['name']] = $targetsByID[$relationshipID];
+            }
+        }
+
+        return $sheets;
+    }
+
+    private static function xlsxCellValue($cell, $sharedStrings)
+    {
+        $type = (string) $cell['t'];
+        if ($type === 'inlineStr')
+        {
+            return isset($cell->is->t) ? (string) $cell->is->t : '';
+        }
+
+        $value = isset($cell->v) ? (string) $cell->v : '';
+        if ($type === 's')
+        {
+            $index = (int) $value;
+            return isset($sharedStrings[$index]) ? $sharedStrings[$index] : '';
+        }
+        if ($type === 'b')
+        {
+            return $value === '1' ? 'TRUE' : 'FALSE';
+        }
+
+        return $value;
+    }
+
+    private static function xlsxColumnIndexFromReference($reference)
+    {
+        if (!preg_match('/^([A-Z]+)/i', $reference, $matches))
+        {
+            return 0;
+        }
+
+        $letters = strtoupper($matches[1]);
+        $index = 0;
+        for ($i = 0; $i < strlen($letters); $i++)
+        {
+            $index = ($index * 26) + (ord($letters[$i]) - 64);
+        }
+
+        return $index;
+    }
+
+    private static function normalizeFallXLSXCellValue($value, $columnIndex)
+    {
+        $value = trim((string) $value);
+        if ($value === '')
+        {
+            return '';
+        }
+
+        if (is_numeric($value))
+        {
+            $numeric = (float) $value;
+            if ($columnIndex === 1 && $numeric > 20000 && $numeric < 60000)
+            {
+                return gmdate('Y-m-d', (int) round(($numeric - 25569) * 86400));
+            }
+            if (in_array($columnIndex, array(28, 29), true) && $numeric >= 0 && $numeric < 1)
+            {
+                $seconds = (int) round($numeric * 86400);
+                return sprintf('%02d:%02d:%02d', floor($seconds / 3600), floor(($seconds % 3600) / 60), $seconds % 60);
+            }
+        }
+
+        return $value;
+    }
+
+    private static function fallScheduleHeaderLooksUsable($headers)
+    {
+        return in_array('staffing', $headers, true)
+            && in_array('in_out', $headers, true)
+            && in_array('location', $headers, true)
+            && in_array('start', $headers, true)
+            && in_array('end', $headers, true);
+    }
+
+    private static function fallScheduleRowIsHeader($row)
+    {
+        $headers = self::normalizeHeader($row);
+        return in_array('staffing', $headers, true) && in_array('location', $headers, true);
+    }
+
+    private static function fallScheduleRowLooksLikeJob($row)
+    {
+        $eventName = self::fallScheduleCell($row, 0);
+        if ($eventName === '' || self::parseStaffingDate($eventName) !== '')
+        {
+            return false;
+        }
+
+        $markers = array(
+            self::fallScheduleCell($row, 3),
+            self::fallScheduleCell($row, 4),
+            self::fallScheduleCell($row, 5),
+            self::fallScheduleCell($row, 26),
+            self::fallScheduleCell($row, 27),
+            self::fallScheduleCell($row, 28)
+        );
+        foreach ($markers as $marker)
+        {
+            if ($marker !== '' && $marker !== '.')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function fallScheduleCell($row, $index)
+    {
+        return isset($row[$index]) ? trim((string) $row[$index]) : '';
+    }
+
+    private static function fallScheduleRowHasMeaningfulValue($row)
+    {
+        foreach ($row as $cell)
+        {
+            $value = trim((string) $cell);
+            if ($value !== '' && $value !== '.')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function parseFallStaffingRequirementText($staffingText)
+    {
+        $staffingText = strtoupper(trim($staffingText));
+        if ($staffingText === '')
+        {
+            return array();
+        }
+
+        $roles = array();
+        $parts = preg_split('/\s*\/\s*/', $staffingText);
+        foreach ($parts as $part)
+        {
+            if (!preg_match('/^(\d+)\s*([A-Z]+)/', trim($part), $matches))
+            {
+                return array();
+            }
+
+            $count = (int) $matches[1];
+            $roleCode = $matches[2][0];
+            switch ($roleCode)
+            {
+                case 'P':
+                    $roleKey = 'photographer';
+                    break;
+                case 'T':
+                    $roleKey = 'table_staff';
+                    break;
+                case 'A':
+                    $roleKey = 'assistant';
+                    break;
+                case 'L':
+                    $roleKey = 'lead';
+                    break;
+                default:
+                    return array();
+            }
+
+            if (!isset($roles[$roleKey]))
+            {
+                $roles[$roleKey] = 0;
+            }
+            $roles[$roleKey] += $count;
+        }
+
+        return $roles;
+    }
+
+    private static function countFallScheduleAssignments($row)
+    {
+        $columnsByRole = array(
+            'lead' => array(9),
+            'photographer' => array(11, 13, 15, 17, 19),
+            'table_staff' => array(21, 23),
+            'trainer' => array(25)
+        );
+        $counts = array('lead' => 0, 'photographer' => 0, 'table_staff' => 0, 'trainer' => 0);
+        foreach ($columnsByRole as $role => $columns)
+        {
+            foreach ($columns as $columnIndex)
+            {
+                $value = self::fallScheduleCell($row, $columnIndex);
+                if ($value !== '' && $value !== '.' && stripos($value, 'no lead') === false)
+                {
+                    $counts[$role]++;
+                }
+            }
+        }
+
+        return $counts;
+    }
+
+    private static function fallScheduleIssueMessage($issueKey, $sheetName, $rowNumber)
+    {
+        $messages = array(
+            'missing_or_malformed_date' => 'No usable date row was found before this job row.',
+            'missing_event_name' => 'The job or league name is missing or appears to be a template placeholder.',
+            'missing_location' => 'The location cell is empty.',
+            'missing_start_or_end_time' => 'Start or end time is missing.',
+            'missing_or_invalid_staffing' => 'The STAFFING cell is empty or not in a recognized pattern such as 1P/1T/1A.',
+            'assigned_required_conflict' => 'Assigned role columns do not match the required staffing count.',
+            'duplicate_source_row' => 'This job row appears to duplicate an earlier source row.'
+        );
+        $message = isset($messages[$issueKey]) ? $messages[$issueKey] : 'This row requires review.';
+
+        return $sheetName . ' row ' . $rowNumber . ': ' . $message;
+    }
+
+    private static function sanitizeStaffingNote($note)
+    {
+        $note = trim(preg_replace('/\s+/', ' ', $note));
+        return substr($note, 0, 500);
+    }
+
+    private static function inferStateFromLocation($location)
+    {
+        if (preg_match('/\b(MA|RI|CT|NH|ME|VT)\b/i', $location, $matches))
+        {
+            return strtoupper($matches[1]);
+        }
+
+        return '';
+    }
+
+    private static function inferSportFromEventName($eventName)
+    {
+        $eventName = strtolower($eventName);
+        if (strpos($eventName, 'soccer') !== false || strpos($eventName, 'ysl') !== false)
+        {
+            return 'Soccer';
+        }
+        if (strpos($eventName, 'hockey') !== false || strpos($eventName, 'yhl') !== false)
+        {
+            return 'Hockey';
+        }
+        if (strpos($eventName, 'football') !== false || strpos($eventName, 'cheer') !== false)
+        {
+            return 'Football/Cheer';
+        }
+
+        return '';
+    }
+
     private static function normalizeHeader($headerRow)
     {
         $headers = array();
@@ -5867,6 +7196,11 @@ class NESPWorkflow
 
     private static function calculateStaffHours($startTime, $endTime, $staffCount)
     {
+        if ((int) $staffCount <= 0)
+        {
+            return 0.0;
+        }
+
         if ($startTime === null || $endTime === null)
         {
             return 0.0;

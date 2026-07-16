@@ -1382,6 +1382,17 @@ CREATE TABLE `nesp_interview` (
   `scheduled_end` DATETIME,
   `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `zoom_meeting_id` VARCHAR(128) COLLATE utf8mb4_unicode_ci,
+  `manual_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `timezone` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'America/New_York',
+  `invitation_status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_generated',
+  `invitation_preview_text` TEXT COLLATE utf8mb4_unicode_ci,
+  `internal_notes` TEXT COLLATE utf8mb4_unicode_ci,
+  `outcome_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `outcome_notes` TEXT COLLATE utf8mb4_unicode_ci,
+  `scheduled_by_user_id` INT(11),
+  `reschedule_count` INT(11) NOT NULL DEFAULT '0',
+  `cancelled_at` DATETIME,
+  `completed_at` DATETIME,
   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   PRIMARY KEY (`interview_id`),
@@ -1389,6 +1400,8 @@ CREATE TABLE `nesp_interview` (
   KEY `IDX_joborder_id` (`joborder_id`),
   KEY `IDX_interviewer_profile_id` (`interviewer_profile_id`),
   KEY `IDX_status_key` (`status_key`),
+  KEY `IDX_nesp_interview_invitation_status` (`invitation_status_key`),
+  KEY `IDX_nesp_interview_outcome` (`outcome_key`),
   KEY `IDX_nesp_interview_schedule` (`scheduled_start`, `status_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1462,7 +1475,7 @@ CREATE TABLE `nesp_integration_status` (
 /* Data for the table `nesp_integration_status` */
 
 INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('vapi', 'Vapi Phone Screening', 'disabled', 'Optional automated phone screen — currently disabled pending final test.', NOW(), NOW());
-INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('zoom', 'Zoom Scheduling', 'disabled', 'Disabled in Phase 2. No meetings can be created.', NOW(), NOW());
+INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('zoom', 'Manual Zoom Tracking', 'disabled', 'Manual interview tracking only. No Zoom meetings are created, updated, cancelled, or synced by this app.', NOW(), NOW());
 INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('ai_review', 'AI Candidate Review', 'disabled', 'Disabled in Phase 2. No model calls can run.', NOW(), NOW());
 INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('email', 'Applicant Email', 'disabled', 'Disabled in Phase 2. No outbound applicant email can be sent.', NOW(), NOW());
 
@@ -1904,6 +1917,50 @@ CREATE TABLE `nesp_staffing_import_issue` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /* Data for the table `nesp_staffing_import_issue` */
+
+/* Table structure for table `nesp_historical_job_staffing` */
+
+CREATE TABLE `nesp_historical_job_staffing` (
+  `historical_staffing_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `import_batch_id` INT(11) NOT NULL,
+  `source_year` INT(4) NOT NULL,
+  `source_tab_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `source_row_number` INT(11) NOT NULL DEFAULT '0',
+  `source_row_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `event_date` DATE,
+  `job_name` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `location` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `state` VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `indoor_outdoor` VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `job_type` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `importance` VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `start_time` TIME,
+  `end_time` TIME,
+  `expected_duration` DECIMAL(6,2) NOT NULL DEFAULT '0.00',
+  `required_leads` INT(11) NOT NULL DEFAULT '0',
+  `required_photographers` INT(11) NOT NULL DEFAULT '0',
+  `required_table_staff` INT(11) NOT NULL DEFAULT '0',
+  `required_assistants` INT(11) NOT NULL DEFAULT '0',
+  `required_trainers` INT(11) NOT NULL DEFAULT '0',
+  `total_required_staff` INT(11) NOT NULL DEFAULT '0',
+  `assigned_lead_count` INT(11) NOT NULL DEFAULT '0',
+  `assigned_photographer_count` INT(11) NOT NULL DEFAULT '0',
+  `assigned_table_count` INT(11) NOT NULL DEFAULT '0',
+  `assigned_assistant_count` INT(11) NOT NULL DEFAULT '0',
+  `actual_total_assigned` INT(11) NOT NULL DEFAULT '0',
+  `staffing_text_original` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `notes_sanitized` TEXT COLLATE utf8mb4_unicode_ci,
+  `data_quality_status` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending_review',
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`historical_staffing_id`),
+  UNIQUE KEY `IDX_nesp_historical_source` (`import_batch_id`, `source_tab_name`, `source_row_number`, `source_row_hash`),
+  KEY `IDX_nesp_historical_event_date` (`event_date`),
+  KEY `IDX_nesp_historical_year` (`source_year`),
+  KEY `IDX_nesp_historical_quality` (`data_quality_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+/* Data for the table `nesp_historical_job_staffing` */
 
 /* Table structure for table `nesp_staffing_forecast` */
 
