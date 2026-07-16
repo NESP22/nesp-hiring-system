@@ -702,6 +702,30 @@ class NESPWorkflowTest extends TestCase
         $this->assertGreaterThanOrEqual(2, count($result['issues']));
     }
 
+    public function testStaffingCSVParserBuildsDryRunSummaryForReviewUI()
+    {
+        $csv = "Date,Start,End,State,Sport,Event,Role,Staff\n"
+            . "2026-09-19,,,RI,Soccer,Fixture Youth Soccer,Photographer,Photographer 1\n"
+            . "2026-09-19,,,RI,Soccer,Fixture Youth Soccer,Table Staff,Table Staff 1\n"
+            . "2026-09-19,,,RI,Soccer,Fixture Youth Soccer,Assistant,Assistant 1\n";
+
+        $result = NESPWorkflow::parseStaffingCSVText($csv, 'fall 2026 review csv');
+        $reviewRows = NESPWorkflow::buildStaffingDryRunReviewRows($result);
+
+        $this->assertArrayHasKey('dry_run', $result);
+        $this->assertSame(array('2026'), $result['dry_run']['source_summary']['years_found']);
+        $this->assertSame(1, $result['dry_run']['quality']['recognized_job_rows']);
+        $this->assertSame(3, $result['dry_run']['quality']['normalized_role_rows']);
+        $this->assertSame(0, $result['dry_run']['quality']['ambiguous_rows']);
+        $this->assertCount(1, $reviewRows);
+        $this->assertTrue($reviewRows[0]['is_valid']);
+        $this->assertSame(1, $reviewRows[0]['photographers']);
+        $this->assertSame(1, $reviewRows[0]['table_staff']);
+        $this->assertSame(1, $reviewRows[0]['assistants']);
+        $this->assertSame(3, $reviewRows[0]['total_required_staff']);
+        $this->assertSame('1P/1T/1A', $reviewRows[0]['staffing_text_original']);
+    }
+
     public function testStaffingCSVParserHandlesDatesInColumns()
     {
         $csv = "Event,State,Sport,4/20/2024,4/21/2024\n"

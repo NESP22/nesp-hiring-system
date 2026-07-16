@@ -1496,6 +1496,7 @@ class NESPWorkflow
                     'indoor_outdoor' => isset($unresolved['indoor_outdoor']) ? $unresolved['indoor_outdoor'] : '',
                     'job_type' => isset($unresolved['job_type']) ? $unresolved['job_type'] : '',
                     'staffing_text_original' => isset($unresolved['staffing_text_original']) ? $unresolved['staffing_text_original'] : '',
+                    'source_format' => isset($unresolved['source_format']) ? $unresolved['source_format'] : '',
                     'photographers' => 0,
                     'leads' => 0,
                     'table_staff' => 0,
@@ -1533,6 +1534,31 @@ class NESPWorkflow
             }
             $groups[$groupKey]['total_required_staff'] += $staffCount;
             $groups[$groupKey]['role_hashes'][] = $row['source_row_hash'];
+        }
+
+        foreach ($groups as $groupKey => $group)
+        {
+            if ($group['source_format'] === 'normalized_csv')
+            {
+                $parts = array();
+                if ($group['photographers'] > 0)
+                {
+                    $parts[] = $group['photographers'] . 'P';
+                }
+                if ($group['leads'] > 0)
+                {
+                    $parts[] = $group['leads'] . 'L';
+                }
+                if ($group['table_staff'] > 0)
+                {
+                    $parts[] = $group['table_staff'] . 'T';
+                }
+                if ($group['assistants'] > 0)
+                {
+                    $parts[] = $group['assistants'] . 'A';
+                }
+                $groups[$groupKey]['staffing_text_original'] = empty($parts) ? 'Role-expanded CSV' : implode('/', $parts);
+            }
         }
 
         return array_values($groups);
@@ -1596,6 +1622,11 @@ class NESPWorkflow
 
     private static function staffingReviewRowKey($row)
     {
+        if (isset($row['review_group_key']) && trim((string) $row['review_group_key']) !== '')
+        {
+            return trim((string) $row['review_group_key']);
+        }
+
         return hash(
             'sha256',
             implode('|', array(
@@ -1649,12 +1680,14 @@ class NESPWorkflow
         $issues = array();
         if (empty($rows))
         {
+            $emptyIssues = array(array('row_number' => 0, 'issue_key' => 'empty_source', 'message' => 'No rows were found.'));
             return array(
                 'rows' => $normalized,
-                'issues' => array(array('row_number' => 0, 'issue_key' => 'empty_source', 'message' => 'No rows were found.')),
+                'issues' => $emptyIssues,
                 'checksum' => hash('sha256', ''),
                 'source_label' => $sourceLabel,
-                'source_type' => $sourceType
+                'source_type' => $sourceType,
+                'dry_run' => self::buildNormalizedStaffingDryRun($normalized, $emptyIssues, $sourceLabel, $sourceType)
             );
         }
 
@@ -1737,7 +1770,8 @@ class NESPWorkflow
             'issues' => $issues,
             'checksum' => hash('sha256', json_encode($rows)),
             'source_label' => $sourceLabel,
-            'source_type' => $sourceType
+            'source_type' => $sourceType,
+            'dry_run' => self::buildNormalizedStaffingDryRun($normalized, $issues, $sourceLabel, $sourceType)
         );
     }
 
@@ -7677,6 +7711,131 @@ class NESPWorkflow
         );
     }
 
+    private static function buildNormalizedStaffingDryRun($rows, $issues, $sourceLabel, $sourceType)
+    {
+        $dryRun = self::emptyFallStaffingDryRun();
+        $sourceName = $sourceType === '' ? 'CSV' : $sourceType;
+        $dryRun['source_label'] = $sourceLabel;
+        $dryRun['source_summary']['total_tabs'] = 1;
+        $dryRun['source_summary']['tabs'] = array($sourceName);
+        $dryRun['source_summary']['tabs_with_jobs'] = empty($rows) ? array() : array($sourceName);
+
+        $groups = array();
+        foreach ($rows as $row)
+        {
+            $groupKey = self::staffingReviewRowKey($row);
+            if (!isset($groups[$groupKey]))
+            {
+                $groups[$groupKey] = array(
+                    'has_issue' => false,
+                    'year' => '',
+                    'missing_date' => false,
+                    'missing_location' => false,
+                    'missing_start_or_end' => false
+                );
+            }
+
+            if (!empty($row['event_date']))
+            {
+                $year = substr($row['event_date'], 0, 4);
+                $groups[$groupKey]['year'] = $year;
+                $dryRun['source_summary']['years_found'][$year] = true;
+                if (!isset($dryRun['quality']['records_by_year'][$year]))
+                {
+                    $dryRun['quality']['records_by_year'][$year] = 0;
+                }
+            }
+            else
+            {
+                $groups[$groupKey]['missing_date'] = true;
+            }
+
+            $unresolved = array();
+            if (isset($row['unresolved_json']) && $row['unresolved_json'] !== '')
+            {
+                $decoded = json_decode($row['unresolved_json'], true);
+                if (is_array($decoded))
+                {
+                    $unresolved = $decoded;
+                }
+            }
+            $location = isset($unresolved['location']) ? trim((string) $unresolved['location']) : '';
+            if ($location === '')
+            {
+                $groups[$groupKey]['missing_location'] = true;
+            }
+            if (empty($row['event_start_time']) || empty($row['event_end_time']))
+            {
+                $groups[$groupKey]['missing_start_or_end'] = true;
+            }
+            if ((int) $row['issue_count'] > 0)
+            {
+                $groups[$groupKey]['has_issue'] = true;
+            }
+        }
+
+        foreach ($groups as $group)
+        {
+            $dryRun['quality']['recognized_job_rows']++;
+            $dryRun['quality']['total_source_rows']++;
+            if ($group['year'] !== '')
+            {
+                $dryRun['quality']['records_by_year'][$group['year']]++;
+            }
+            if ($group['has_issue'])
+            {
+                $dryRun['quality']['ambiguous_rows']++;
+            }
+            if ($group['missing_date'])
+            {
+                $dryRun['quality']['rows_missing_dates']++;
+            }
+            if ($group['missing_location'])
+            {
+                $dryRun['quality']['rows_missing_location']++;
+            }
+            if ($group['missing_start_or_end'])
+            {
+                $dryRun['quality']['rows_missing_start_or_end']++;
+            }
+        }
+
+        foreach ((array) $issues as $issue)
+        {
+            if (isset($issue['issue_key']) && $issue['issue_key'] === 'duplicate_source_row')
+            {
+                $dryRun['quality']['duplicate_rows']++;
+            }
+            if (isset($issue['issue_key']) && $issue['issue_key'] === 'missing_staff')
+            {
+                $dryRun['quality']['invalid_staffing_rows']++;
+            }
+        }
+
+        $dryRun['quality']['normalized_role_rows'] = count($rows);
+        $dryRun['quality']['issue_count'] = count($issues);
+        $dryRun['source_summary']['years_found'] = array_map('strval', array_keys($dryRun['source_summary']['years_found']));
+        sort($dryRun['source_summary']['years_found']);
+        $dryRun['source_summary']['prior_fall_years_present'] = count(array_filter(
+            $dryRun['source_summary']['years_found'],
+            function ($year) {
+                return (int) $year < 2026;
+            }
+        )) > 0;
+        $dryRun['source_summary']['requires_additional_historical_workbooks'] = !$dryRun['source_summary']['prior_fall_years_present'];
+        $dryRun['tab_summaries'][] = array(
+            'tab_name' => $sourceName,
+            'source_rows' => count($rows),
+            'recognized_job_rows' => count($groups),
+            'staffing_rows' => count($rows),
+            'assignment_rows' => 0,
+            'ambiguous_rows' => $dryRun['quality']['ambiguous_rows'],
+            'years_found' => $dryRun['source_summary']['years_found']
+        );
+
+        return $dryRun;
+    }
+
     private static function readXLSXWorkbookSheets($zip)
     {
         $sharedStrings = self::readXLSXSharedStrings($zip);
@@ -8151,24 +8310,52 @@ class NESPWorkflow
         $startTime = self::parseStaffingTime(self::firstMappedValue($mapped, array('start', 'start_time', 'time')));
         $endTime = self::parseStaffingTime(self::firstMappedValue($mapped, array('end', 'end_time')));
         $staffHours = self::calculateStaffHours($startTime, $endTime, count($staffNames));
+        $sourceSheetName = self::firstMappedValue($mapped, array('sheet', 'tab'));
+        if ($sourceSheetName === '')
+        {
+            $sourceSheetName = 'CSV';
+        }
+        $eventName = self::firstMappedValue($mapped, array('event', 'event_name', 'league', 'school', 'organization'));
+        $state = strtoupper(self::firstMappedValue($mapped, array('state', 'st')));
+        $location = self::firstMappedValue($mapped, array('location', 'venue', 'field', 'site'));
+        if ($location === '')
+        {
+            $location = $state;
+        }
+        $unresolved = array(
+            'source_label' => $sourceLabel,
+            'location' => $location,
+            'staffing_text_original' => $staff,
+            'source_format' => 'normalized_csv'
+        );
+
         $row = array(
-            'source_sheet_name' => self::firstMappedValue($mapped, array('sheet', 'tab')),
+            'source_sheet_name' => $sourceSheetName,
             'source_row_number' => $rowNumber,
             'event_date' => $normalizedDate,
             'event_start_time' => $startTime,
             'event_end_time' => $endTime,
-            'state' => strtoupper(self::firstMappedValue($mapped, array('state', 'st'))),
+            'state' => $state,
             'sport' => self::firstMappedValue($mapped, array('sport', 'league_sport')),
-            'event_name' => self::firstMappedValue($mapped, array('event', 'event_name', 'league', 'school', 'organization')),
+            'event_name' => $eventName,
             'role_key' => $role,
             'staff_name' => implode('; ', $staffNames),
             'staff_count' => count($staffNames),
             'staff_hours' => $staffHours,
             'raw_source_text' => $rawText,
-            'unresolved_json' => json_encode(array('source_label' => $sourceLabel)),
+            'unresolved_json' => json_encode($unresolved),
             'issue_count' => count($issues),
             'status_key' => count($issues) > 0 ? 'needs_review' : 'normalized'
         );
+        $row['review_group_key'] = hash('sha256', implode('|', array(
+            $sourceLabel,
+            $normalizedDate,
+            $eventName,
+            $state,
+            $location,
+            $startTime,
+            $endTime
+        )));
         $row['source_row_hash'] = hash('sha256', $rawText . '|' . $row['event_date'] . '|' . $row['event_name'] . '|' . $row['staff_name']);
 
         return array('row' => $row, 'issues' => $issues);
