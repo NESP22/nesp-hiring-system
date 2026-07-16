@@ -159,15 +159,20 @@ a:hover
 #header ul#primary a.inactive
 {
     background: #E2E2E2 url(images/tabs/inactive.jpg) no-repeat;
+    align-items: center;
+    box-sizing: border-box;
+    justify-content: center;
     height: 21px;
     width: 81px;
     margin: 3px 3px 0px 0px; /* 1px more margin-left than a.active. */
     text-align: center;
     text-decoration: none;
     float: left;
-    line-height: 22px;
+    line-height: normal;
     color: #000;
-    display: block;
+    display: flex;
+    overflow: visible;
+    white-space: nowrap;
 }
 
 /* Inactive Tab Hover */
@@ -182,6 +187,9 @@ a:hover
 #header ul#primary a.active
 {
     background: #E2E2E2 url(images/tabs/active.jpg) no-repeat;
+    align-items: center;
+    box-sizing: border-box;
+    justify-content: center;
     height: 24px;
     width: 81px;
     margin: 1px 2px 0px 0px;
@@ -189,8 +197,10 @@ a:hover
     text-decoration: none;
     float: left;
     color: #fff;
-    display: block;
-    line-height: 28px;
+    display: flex;
+    line-height: normal;
+    overflow: visible;
+    white-space: nowrap;
 }
 
 /* Active Tab Hover */
@@ -209,21 +219,26 @@ a:hover
     left: 1px;
     width: 65em;
     font: normal normal normal 12px Arial, Tahoma, sans-serif;
+    min-height: 24px;
 }
 
 /* Inactive Secondary "Tab" */
 #header ul#secondary li a
 {
+    align-items: center;
     text-align: center;
-    display: block;
+    display: flex;
     border: none;
     float: left;
     width: auto;
-    padding: 0px 10px 0px 10px;
-    margin: 6px 0px 0px 0px;
+    min-height: 18px;
+    padding: 3px 10px 2px 10px;
+    margin: 3px 0px 0px 0px;
     border-right: 1px dotted #aaa;
     color: #f4f4f4;
+    line-height: 14px;
     text-decoration: underline;
+    white-space: nowrap;
 }
 
 /* Inactive Secondary "Tab" Hover */
@@ -236,14 +251,18 @@ a:hover
 /* Active Secondary "Tab"  */
 #header ul#secondary li span
 {
+    align-items: center;
     width: auto;
-    display: block;
+    display: flex;
     border: none;
     float: left;
-    padding: 1px 10px 0px 10px; /* Needs 1px more padding-top than inactive tab. */
-    margin: 6px 0px 0px 0px;
+    min-height: 18px;
+    padding: 3px 10px 2px 10px;
+    margin: 3px 0px 0px 0px;
     border-right: 1px dotted #aaa;
     color: #ccc;
+    line-height: 14px;
+    white-space: nowrap;
 }
 
 /* The last secondary "tab". */

@@ -6,27 +6,27 @@
     color: #1b2733;
 }
 
-.nesp-page-title {
+.nesp-workflow .nesp-page-title {
     margin: 0 0 16px;
     border-bottom: 4px solid #cf001c;
     background: #ffffff;
     padding: 16px;
 }
 
-.nesp-brand-lockup {
+.nesp-workflow .nesp-brand-lockup {
     align-items: center;
     display: flex;
     gap: 18px;
 }
 
-.nesp-brand-lockup img {
+.nesp-workflow .nesp-brand-lockup img {
     flex: 0 0 auto;
     height: auto;
     max-width: 176px;
     width: 28%;
 }
 
-.nesp-kicker {
+.nesp-workflow .nesp-kicker {
     color: #cf001c;
     display: block;
     font-size: 11px;
@@ -37,7 +37,7 @@
     text-transform: uppercase;
 }
 
-.nesp-page-title h2 {
+.nesp-workflow .nesp-page-title h2 {
     margin: 0 0 6px;
     color: #061f46;
     font-size: 25px;
@@ -45,14 +45,14 @@
     line-height: 1.18;
 }
 
-.nesp-page-title p {
+.nesp-workflow .nesp-page-title p {
     margin: 0;
     color: #4f5e70;
     font-size: 13px;
     line-height: 1.5;
 }
 
-.nesp-safety-banner {
+.nesp-workflow .nesp-safety-banner {
     margin: 0 0 16px;
     border: 1px solid #d6b256;
     background: #fff7df;
@@ -62,14 +62,14 @@
     font-weight: bold;
 }
 
-.nesp-step-row {
+.nesp-workflow .nesp-step-row {
     display: grid;
     gap: 8px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     margin: 0 0 16px;
 }
 
-.nesp-step {
+.nesp-workflow .nesp-step {
     align-items: center;
     background: #ffffff;
     border: 1px solid #d7dee8;
@@ -80,7 +80,7 @@
     padding: 10px;
 }
 
-.nesp-step span {
+.nesp-workflow .nesp-step span {
     align-items: center;
     background: #061f46;
     color: #ffffff;
@@ -92,48 +92,48 @@
     justify-content: center;
 }
 
-.nesp-step strong {
+.nesp-workflow .nesp-step strong {
     color: #253647;
     font-size: 12px;
     line-height: 1.25;
 }
 
-.nesp-step.is-current {
+.nesp-workflow .nesp-step.is-current {
     border-color: #315f93;
     box-shadow: inset 3px 0 0 #cf001c;
 }
 
-.nesp-card-grid {
+.nesp-workflow .nesp-card-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     margin: 0 0 18px;
 }
 
-.nesp-card-grid-compact {
+.nesp-workflow .nesp-card-grid-compact {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
-.nesp-card-grid-tight {
+.nesp-workflow .nesp-card-grid-tight {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.nesp-card,
-.nesp-panel {
+.nesp-workflow .nesp-card,
+.nesp-workflow .nesp-panel {
     border: 1px solid #d7dee8;
     background: #ffffff;
     padding: 14px;
     overflow-x: auto;
 }
 
-.nesp-card-label {
+.nesp-workflow .nesp-card-label {
     display: block;
     color: #536579;
     font-size: 12px;
     line-height: 1.4;
 }
 
-.nesp-card strong {
+.nesp-workflow .nesp-card strong {
     display: block;
     color: #061f46;
     font-size: 30px;
@@ -141,7 +141,7 @@
     margin-top: 4px;
 }
 
-.nesp-card-hint {
+.nesp-workflow .nesp-card-hint {
     color: #cf001c;
     display: block;
     font-size: 11px;
@@ -149,32 +149,32 @@
     margin-top: 3px;
 }
 
-.nesp-two-column {
+.nesp-workflow .nesp-two-column {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 14px;
 }
 
-.nesp-panel h3 {
+.nesp-workflow .nesp-panel h3 {
     margin: 0 0 10px;
     color: #061f46;
     font-size: 17px;
 }
 
-.nesp-panel h4 {
+.nesp-workflow .nesp-panel h4 {
     margin: 0 0 8px;
     color: #1b2733;
     font-size: 14px;
 }
 
-.nesp-dashboard-nav {
+.nesp-workflow .nesp-dashboard-nav {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     margin: 0 0 16px;
 }
 
-.nesp-dashboard-nav a {
+.nesp-workflow .nesp-dashboard-nav a {
     border: 1px solid #b9c5d3;
     background: #f7f9fc;
     color: #24384d;
@@ -184,30 +184,30 @@
     font-weight: bold;
 }
 
-.nesp-dashboard-nav a.active,
-.nesp-dashboard-nav a:hover {
+.nesp-workflow .nesp-dashboard-nav a.active,
+.nesp-workflow .nesp-dashboard-nav a:hover {
     border-color: #315f93;
     background: #315f93;
     color: #ffffff;
 }
 
-.nesp-queue-section {
+.nesp-workflow .nesp-queue-section {
     margin: 0 0 18px;
 }
 
-.nesp-queue-section h3 {
+.nesp-workflow .nesp-queue-section h3 {
     margin: 0 0 10px;
     color: #071e41;
     font-size: 18px;
 }
 
-.nesp-task-grid {
+.nesp-workflow .nesp-task-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
 }
 
-.nesp-task-card {
+.nesp-workflow .nesp-task-card {
     border: 1px solid #cfd8e4;
     background: #ffffff;
     padding: 12px;
@@ -216,7 +216,7 @@
     flex-direction: column;
 }
 
-.nesp-task-topline {
+.nesp-workflow .nesp-task-topline {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -224,13 +224,13 @@
     margin: 0 0 6px;
 }
 
-.nesp-task-topline strong {
+.nesp-workflow .nesp-task-topline strong {
     color: #071e41;
     font-size: 15px;
     line-height: 1.25;
 }
 
-.nesp-task-topline span {
+.nesp-workflow .nesp-task-topline span {
     flex: 0 0 auto;
     background: #edf1f6;
     color: #425466;
@@ -238,21 +238,21 @@
     padding: 3px 6px;
 }
 
-.nesp-task-role,
-.nesp-muted {
+.nesp-workflow .nesp-task-role,
+.nesp-workflow .nesp-muted {
     color: #596b7d;
     font-size: 12px;
     line-height: 1.35;
 }
 
-.nesp-task-card p {
+.nesp-workflow .nesp-task-card p {
     color: #283747;
     font-size: 13px;
     line-height: 1.45;
     margin: 10px 0;
 }
 
-.nesp-task-card dl {
+.nesp-workflow .nesp-task-card dl {
     display: grid;
     grid-template-columns: 86px minmax(0, 1fr);
     gap: 5px 8px;
@@ -261,19 +261,19 @@
     line-height: 1.35;
 }
 
-.nesp-task-card dt {
+.nesp-workflow .nesp-task-card dt {
     color: #66778a;
     font-weight: bold;
 }
 
-.nesp-task-card dd {
+.nesp-workflow .nesp-task-card dd {
     margin: 0;
     color: #1b2733;
 }
 
-.nesp-primary-action,
-.nesp-primary-button,
-.nesp-secondary-button {
+.nesp-workflow .nesp-primary-action,
+.nesp-workflow .nesp-primary-button,
+.nesp-workflow .nesp-secondary-button {
     display: inline-block;
     border: 1px solid #315f93;
     background: #315f93;
@@ -286,38 +286,38 @@
     cursor: pointer;
 }
 
-.nesp-primary-action:hover,
-.nesp-primary-action:focus,
-.nesp-primary-button:hover,
-.nesp-primary-button:focus,
-.nesp-secondary-button:hover,
-.nesp-secondary-button:focus {
+.nesp-workflow .nesp-primary-action:hover,
+.nesp-workflow .nesp-primary-action:focus,
+.nesp-workflow .nesp-primary-button:hover,
+.nesp-workflow .nesp-primary-button:focus,
+.nesp-workflow .nesp-secondary-button:hover,
+.nesp-workflow .nesp-secondary-button:focus {
     outline: 3px solid rgba(49, 95, 147, .22);
 }
 
-.nesp-secondary-button {
+.nesp-workflow .nesp-secondary-button {
     border-color: #4f6578;
     background: #4f6578;
 }
 
-.nesp-action-form {
+.nesp-workflow .nesp-action-form {
     align-items: center;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.nesp-form-grid {
+.nesp-workflow .nesp-form-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
 }
 
-.nesp-form-grid button {
+.nesp-workflow .nesp-form-grid button {
     align-self: end;
 }
 
-.nesp-copy-box {
+.nesp-workflow .nesp-copy-box {
     width: 100%;
     box-sizing: border-box;
     border: 1px solid #b9c5d3;
@@ -329,45 +329,45 @@
     line-height: 1.5;
 }
 
-.nesp-secondary-action,
-.nesp-secondary-actions a {
+.nesp-workflow .nesp-secondary-action,
+.nesp-workflow .nesp-secondary-actions a {
     color: #315f93;
     font-size: 12px;
     font-weight: bold;
     text-decoration: none;
 }
 
-button.nesp-secondary-action {
+.nesp-workflow button.nesp-secondary-action {
     background: #ffffff;
     border: 1px solid #315f93;
     padding: 8px 11px;
     cursor: pointer;
 }
 
-.nesp-secondary-actions {
+.nesp-workflow .nesp-secondary-actions {
     display: flex;
     gap: 12px;
     margin-top: 8px;
 }
 
-.nesp-button-row {
+.nesp-workflow .nesp-button-row {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.nesp-inline-form {
+.nesp-workflow .nesp-inline-form {
     margin-top: 10px;
 }
 
-.nesp-help-text {
+.nesp-workflow .nesp-help-text {
     margin: 0 0 10px;
     color: #536579;
     font-size: 12px;
     line-height: 1.45;
 }
 
-.nesp-reference-list {
+.nesp-workflow .nesp-reference-list {
     margin-top: 12px;
     border: 1px solid #d7dee8;
     background: #f7f9fc;
@@ -377,12 +377,12 @@ button.nesp-secondary-action {
     line-height: 1.45;
 }
 
-.nesp-reference-list ul {
+.nesp-workflow .nesp-reference-list ul {
     margin: 6px 0 0 18px;
     padding: 0;
 }
 
-.nesp-empty {
+.nesp-workflow .nesp-empty {
     border: 1px dashed #c9d3df;
     background: #f7f9fc;
     color: #536579;
@@ -390,15 +390,15 @@ button.nesp-secondary-action {
     font-size: 13px;
 }
 
-.nesp-form,
-.nesp-scorecard-form {
+.nesp-workflow .nesp-form,
+.nesp-workflow .nesp-scorecard-form {
     display: grid;
     gap: 10px;
     margin-top: 12px;
 }
 
-.nesp-form label,
-.nesp-scorecard-form label {
+.nesp-workflow .nesp-form label,
+.nesp-workflow .nesp-scorecard-form label {
     display: grid;
     gap: 5px;
     color: #253647;
@@ -406,11 +406,11 @@ button.nesp-secondary-action {
     font-weight: bold;
 }
 
-.nesp-form input,
-.nesp-form select,
-.nesp-form textarea,
-.nesp-scorecard-form select,
-.nesp-scorecard-form textarea {
+.nesp-workflow .nesp-form input,
+.nesp-workflow .nesp-form select,
+.nesp-workflow .nesp-form textarea,
+.nesp-workflow .nesp-scorecard-form select,
+.nesp-workflow .nesp-scorecard-form textarea {
     box-sizing: border-box;
     width: 100%;
     border: 1px solid #b8c5d3;
@@ -418,43 +418,43 @@ button.nesp-secondary-action {
     font-size: 13px;
 }
 
-.nesp-fieldset {
+.nesp-workflow .nesp-fieldset {
     border: 1px solid #d8dee8;
     border-radius: 6px;
     margin: 0;
     padding: 10px 12px;
 }
 
-.nesp-fieldset legend {
+.nesp-workflow .nesp-fieldset legend {
     color: #475569;
     font-weight: 700;
     padding: 0 4px;
 }
 
-.nesp-checkbox-row {
+.nesp-workflow .nesp-checkbox-row {
     align-items: flex-start;
     display: flex;
     gap: 8px;
     line-height: 1.35;
 }
 
-.nesp-checkbox-row input[type="checkbox"] {
+.nesp-workflow .nesp-checkbox-row input[type="checkbox"] {
     flex: 0 0 auto;
     margin-top: 2px;
     width: auto;
 }
 
-.nesp-form-wide {
+.nesp-workflow .nesp-form-wide {
     grid-template-columns: repeat(3, minmax(180px, 1fr));
 }
 
-.nesp-form-wide textarea,
-.nesp-form-wide .nesp-fieldset,
-.nesp-form-wide .nesp-confirm-box {
+.nesp-workflow .nesp-form-wide textarea,
+.nesp-workflow .nesp-form-wide .nesp-fieldset,
+.nesp-workflow .nesp-form-wide .nesp-confirm-box {
     grid-column: 1 / -1;
 }
 
-.nesp-confirm-box {
+.nesp-workflow .nesp-confirm-box {
     background: #fff7ed;
     border: 1px solid #fed7aa;
     border-radius: 6px;
@@ -462,14 +462,14 @@ button.nesp-secondary-action {
     padding: 10px 12px;
 }
 
-.nesp-table {
+.nesp-workflow .nesp-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
     background: #ffffff;
 }
 
-.nesp-table caption {
+.nesp-workflow .nesp-table caption {
     height: 1px;
     margin: -1px;
     overflow: hidden;
@@ -477,8 +477,8 @@ button.nesp-secondary-action {
     width: 1px;
 }
 
-.nesp-table th,
-.nesp-table td {
+.nesp-workflow .nesp-table th,
+.nesp-workflow .nesp-table td {
     border: 1px solid #d7dee8;
     padding: 8px;
     text-align: left;
@@ -486,12 +486,12 @@ button.nesp-secondary-action {
     line-height: 1.45;
 }
 
-.nesp-table th {
+.nesp-workflow .nesp-table th {
     background: #f0f4f9;
     color: #061f46;
 }
 
-.nesp-status {
+.nesp-workflow .nesp-status {
     display: inline-block;
     min-width: 64px;
     padding: 3px 8px;
@@ -500,24 +500,24 @@ button.nesp-secondary-action {
     font-size: 11px;
 }
 
-.nesp-status-off {
+.nesp-workflow .nesp-status-off {
     background: #edf1f6;
     color: #4a5968;
 }
 
-.nesp-status-on {
+.nesp-workflow .nesp-status-on {
     background: #e5f5ec;
     color: #166335;
 }
 
-.nesp-list {
+.nesp-workflow .nesp-list {
     margin: 0;
     padding-left: 18px;
     font-size: 13px;
     line-height: 1.6;
 }
 
-.nesp-detail-list {
+.nesp-workflow .nesp-detail-list {
     display: grid;
     grid-template-columns: minmax(120px, 180px) 1fr;
     gap: 8px 14px;
@@ -525,18 +525,18 @@ button.nesp-secondary-action {
     font-size: 13px;
 }
 
-.nesp-detail-list dt {
+.nesp-workflow .nesp-detail-list dt {
     color: #4a5968;
     font-weight: bold;
 }
 
-.nesp-detail-list dd {
+.nesp-workflow .nesp-detail-list dd {
     margin: 0;
     min-width: 0;
     overflow-wrap: anywhere;
 }
 
-.nesp-field-label {
+.nesp-workflow .nesp-field-label {
     color: #253647;
     display: block;
     font-size: 12px;
@@ -544,7 +544,7 @@ button.nesp-secondary-action {
     margin: 0 0 5px;
 }
 
-.nesp-script-preview {
+.nesp-workflow .nesp-script-preview {
     margin: 0;
     padding: 12px;
     background: #f8fafc;
@@ -575,54 +575,54 @@ button.nesp-secondary-action {
         padding: 14px 10px 28px;
     }
 
-    .nesp-card-grid,
-    .nesp-card-grid-compact,
-    .nesp-card-grid-tight,
-    .nesp-two-column,
-    .nesp-form-wide,
-    .nesp-task-grid,
-    .nesp-step-row {
+    .nesp-workflow .nesp-card-grid,
+    .nesp-workflow .nesp-card-grid-compact,
+    .nesp-workflow .nesp-card-grid-tight,
+    .nesp-workflow .nesp-two-column,
+    .nesp-workflow .nesp-form-wide,
+    .nesp-workflow .nesp-task-grid,
+    .nesp-workflow .nesp-step-row {
         grid-template-columns: 1fr;
     }
 
-    .nesp-brand-lockup {
+    .nesp-workflow .nesp-brand-lockup {
         align-items: flex-start;
     }
 
-    .nesp-brand-lockup img {
+    .nesp-workflow .nesp-brand-lockup img {
         max-width: 118px;
         width: 36%;
     }
 
-    .nesp-page-title h2 {
+    .nesp-workflow .nesp-page-title h2 {
         font-size: 21px;
     }
 
-    .nesp-action-form .nesp-primary-action,
-    .nesp-action-form .nesp-secondary-action {
+    .nesp-workflow .nesp-action-form .nesp-primary-action,
+    .nesp-workflow .nesp-action-form .nesp-secondary-action {
         box-sizing: border-box;
         width: 100%;
     }
 
-    .nesp-table,
-    .nesp-table tbody,
-    .nesp-table tr,
-    .nesp-table td {
+    .nesp-workflow .nesp-table,
+    .nesp-workflow .nesp-table tbody,
+    .nesp-workflow .nesp-table tr,
+    .nesp-workflow .nesp-table td {
         display: block;
         width: 100%;
     }
 
-    .nesp-table tr:first-child {
+    .nesp-workflow .nesp-table tr:first-child {
         display: none;
     }
 
-    .nesp-table tr {
+    .nesp-workflow .nesp-table tr {
         border: 1px solid #d7dee8;
         box-sizing: border-box;
         margin: 0 0 10px;
     }
 
-    .nesp-table td {
+    .nesp-workflow .nesp-table td {
         border: 0;
         border-bottom: 1px solid #edf1f6;
         box-sizing: border-box;
@@ -630,7 +630,7 @@ button.nesp-secondary-action {
         position: relative;
     }
 
-    .nesp-table td:before {
+    .nesp-workflow .nesp-table td:before {
         color: #536579;
         content: attr(data-label);
         font-weight: bold;
@@ -640,7 +640,7 @@ button.nesp-secondary-action {
         width: 86px;
     }
 
-    .nesp-detail-list {
+    .nesp-workflow .nesp-detail-list {
         grid-template-columns: 1fr;
         gap: 3px;
     }
