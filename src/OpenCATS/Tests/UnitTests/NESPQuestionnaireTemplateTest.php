@@ -105,12 +105,37 @@ class NESPQuestionnaireTemplateTest extends TestCase
     {
         $source = file_get_contents('main.css');
 
+        $this->assertMatchesRegularExpression('/#header\s*\{[^}]*clear:\s*both;/s', $source);
+        $this->assertMatchesRegularExpression('/#header\s*\{[^}]*height:\s*auto;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary\s*\{[^}]*position:\s*static;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary\s*\{[^}]*display:\s*flex;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary\s*\{[^}]*flex-wrap:\s*wrap;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary\s*\{[^}]*width:\s*auto;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary > li\s*\{[^}]*display:\s*contents;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*display:\s*flex;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*align-items:\s*center;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*float:\s*none;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*width:\s*auto;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*min-width:\s*70px;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive\s*\{[^}]*background:\s*#E2E2E2;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*display:\s*flex;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*line-height:\s*normal;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*float:\s*none;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*width:\s*auto;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.active\s*\{[^}]*background:\s*#6c94eb;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#primary a\.inactive:focus,\s*#header ul#primary a\.active:focus\s*\{[^}]*outline:\s*2px solid #315f93;/s', $source);
+        $this->assertDoesNotMatchRegularExpression('/#header ul#primary a\.(?:inactive|active)\s*\{[^}]*url\(images\/tabs\//s', $source);
+        $this->assertDoesNotMatchRegularExpression('/#header ul#primary a\.(?:inactive|active)\s*\{[^}]*width:\s*81px;/s', $source);
+        $this->assertDoesNotMatchRegularExpression('/#header ul#primary a\.(?:inactive|active)\s*\{[^}]*float:\s*left;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*position:\s*static;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*display:\s*flex;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*flex-wrap:\s*wrap;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*width:\s*100%;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#secondary\s*\{[^}]*min-height:\s*24px;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary li a\s*\{[^}]*float:\s*none;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#secondary li a\s*\{[^}]*white-space:\s*nowrap;/s', $source);
+        $this->assertMatchesRegularExpression('/#header ul#secondary li span\s*\{[^}]*float:\s*none;/s', $source);
         $this->assertMatchesRegularExpression('/#header ul#secondary li span\s*\{[^}]*white-space:\s*nowrap;/s', $source);
+        $this->assertMatchesRegularExpression('/#main\s*\{[^}]*padding-top:\s*0px;/s', $source);
     }
 }
