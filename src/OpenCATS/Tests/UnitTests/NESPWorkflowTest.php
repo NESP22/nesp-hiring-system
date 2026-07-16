@@ -6,6 +6,7 @@ include_once(LEGACY_ROOT . '/config.php');
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
+include_once(LEGACY_ROOT . '/lib/NESPGoogleCalendarFreeBusy.php');
 
 class NESPWorkflowTest extends TestCase
 {
@@ -28,7 +29,7 @@ class NESPWorkflowTest extends TestCase
     {
         $statuses = NESPWorkflow::getDefaultIntegrationStatuses();
 
-        $this->assertCount(4, $statuses);
+        $this->assertCount(5, $statuses);
         foreach ($statuses as $status)
         {
             $this->assertSame('disabled', $status[2]);
@@ -64,7 +65,125 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('allowPhoneScreenReschedule'));
         $this->assertSame('NESP_INTERVIEWER_AVAILABILITY_ENABLED', NESPWorkflow::getFeatureFlagForAction('myAvailability'));
         $this->assertSame('NESP_INTERVIEWER_AVAILABILITY_ENABLED', NESPWorkflow::getFeatureFlagForAction('createInterviewerBlackout'));
+        $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('googleCalendarConnect'));
+        $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('googleCalendarDisconnect'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('unexpectedAction'));
+    }
+
+    public function testGoogleCalendarFreeBusyDefaultsAreReadOnlyAndDisabled()
+    {
+        $this->assertSame('NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED', NESPGoogleCalendarFreeBusy::FEATURE_FLAG);
+        $this->assertSame(
+            array('https://www.googleapis.com/auth/calendar.freebusy'),
+            NESPGoogleCalendarFreeBusy::getRequiredOAuthScopes()
+        );
+
+        $status = NESPGoogleCalendarFreeBusy::getConfigurationStatus(false);
+        $this->assertFalse($status['feature_enabled']);
+        $this->assertFalse($status['event_creation_enabled']);
+        $this->assertSame('disabled', $status['status_key']);
+
+        $this->assertSame(array(
+            'disconnected' => 'Not Connected',
+            'connected' => 'Connected',
+            'reauthorize_required' => 'Reauthorization Required',
+            'error' => 'Error'
+        ), NESPGoogleCalendarFreeBusy::getConnectionStateLabels());
+    }
+
+    public function testGoogleCalendarFreeBusyAdapterFailsClosedWhenDisabled()
+    {
+        $adapter = new NESPGoogleCalendarFreeBusy(null, false);
+        $result = $adapter->queryFreeBusy(
+            'access-token',
+            array('primary'),
+            '2026-07-16T12:00:00Z',
+            '2026-07-16T13:00:00Z',
+            'UTC',
+            function () {
+                return array('status_code' => 200, 'body' => array());
+            }
+        );
+
+        $this->assertSame('disabled', $result['status_key']);
+        $this->assertSame(array(), $result['busy']);
+    }
+
+    public function testGoogleCalendarFreeBusyAdapterReturnsOnlyBusyWindows()
+    {
+        $adapter = new NESPGoogleCalendarFreeBusy(null, true);
+        $result = $adapter->queryFreeBusy(
+            'access-token',
+            array('primary'),
+            '2026-07-16T12:00:00Z',
+            '2026-07-16T13:00:00Z',
+            'UTC',
+            function () {
+                return array(
+                    'status_code' => 200,
+                    'body' => array(
+                        'calendars' => array(
+                            'primary' => array(
+                                'busy' => array(
+                                    array(
+                                        'start' => '2026-07-16T12:15:00Z',
+                                        'end' => '2026-07-16T12:45:00Z',
+                                        'summary' => 'Private Interview'
+                                    )
+                                )
+                            )
+                        )
+                    )
+                );
+            }
+        );
+
+        $this->assertSame('busy', $result['status_key']);
+        $this->assertSame(array(
+            array(
+                'start' => '2026-07-16T12:15:00Z',
+                'end' => '2026-07-16T12:45:00Z',
+                'source_key' => 'google_calendar_freebusy'
+            )
+        ), $result['busy']);
+        $this->assertStringNotContainsString('Private Interview', json_encode($result));
+        $this->assertArrayHasKey(hash('sha256', 'primary'), $result['calendars']);
+        $this->assertArrayNotHasKey('primary', $result['calendars']);
+    }
+
+    public function testGoogleCalendarFreeBusyAdapterHandlesRevokedAuth()
+    {
+        $adapter = new NESPGoogleCalendarFreeBusy(null, true);
+        $result = $adapter->queryFreeBusy(
+            'revoked-token',
+            array('primary'),
+            '2026-07-16T12:00:00Z',
+            '2026-07-16T13:00:00Z',
+            'UTC',
+            function () {
+                return array('status_code' => 401, 'body' => array());
+            }
+        );
+
+        $this->assertSame('reauthorize_required', $result['status_key']);
+        $this->assertContains('google_auth_revoked', $result['errors']);
+    }
+
+    public function testGoogleCalendarTokenEncryptionDoesNotExposeTokenValue()
+    {
+        putenv('NESP_GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY=unit-test-google-calendar-token-key');
+        $token = 'unit-test-google-calendar-token';
+        $encrypted = NESPGoogleCalendarFreeBusy::encryptToken($token);
+
+        if ($encrypted === false)
+        {
+            $this->markTestSkipped('OpenSSL is required for Google Calendar token encryption.');
+        }
+
+        $this->assertStringNotContainsString($token, $encrypted);
+        $this->assertSame($token, NESPGoogleCalendarFreeBusy::decryptToken($encrypted));
+        $this->assertSame(hash('sha256', $token), NESPGoogleCalendarFreeBusy::tokenFingerprint($token));
+        putenv('NESP_GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY');
     }
 
     public function testDashboardNavigationIncludesTaskViews()

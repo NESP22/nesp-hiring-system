@@ -68,6 +68,19 @@ class NESPUI extends UserInterface
                 $this->saveFeatureFlags();
                 break;
 
+            case 'googleCalendarConnect':
+            case 'googleCalendarReauthorize':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->googleCalendarConnect();
+                break;
+
+            case 'googleCalendarDisconnect':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->googleCalendarDisconnect();
+                break;
+
             case 'createInterviewer':
                 $this->adminOnly();
                 $this->requirePostCSRF();
@@ -412,6 +425,12 @@ class NESPUI extends UserInterface
         $this->_template->assign('scorecards', $this->_workflow->getScorecardSummaries(50));
         $this->_template->assign('summary', $this->_workflow->getInterviewerAccessSummary());
         $this->_template->assign('vapiConfiguration', $this->_workflow->getVapiConfigurationStatus());
+        $googleCalendarMessage = isset($_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'])
+            ? $_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'] : '';
+        unset($_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE']);
+        $this->_template->assign('googleCalendarMessage', $googleCalendarMessage);
+        $this->_template->assign('googleCalendarConfiguration', $this->_workflow->getGoogleCalendarConfigurationStatus());
+        $this->_template->assign('googleCalendarConnections', $this->_workflow->getGoogleCalendarConnections());
         $this->_template->display('./modules/nesp/Settings.tpl');
     }
 
@@ -429,6 +448,33 @@ class NESPUI extends UserInterface
             );
         }
 
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
+    private function googleCalendarConnect()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        $result = $this->_workflow->requestGoogleCalendarAuthorization($interviewerProfileID, $this->_userID);
+        if ($result === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an interviewer before preparing Google Calendar authorization.');
+        }
+
+        $_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'] =
+            'Authorization prepared for ' . $result['display_name'] . '. Use the Google consent URL only in an approved test environment: ' . $result['authorization_url'];
+
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
+    private function googleCalendarDisconnect()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($interviewerProfileID <= 0 || !$this->_workflow->disconnectGoogleCalendar($interviewerProfileID, $this->_userID))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an interviewer calendar connection to disconnect.');
+        }
+
+        $_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'] = 'Google Calendar free/busy connection disconnected and stored tokens removed.';
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
     }
 
