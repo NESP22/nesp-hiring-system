@@ -57,6 +57,7 @@ jobs:
         run: ./vendor/bin/phpunit --log-junit reports/unit-report.xml --testsuite UnitTests
 
       - name: Run Integration Tests (Docker)
+        timeout-minutes: 30
         run: |
           # 1. Prepare environment files
           cp test/config.php ./config.php
