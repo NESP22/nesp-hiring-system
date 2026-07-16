@@ -12,6 +12,17 @@
             <div class="nesp-safety-banner">
                 This screen does not contact applicants, publish postings, edit jobs, import Drive files automatically, or change feature flags.
             </div>
+            <?php if ($this->importResult !== null): ?>
+                <?php if (!empty($this->importResult['ok'])): ?>
+                    <div class="nesp-success">
+                        Staffing import finished. Imported <?php $this->_($this->importResult['rows_imported']); ?> role rows; skipped <?php $this->_($this->importResult['skipped']); ?> already-imported rows. Forecast was recalculated from reviewed imported rows only.
+                    </div>
+                <?php else: ?>
+                    <div class="nesp-empty">
+                        Import stopped: <?php $this->_($this->importResult['error']); ?>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
             <?php if ((int) $this->forecast['sourceStatus']['rows_imported'] === 0 && !count($this->forecast['history'])): ?>
             <div class="nesp-empty">
                 No historical schedules imported yet.
@@ -121,6 +132,104 @@
                             </table>
                             <p class="nesp-help-text">Dry-run complete. No source rows were imported. A controlled import still requires Craig approval, an encrypted backup, additive migrations, and valid-row approval.</p>
                         </div>
+                        <?php if (isset($this->dryRunResult['review_rows'])): ?>
+                        <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=importApprovedStaffingRows" class="nesp-import-approval-form">
+                            <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="dryRunBatchID" value="<?php echo(htmlspecialchars($this->dryRunResult['batch_id'], ENT_QUOTES, 'UTF-8')); ?>" />
+                            <div class="nesp-panel">
+                                <h4>Step 2: Review and Approve Rows</h4>
+                                <p class="nesp-help-text">Only valid rows can be approved. Ambiguous rows stay locked until the workbook is corrected and a new dry-run is run. This dry-run batch expires at <?php $this->_($this->dryRunResult['expires_at']); ?>.</p>
+                                <div class="nesp-inline-form">
+                                    <button type="button" class="nesp-secondary-button" onclick="nespSetStaffingApprovals(true);">Approve all valid rows</button>
+                                    <button type="button" class="nesp-secondary-button" onclick="nespSetStaffingApprovals(false);">Clear all</button>
+                                    <span class="nesp-help-text"><span id="nesp-approved-row-count">0</span> rows approved.</span>
+                                </div>
+                                <div class="nesp-table-scroll">
+                                    <table class="nesp-table nesp-review-table">
+                                        <tr>
+                                            <th>Approve</th>
+                                            <th>Tab</th>
+                                            <th>Row</th>
+                                            <th>Date</th>
+                                            <th>Job / Location</th>
+                                            <th>Staffing</th>
+                                            <th>P</th>
+                                            <th>Lead</th>
+                                            <th>Table</th>
+                                            <th>Assist</th>
+                                            <th>Total</th>
+                                            <th>Status</th>
+                                        </tr>
+                                        <?php foreach ($this->dryRunResult['review_rows'] as $reviewRow): ?>
+                                        <tr>
+                                            <td>
+                                                <?php if (!empty($reviewRow['is_valid'])): ?>
+                                                    <input type="checkbox" class="nesp-staffing-approval-checkbox" name="approvedRows[]" value="<?php echo(htmlspecialchars($reviewRow['review_key'], ENT_QUOTES, 'UTF-8')); ?>" onchange="nespUpdateApprovedRowCount();" />
+                                                <?php else: ?>
+                                                    <span class="nesp-badge nesp-badge-muted">Review</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?php $this->_($reviewRow['source_sheet_name']); ?></td>
+                                            <td><?php $this->_($reviewRow['source_row_number']); ?></td>
+                                            <td><?php $this->_($reviewRow['event_date']); ?></td>
+                                            <td>
+                                                <strong><?php $this->_($reviewRow['event_name']); ?></strong><br />
+                                                <span class="nesp-help-text"><?php $this->_($reviewRow['location']); ?></span>
+                                            </td>
+                                            <td><?php $this->_($reviewRow['staffing_text_original']); ?></td>
+                                            <td><?php $this->_($reviewRow['photographers']); ?></td>
+                                            <td><?php $this->_($reviewRow['leads']); ?></td>
+                                            <td><?php $this->_($reviewRow['table_staff']); ?></td>
+                                            <td><?php $this->_($reviewRow['assistants']); ?></td>
+                                            <td><?php $this->_($reviewRow['total_required_staff']); ?></td>
+                                            <td>
+                                                <?php if (!empty($reviewRow['is_valid'])): ?>
+                                                    <span class="nesp-badge nesp-badge-success">Valid</span>
+                                                <?php else: ?>
+                                                    <span class="nesp-badge nesp-badge-warning"><?php $this->_(count($reviewRow['warnings']) ? implode(', ', $reviewRow['warnings']) : $reviewRow['duplicate_status']); ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="nesp-panel">
+                                <h4>Step 3: Verify Backup and Import</h4>
+                                <p class="nesp-help-text">Import writes only approved normalized staffing rows. It never changes the Google Sheet and never contacts applicants or staff.</p>
+                                <label class="nesp-form-label" for="backupReference">Fresh encrypted backup reference</label>
+                                <input type="text" id="backupReference" name="backupReference" class="nesp-form-control" placeholder="Backup timestamp or verified reference" />
+                                <label class="nesp-checkbox-row">
+                                    <input type="checkbox" name="backupVerified" value="1" />
+                                    I verified the fresh encrypted production database backup and want to import only the approved rows above.
+                                </label>
+                                <button type="submit" class="nesp-primary-button" onclick="return confirm('Import only the approved staffing rows from this dry-run batch?');">Import Approved Rows</button>
+                            </div>
+                        </form>
+                        <script type="text/javascript">
+                        function nespSetStaffingApprovals(checked) {
+                            var boxes = document.querySelectorAll('.nesp-staffing-approval-checkbox');
+                            for (var i = 0; i < boxes.length; i++) {
+                                boxes[i].checked = checked;
+                            }
+                            nespUpdateApprovedRowCount();
+                        }
+                        function nespUpdateApprovedRowCount() {
+                            var boxes = document.querySelectorAll('.nesp-staffing-approval-checkbox');
+                            var count = 0;
+                            for (var i = 0; i < boxes.length; i++) {
+                                if (boxes[i].checked) {
+                                    count++;
+                                }
+                            }
+                            var counter = document.getElementById('nesp-approved-row-count');
+                            if (counter) {
+                                counter.innerHTML = count;
+                            }
+                        }
+                        nespUpdateApprovedRowCount();
+                        </script>
+                        <?php endif; ?>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>
@@ -176,13 +285,14 @@
                 </div>
 
                 <div class="nesp-panel">
-                    <h3>Hiring Gap</h3>
+                    <h3>Fall 2026 Preliminary Forecast</h3>
                     <p class="nesp-help-text">The gap is advisory and never opens, closes, or edits jobs.</p>
                     <table class="nesp-table">
+                        <tr><th>Required headcount at peak</th><td><?php $this->_($this->forecast['metrics']['peak_day_staffing']); ?></td></tr>
+                        <tr><th>Current confirmed staff</th><td>0</td></tr>
                         <tr><th>Recommended pool</th><td><?php $this->_($this->forecast['metrics']['recommended_pool']); ?></td></tr>
-                        <tr><th>Recommended backup</th><td><?php $this->_($this->forecast['metrics']['recommended_backup']); ?></td></tr>
-                        <tr><th>Hiring target</th><td><?php $this->_($this->forecast['metrics']['hiring_gap']); ?></td></tr>
-                        <tr><th>Peak-day staffing</th><td><?php $this->_($this->forecast['metrics']['peak_day_staffing']); ?></td></tr>
+                        <tr><th>Recommended backup / on-call</th><td><?php $this->_($this->forecast['metrics']['recommended_backup']); ?></td></tr>
+                        <tr><th>Preliminary hiring gap</th><td><?php $this->_($this->forecast['metrics']['hiring_gap']); ?></td></tr>
                         <tr><th>Average staff per event</th><td><?php $this->_($this->forecast['metrics']['average_staff_per_event']); ?></td></tr>
                     </table>
                     <?php if ($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA): ?>

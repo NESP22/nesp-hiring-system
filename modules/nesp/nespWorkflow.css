@@ -509,6 +509,16 @@
     font-size: 13px;
 }
 
+.nesp-workflow .nesp-success {
+    border: 1px solid #3aa36f;
+    background: #103522;
+    color: #c9f7dd;
+    margin: 0 0 16px;
+    padding: 14px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
 .nesp-workflow .nesp-form,
 .nesp-workflow .nesp-scorecard-form {
     display: grid;
@@ -528,6 +538,7 @@
 .nesp-workflow .nesp-form input,
 .nesp-workflow .nesp-form select,
 .nesp-workflow .nesp-form textarea,
+.nesp-workflow .nesp-form-control,
 .nesp-workflow .nesp-scorecard-form select,
 .nesp-workflow .nesp-scorecard-form textarea {
     box-sizing: border-box;
@@ -542,11 +553,20 @@
 .nesp-workflow .nesp-form input:focus,
 .nesp-workflow .nesp-form select:focus,
 .nesp-workflow .nesp-form textarea:focus,
+.nesp-workflow .nesp-form-control:focus,
 .nesp-workflow .nesp-scorecard-form select:focus,
 .nesp-workflow .nesp-scorecard-form textarea:focus,
 .nesp-workflow textarea[readonly]:focus {
     border-color: #9fc9ff;
     outline: 3px solid var(--nesp-dashboard-focus);
+}
+
+.nesp-workflow .nesp-form-label {
+    color: var(--nesp-dashboard-text);
+    display: block;
+    font-size: 12px;
+    font-weight: bold;
+    margin: 0 0 5px;
 }
 
 .nesp-workflow .nesp-fieldset {
@@ -622,6 +642,38 @@
 .nesp-workflow .nesp-table th {
     background: var(--nesp-dashboard-panel-strong);
     color: #ffffff;
+}
+
+.nesp-workflow .nesp-table-scroll {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.nesp-workflow .nesp-review-table {
+    min-width: 980px;
+}
+
+.nesp-workflow .nesp-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1.3;
+    padding: 3px 6px;
+}
+
+.nesp-workflow .nesp-badge-success {
+    background: #143c2a;
+    color: #b8f3cd;
+}
+
+.nesp-workflow .nesp-badge-warning {
+    background: #33280f;
+    color: #ffe7a6;
+}
+
+.nesp-workflow .nesp-badge-muted {
+    background: #24384d;
+    color: #dce8f6;
 }
 
 .nesp-workflow .nesp-status {
@@ -773,6 +825,32 @@
         position: absolute;
         top: 8px;
         width: 86px;
+    }
+
+    .nesp-workflow .nesp-review-table {
+        display: table;
+        min-width: 980px;
+    }
+
+    .nesp-workflow .nesp-review-table tbody {
+        display: table-row-group;
+    }
+
+    .nesp-workflow .nesp-review-table tr,
+    .nesp-workflow .nesp-review-table tr:first-child {
+        display: table-row;
+    }
+
+    .nesp-workflow .nesp-review-table th,
+    .nesp-workflow .nesp-review-table td {
+        display: table-cell;
+        width: auto;
+        padding: 8px;
+        position: static;
+    }
+
+    .nesp-workflow .nesp-review-table td:before {
+        content: none;
     }
 
     .nesp-workflow .nesp-detail-list {

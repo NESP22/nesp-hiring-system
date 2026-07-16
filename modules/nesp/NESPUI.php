@@ -342,6 +342,12 @@ class NESPUI extends UserInterface
                 $this->dryRunStaffingImport();
                 break;
 
+            case 'importApprovedStaffingRows':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->importApprovedStaffingRows();
+                break;
+
             case 'staffingForecast':
                 $this->adminOnly();
                 $this->staffingForecast();
@@ -1201,6 +1207,7 @@ class NESPUI extends UserInterface
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('forecast', $this->_workflow->getStaffingForecast());
         $this->_template->assign('dryRunResult', null);
+        $this->_template->assign('importResult', null);
         $this->_template->display('./modules/nesp/StaffingForecast.tpl');
     }
 
@@ -1235,6 +1242,15 @@ class NESPUI extends UserInterface
                 $csv = file_get_contents($_FILES['staffingWorkbook']['tmp_name']);
                 $dryRunResult['result'] = NESPWorkflow::parseStaffingCSVText($csv === false ? '' : $csv, $fileName);
             }
+
+            if ($dryRunResult['result'] !== null)
+            {
+                $batchID = $this->storeStaffingDryRunBatch($dryRunResult['result'], $fileName);
+                $reviewRows = NESPWorkflow::buildStaffingDryRunReviewRows($dryRunResult['result']);
+                $dryRunResult['batch_id'] = $batchID;
+                $dryRunResult['review_rows'] = $this->_workflow->markStaffingReviewRowsWithExistingDuplicates($reviewRows);
+                $dryRunResult['expires_at'] = date('Y-m-d H:i:s', $_SESSION['NESP_STAFFING_DRY_RUNS'][$batchID]['expires_at']);
+            }
         }
 
         $this->_template->assign('active', $this);
@@ -1243,7 +1259,99 @@ class NESPUI extends UserInterface
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('forecast', $this->_workflow->getStaffingForecast());
         $this->_template->assign('dryRunResult', $dryRunResult);
+        $this->_template->assign('importResult', null);
         $this->_template->display('./modules/nesp/StaffingForecast.tpl');
+    }
+
+    private function importApprovedStaffingRows()
+    {
+        $importResult = array(
+            'ok' => false,
+            'status' => 'not_run',
+            'error' => ''
+        );
+        $batchID = isset($_POST['dryRunBatchID']) ? trim($_POST['dryRunBatchID']) : '';
+        $approvedRows = isset($_POST['approvedRows']) && is_array($_POST['approvedRows']) ? $_POST['approvedRows'] : array();
+        $backupReference = isset($_POST['backupReference']) ? trim($_POST['backupReference']) : '';
+        $backupConfirmed = isset($_POST['backupVerified']) && $_POST['backupVerified'] === '1';
+
+        $dryRunBatch = $this->getStaffingDryRunBatch($batchID);
+        if (empty($dryRunBatch))
+        {
+            $importResult['status'] = 'stale_or_missing_batch';
+            $importResult['error'] = 'Run a fresh dry-run before importing approved staffing rows.';
+        }
+        else if (!$backupConfirmed || $backupReference === '')
+        {
+            $importResult['status'] = 'backup_required';
+            $importResult['error'] = 'Verify the encrypted production backup and enter its reference before importing.';
+        }
+        else
+        {
+            $parseResult = $dryRunBatch['result'];
+            $sourceType = isset($parseResult['source_type']) ? $parseResult['source_type'] : 'fall_schedule_workbook';
+            $sourceLabel = isset($dryRunBatch['source_label']) ? $dryRunBatch['source_label'] : 'Fall schedule workbook';
+            $sourceIdentifier = hash('sha256', $sourceLabel . '|' . (isset($parseResult['checksum']) ? $parseResult['checksum'] : '') . '|' . $dryRunBatch['created_at']);
+            $importResult = $this->_workflow->saveApprovedStaffingImport(
+                $this->_userID,
+                $sourceType,
+                $sourceIdentifier,
+                $sourceLabel,
+                $parseResult,
+                $approvedRows,
+                $backupReference
+            );
+
+            if (!empty($importResult['ok']))
+            {
+                unset($_SESSION['NESP_STAFFING_DRY_RUNS'][$batchID]);
+            }
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Staffing Forecast');
+        $this->_template->assign('viewKey', 'staffingForecast');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('forecast', $this->_workflow->getStaffingForecast());
+        $this->_template->assign('dryRunResult', null);
+        $this->_template->assign('importResult', $importResult);
+        $this->_template->display('./modules/nesp/StaffingForecast.tpl');
+    }
+
+    private function storeStaffingDryRunBatch($parseResult, $sourceLabel)
+    {
+        if (!isset($_SESSION['NESP_STAFFING_DRY_RUNS']) || !is_array($_SESSION['NESP_STAFFING_DRY_RUNS']))
+        {
+            $_SESSION['NESP_STAFFING_DRY_RUNS'] = array();
+        }
+
+        $createdAt = time();
+        $batchID = hash('sha256', session_id() . '|' . $sourceLabel . '|' . $createdAt . '|' . (isset($parseResult['checksum']) ? $parseResult['checksum'] : ''));
+        $_SESSION['NESP_STAFFING_DRY_RUNS'][$batchID] = array(
+            'created_at' => $createdAt,
+            'expires_at' => $createdAt + 7200,
+            'source_label' => $sourceLabel,
+            'result' => $parseResult
+        );
+
+        return $batchID;
+    }
+
+    private function getStaffingDryRunBatch($batchID)
+    {
+        if ($batchID === '' || !isset($_SESSION['NESP_STAFFING_DRY_RUNS'][$batchID]))
+        {
+            return array();
+        }
+
+        $batch = $_SESSION['NESP_STAFFING_DRY_RUNS'][$batchID];
+        if (!isset($batch['expires_at']) || (int) $batch['expires_at'] < time())
+        {
+            unset($_SESSION['NESP_STAFFING_DRY_RUNS'][$batchID]);
+            return array();
+        }
+
+        return $batch;
     }
 
     private function schemaMissing()
