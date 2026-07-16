@@ -2110,6 +2110,7 @@ class CATSSchema
                   `can_view_other_interviewer_notes` TINYINT(1) NOT NULL DEFAULT '0',
                   `can_add_notes` TINYINT(1) NOT NULL DEFAULT '1',
                   `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1',
+                  `default_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
                   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   PRIMARY KEY (`interviewer_profile_id`),
@@ -2735,6 +2736,11 @@ class CATSSchema
                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
                 SELECT 'NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0, 1, NOW(), NOW()
                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_ZOOM_ENABLED');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'NESP_INTERVIEWER_ZOOM_LINKS_ENABLED', 'Interviewer Zoom Links', 'Disabled participant-link helper. No Zoom API, OAuth, meeting creation, cancellation, rescheduling, or invitations are sent.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
 
                 INSERT INTO nesp_feature_flag
                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)

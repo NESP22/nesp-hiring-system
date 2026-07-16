@@ -119,6 +119,11 @@ class NESPUI extends UserInterface
                 $this->setInterviewerAvailabilityStatus();
                 break;
 
+            case 'updateInterviewerZoomLink':
+                $this->requirePostCSRF();
+                $this->updateInterviewerZoomLink();
+                break;
+
             case 'createInterviewerAvailabilityOverride':
                 $this->requirePostCSRF();
                 $this->createInterviewerAvailabilityOverride();
@@ -499,6 +504,7 @@ class NESPUI extends UserInterface
             'may_recommend' => isset($_POST['mayRecommend']) ? 1 : 0,
             'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
             'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
+            'default_zoom_join_url' => isset($_POST['defaultZoomJoinURL']) ? $_POST['defaultZoomJoinURL'] : '',
             'temporary_password' => isset($_POST['temporaryPassword']) ? $_POST['temporaryPassword'] : ''
         );
 
@@ -506,6 +512,10 @@ class NESPUI extends UserInterface
         if ($result === false)
         {
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Interviewer display name is required.');
+        }
+        if (is_array($result) && isset($result['ok']) && empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to create interviewer profile.');
         }
         if (is_array($result) && !empty($result['temporary_login_message']))
         {
@@ -540,6 +550,7 @@ class NESPUI extends UserInterface
             'may_recommend' => isset($_POST['mayRecommend']) ? 1 : 0,
             'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
             'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
+            'default_zoom_join_url' => isset($_POST['defaultZoomJoinURL']) ? $_POST['defaultZoomJoinURL'] : '',
             'approved_joborder_ids' => isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array(),
             'temporary_password' => isset($_POST['temporaryPassword']) ? $_POST['temporaryPassword'] : ''
         );
@@ -548,6 +559,10 @@ class NESPUI extends UserInterface
         if ($result === false)
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to update interviewer settings.');
+        }
+        if (is_array($result) && isset($result['ok']) && empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to update interviewer settings.');
         }
         if (is_array($result) && !empty($result['temporary_login_message']))
         {
@@ -608,6 +623,28 @@ class NESPUI extends UserInterface
         if ($this->_workflow->setInterviewerAvailabilityStatus($interviewerProfileID, $statusKey, $reason, $closedUntil, $this->_userID) === false)
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to update availability status.');
+        }
+
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
+    }
+
+    private function updateInterviewerZoomLink()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can edit only your own Zoom participant link.');
+            }
+        }
+
+        $joinURL = isset($_POST['defaultZoomJoinURL']) ? $_POST['defaultZoomJoinURL'] : '';
+        $result = $this->_workflow->updateInterviewerDefaultZoomJoinURL($interviewerProfileID, $joinURL, $this->_userID);
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to update Zoom participant link.');
         }
 
         CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');

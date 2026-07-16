@@ -29,6 +29,7 @@ class NESPWorkflow
             array('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0),
             array('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0),
             array('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0),
+            array('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED', 'Interviewer Zoom Links', 'Disabled participant-link helper. No Zoom API, OAuth, meeting creation, cancellation, rescheduling, or invitations are sent.', 0),
             array('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0),
             array('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0),
             array('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0),
@@ -45,6 +46,7 @@ class NESPWorkflow
             'NESP_PRESCREEN_ENABLED',
             'NESP_VAPI_ENABLED',
             'NESP_ZOOM_ENABLED',
+            'NESP_INTERVIEWER_ZOOM_LINKS_ENABLED',
             'NESP_AI_REVIEW_ENABLED',
             'NESP_STAFFING_FORECAST_ENABLED',
             'NESP_STAFFING_DRIVE_IMPORT_ENABLED',
@@ -148,7 +150,8 @@ class NESPWorkflow
             'createInterviewer',
             'updateInterviewerSettings',
             'createInterviewerRoleRule',
-            'createCandidateGrant'
+            'createCandidateGrant',
+            'updateInterviewerZoomLink'
         )))
         {
             return 'NESP_INTERVIEWER_POOL_ENABLED';
@@ -294,7 +297,7 @@ class NESPWorkflow
 
         $path = isset($parts['path']) ? strtolower($parts['path']) : '';
         $query = isset($parts['query']) ? strtolower($parts['query']) : '';
-        if (strpos($path, '/start') !== false || strpos($query, 'start_url=') !== false || strpos($query, 'zak=') !== false)
+        if (preg_match('#(^|/)start(/|$)#', $path) || strpos($query, 'start_url=') !== false || strpos($query, 'zak=') !== false || preg_match('/(^|[?&])zak(&|=|$)/', '?' . $query))
         {
             return array('ok' => false, 'error' => 'Paste the applicant join link, not the Zoom host/start link.');
         }
@@ -322,6 +325,17 @@ class NESPWorkflow
         }
 
         return strtolower($parts['host']) . $path;
+    }
+
+    public static function isInterviewerZoomLinksEnabledByDefault()
+    {
+        $value = getenv('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
+        if ($value === false)
+        {
+            return false;
+        }
+
+        return in_array(strtolower(trim((string) $value)), array('1', 'true', 'yes', 'on'), true);
     }
 
     public static function buildManualInterviewInvitationCopy($firstName, $roleTitle, $scheduledStart, $durationMinutes, $timezone, $joinURL)
@@ -1897,6 +1911,7 @@ class NESPWorkflow
             array('nesp_candidate_workflow', 'summary'),
             array('nesp_candidate_workflow', 'next_action_label'),
             array('nesp_interviewer_profile', 'can_add_notes'),
+            array('nesp_interviewer_profile', 'default_zoom_join_url'),
             array('nesp_interview', 'manual_zoom_join_url'),
             array('nesp_interview', 'timezone'),
             array('nesp_interview', 'invitation_status_key'),
@@ -1956,7 +1971,7 @@ class NESPWorkflow
             FROM
                 nesp_feature_flag
             WHERE
-                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_INTERVIEWER_AVAILABILITY_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED", "NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED")
+                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_INTERVIEWER_AVAILABILITY_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_INTERVIEWER_ZOOM_LINKS_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED", "NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED")
             ORDER BY
                 display_name'
         );
@@ -2669,7 +2684,8 @@ class NESPWorkflow
             'may_recommend' => '1',
             'private_admin_notes' => '""',
             'last_login_at' => 'NULL',
-            'email_warning' => '""'
+            'email_warning' => '""',
+            'default_zoom_join_url' => '""'
         );
 
         foreach ($optionalColumns as $column => $fallback)
@@ -2909,6 +2925,7 @@ class NESPWorkflow
         $row['active_interviews'] = $this->getActiveInterviewsForCandidateJob($candidateID, $jobOrderID, $interviewID);
         $row['default_timezone'] = 'America/New_York';
         $row['default_duration_minutes'] = 30;
+        $row['interviewer_zoom_links_enabled'] = $this->isFeatureFlagEnabled('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
         return $row;
     }
 
@@ -3070,10 +3087,13 @@ class NESPWorkflow
             )
         );
         $this->setCandidateWorkflowStage($normalized['candidate_id'], $normalized['joborder_id'], 'interview_confirmation_pending', 'Applicant', 'Interview was rescheduled. Review updated invitation copy.', 'Review updated interview', $actorUserID);
+        $linkChanged = trim((string) $interview['manual_zoom_join_url']) !== trim((string) $normalized['manual_zoom_join_url']);
         $this->logAuditEvent($actorUserID, 'manual_interview_rescheduled', 'nesp_interview', $interviewID, array(
             'previous_start' => $interview['scheduled_start'],
             'new_start' => $normalized['scheduled_start'],
-            'zoom_join_url_masked' => self::maskZoomURLForAudit($normalized['manual_zoom_join_url'])
+            'previous_zoom_join_url_masked' => self::maskZoomURLForAudit($interview['manual_zoom_join_url']),
+            'new_zoom_join_url_masked' => self::maskZoomURLForAudit($normalized['manual_zoom_join_url']),
+            'zoom_join_url_replaced' => $linkChanged ? 1 : 0
         ));
         if (!empty($conflictResult['override']))
         {
@@ -3699,6 +3719,16 @@ class NESPWorkflow
         );
 
         $extraDefaults = $this->normalizeInterviewerSettingsOptions($options);
+        if ($this->isColumnInstalled('nesp_interviewer_profile', 'default_zoom_join_url')
+            && $extraDefaults['default_zoom_join_url'] !== '')
+        {
+            $zoomValidation = self::validateZoomApplicantJoinURL($extraDefaults['default_zoom_join_url']);
+            if (empty($zoomValidation['ok']))
+            {
+                return array('ok' => false, 'error' => $zoomValidation['error']);
+            }
+            $extraDefaults['default_zoom_join_url'] = $zoomValidation['url'];
+        }
         foreach ($extraDefaults as $column => $value)
         {
             if ($this->isColumnInstalled('nesp_interviewer_profile', $column))
@@ -3772,6 +3802,16 @@ class NESPWorkflow
         }
 
         $normalized = $this->normalizeInterviewerSettingsOptions($settings);
+        if ($this->isColumnInstalled('nesp_interviewer_profile', 'default_zoom_join_url')
+            && $normalized['default_zoom_join_url'] !== '')
+        {
+            $zoomValidation = self::validateZoomApplicantJoinURL($normalized['default_zoom_join_url']);
+            if (empty($zoomValidation['ok']))
+            {
+                return array('ok' => false, 'error' => $zoomValidation['error']);
+            }
+            $normalized['default_zoom_join_url'] = $zoomValidation['url'];
+        }
         $sets = array();
         foreach ($normalized as $column => $value)
         {
@@ -3842,17 +3882,19 @@ class NESPWorkflow
             $this->syncInterviewerUserAccess($interviewerProfileID, !empty($settings['is_active']), $actorUserID);
         }
 
+        $after = $this->_db->getAssoc(sprintf(
+            'SELECT * FROM nesp_interviewer_profile WHERE interviewer_profile_id = %s LIMIT 1',
+            $this->_db->makeQueryInteger($interviewerProfileID)
+        ));
+
         $this->logAuditEvent(
             $actorUserID,
-            'interviewer_settings_updated',
+            $this->maskedInterviewerZoomLink($before) !== $this->maskedInterviewerZoomLink($after) ? 'interviewer_zoom_participant_link_updated' : 'interviewer_settings_updated',
             'interviewer_profile',
             $interviewerProfileID,
             array(
                 'old' => $this->auditSafeInterviewerSettings($before),
-                'new' => $this->auditSafeInterviewerSettings($this->_db->getAssoc(sprintf(
-                    'SELECT * FROM nesp_interviewer_profile WHERE interviewer_profile_id = %s LIMIT 1',
-                    $this->_db->makeQueryInteger($interviewerProfileID)
-                )))
+                'new' => $this->auditSafeInterviewerSettings($after)
             )
         );
 
@@ -3893,6 +3935,64 @@ class NESPWorkflow
         );
 
         return true;
+    }
+
+    public function updateInterviewerDefaultZoomJoinURL($interviewerProfileID, $joinURL, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $joinURL = trim((string) $joinURL);
+        if ($interviewerProfileID <= 0 || !$this->isColumnInstalled('nesp_interviewer_profile', 'default_zoom_join_url'))
+        {
+            return array('ok' => false, 'error' => 'Unable to update the interviewer Zoom participant link.');
+        }
+
+        $before = $this->_db->getAssoc(
+            sprintf(
+                'SELECT interviewer_profile_id, default_zoom_join_url
+                 FROM nesp_interviewer_profile
+                 WHERE interviewer_profile_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+        if (empty($before))
+        {
+            return array('ok' => false, 'error' => 'Interviewer profile not found.');
+        }
+
+        if ($joinURL !== '')
+        {
+            $zoomValidation = self::validateZoomApplicantJoinURL($joinURL);
+            if (empty($zoomValidation['ok']))
+            {
+                return array('ok' => false, 'error' => $zoomValidation['error']);
+            }
+            $joinURL = $zoomValidation['url'];
+        }
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_interviewer_profile
+                 SET default_zoom_join_url = %s,
+                     date_modified = NOW()
+                 WHERE interviewer_profile_id = %s',
+                $this->_db->makeQueryString($joinURL),
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_zoom_participant_link_updated',
+            'interviewer_profile',
+            $interviewerProfileID,
+            array(
+                'old_zoom_join_url_masked' => self::maskZoomURLForAudit($before['default_zoom_join_url']),
+                'new_zoom_join_url_masked' => self::maskZoomURLForAudit($joinURL)
+            )
+        );
+
+        return array('ok' => true);
     }
 
     public function createInterviewerAvailabilityOverride($interviewerProfileID, $overrideDate, $overrideTypeKey, $startTime, $endTime, $timezone, $privateReason, $actorUserID)
@@ -6309,6 +6409,26 @@ class NESPWorkflow
         );
     }
 
+    private function getDefaultZoomJoinURLForInterviewer($interviewerProfileID)
+    {
+        if (!$this->isColumnInstalled('nesp_interviewer_profile', 'default_zoom_join_url'))
+        {
+            return '';
+        }
+
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT default_zoom_join_url
+                 FROM nesp_interviewer_profile
+                 WHERE interviewer_profile_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+
+        return empty($row) ? '' : trim((string) $row['default_zoom_join_url']);
+    }
+
     private function normalizeManualInterviewInput($input)
     {
         $candidateID = isset($input['candidateID']) ? (int) $input['candidateID'] : 0;
@@ -6333,6 +6453,11 @@ class NESPWorkflow
         if ($timezone === '')
         {
             $timezone = 'America/New_York';
+        }
+
+        if ($joinURL === '' && $this->isFeatureFlagEnabled('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED'))
+        {
+            $joinURL = $this->getDefaultZoomJoinURLForInterviewer($interviewerProfileID);
         }
 
         $zoomValidation = self::validateZoomApplicantJoinURL($joinURL);
@@ -7403,7 +7528,8 @@ class NESPWorkflow
             'craig_must_attend' => isset($options['craig_must_attend']) && (int) $options['craig_must_attend'] === 1 ? 1 : 0,
             'may_recommend' => isset($options['may_recommend']) && (int) $options['may_recommend'] === 0 ? 0 : 1,
             'private_admin_notes' => isset($options['private_admin_notes']) ? trim($options['private_admin_notes']) : '',
-            'email_warning' => isset($options['email_warning']) ? trim($options['email_warning']) : ''
+            'email_warning' => isset($options['email_warning']) ? trim($options['email_warning']) : '',
+            'default_zoom_join_url' => isset($options['default_zoom_join_url']) ? trim($options['default_zoom_join_url']) : ''
         );
     }
 
@@ -7436,8 +7562,22 @@ class NESPWorkflow
                 $safe[$key] = $row[$key];
             }
         }
+        if (isset($row['default_zoom_join_url']))
+        {
+            $safe['default_zoom_join_url_masked'] = self::maskZoomURLForAudit($row['default_zoom_join_url']);
+        }
 
         return $safe;
+    }
+
+    private function maskedInterviewerZoomLink($row)
+    {
+        if (empty($row) || !isset($row['default_zoom_join_url']))
+        {
+            return '';
+        }
+
+        return self::maskZoomURLForAudit($row['default_zoom_join_url']);
     }
 
     private function selectOptionalColumn($table, $alias, $column, $fallbackSQL)

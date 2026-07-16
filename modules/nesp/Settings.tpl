@@ -155,6 +155,11 @@
                             <input type="text" name="defaultInterviewMinutes" value="30" />
                         </label>
                         <label>
+                            Default Zoom participant link
+                            <input type="url" name="defaultZoomJoinURL" placeholder="https://*.zoom.us/j/..." />
+                            <span class="nesp-help-text">Optional. Participant join link only; host/start URLs are rejected.</span>
+                        </label>
+                        <label>
                             Buffer minutes
                             <input type="text" name="bufferMinutes" value="15" />
                         </label>
@@ -296,6 +301,7 @@
                         <th>Status</th>
                         <th>Active Grants</th>
                         <th>Capacity</th>
+                        <th>Zoom Link</th>
                         <th>Last Change</th>
                         <th>Action</th>
                     </tr>
@@ -314,13 +320,14 @@
                         <td><?php echo(((int) $profile['is_active'] === 1) ? 'Active' : 'Inactive'); ?></td>
                         <td><?php $this->_($profile['active_grants']); ?></td>
                         <td><?php $this->_((int) $profile['max_interviews_per_day'] . '/day, ' . (int) $profile['max_interviews_per_week'] . '/week'); ?></td>
+                        <td><?php $this->_($profile['default_zoom_join_url'] === '' ? 'None' : NESPWorkflow::maskZoomURLForAudit($profile['default_zoom_join_url'])); ?></td>
                         <td><?php $this->_($profile['date_modified']); ?></td>
                         <td><a class="nesp-secondary-action" href="#interviewer-<?php echo((int) $profile['interviewer_profile_id']); ?>">Edit</a></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (!count($this->interviewerProfiles)): ?>
                     <tr>
-                        <td colspan="9">No interviewer profiles have been created.</td>
+                        <td colspan="10">No interviewer profiles have been created.</td>
                     </tr>
                     <?php endif; ?>
                 </table>
@@ -407,6 +414,11 @@
                         <label>
                             Default duration
                             <input type="text" name="defaultInterviewMinutes" value="<?php echo((int) $profile['default_interview_minutes']); ?>" />
+                        </label>
+                        <label>
+                            Default Zoom participant link
+                            <input type="url" name="defaultZoomJoinURL" value="<?php echo(htmlspecialchars($profile['default_zoom_join_url'], ENT_QUOTES, 'UTF-8')); ?>" placeholder="https://*.zoom.us/j/..." />
+                            <span class="nesp-help-text">Optional. Used as a scheduling default only when NESP_INTERVIEWER_ZOOM_LINKS_ENABLED is enabled. Participant join link only; host/start URLs are rejected.</span>
                         </label>
                         <label>
                             Buffer minutes

@@ -53,7 +53,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
 
     public function testNESPWorkflowSeedDataIsSafeByDefault()
     {
-        $this->assertSame(10, $this->countRows('nesp_feature_flag'));
+        $this->assertSame(11, $this->countRows('nesp_feature_flag'));
         $this->assertSame(0, $this->countRowsWhere('nesp_feature_flag', 'is_enabled = 1'));
         $this->assertSame(17, $this->countRows('nesp_workflow_stage'));
         $this->assertSame(5, $this->countRowsWhere('nesp_integration_status', "status_key = 'disabled'"));
@@ -68,8 +68,9 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
         $this->assertSame(0, $this->countRows('nesp_recruiting_campaign_control'));
         $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
-        $this->assertSame(10, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
+        $this->assertSame(11, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_feature_flag', "flag_key = 'NESP_INTERVIEWER_AVAILABILITY_ENABLED' AND is_enabled = 0"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_feature_flag', "flag_key = 'NESP_INTERVIEWER_ZOOM_LINKS_ENABLED' AND is_enabled = 0"));
         $this->assertSame(1, $this->countRowsWhere('nesp_feature_flag', "flag_key = 'NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED' AND is_enabled = 0"));
         $this->assertSame(1, $this->countRowsWhere('nesp_integration_status', "integration_key = 'google_calendar_freebusy' AND status_key = 'disabled'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'timezone' AND setting_value = 'America/New_York'"));
@@ -98,6 +99,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'max_interviews_per_week'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'min_notice_minutes'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'email_warning'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'default_zoom_join_url'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_job_role', 'joborder_id'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_availability_override', 'override_type_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_blackout', 'private_reason'));

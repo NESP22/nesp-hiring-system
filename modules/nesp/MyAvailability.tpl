@@ -39,6 +39,20 @@
                 </div>
 
                 <div class="nesp-panel">
+                    <h3>Zoom Participant Link</h3>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=updateInterviewerZoomLink" class="nesp-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $this->profile['interviewer_profile_id']); ?>" />
+                        <label>
+                            Default Zoom participant link
+                            <input type="url" name="defaultZoomJoinURL" value="<?php echo(htmlspecialchars(isset($this->profile['default_zoom_join_url']) ? $this->profile['default_zoom_join_url'] : '', ENT_QUOTES, 'UTF-8')); ?>" placeholder="https://*.zoom.us/j/..." />
+                            <span class="nesp-help-text">Optional. Participant join link only; host/start URLs are rejected.</span>
+                        </label>
+                        <button type="submit" class="nesp-secondary-button">Save Zoom Link</button>
+                    </form>
+                </div>
+
+                <div class="nesp-panel">
                     <h3>Add Weekly Time Block</h3>
                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createInterviewerAvailability" class="nesp-form">
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
