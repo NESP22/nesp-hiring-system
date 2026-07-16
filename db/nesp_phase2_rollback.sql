@@ -12,6 +12,7 @@ DELETE FROM `nesp_feature_flag`
 WHERE `flag_key` IN (
     'NESP_WORKFLOW_ENABLED',
     'NESP_INTERVIEWER_POOL_ENABLED',
+    'NESP_INTERVIEWER_AVAILABILITY_ENABLED',
     'NESP_PRESCREEN_ENABLED',
     'NESP_VAPI_ENABLED',
     'NESP_ZOOM_ENABLED',
@@ -68,7 +69,8 @@ ALTER TABLE `nesp_interview`
 
 ALTER TABLE `nesp_interviewer_profile`
     DROP COLUMN IF EXISTS `can_add_notes`,
-    DROP COLUMN IF EXISTS `can_submit_scorecard`;
+    DROP COLUMN IF EXISTS `can_submit_scorecard`,
+    DROP COLUMN IF EXISTS `min_notice_minutes`;
 
 ALTER TABLE `nesp_candidate_workflow`
     DROP INDEX IF EXISTS `IDX_nesp_dashboard_due`,

@@ -15,6 +15,7 @@ ALTER TABLE `nesp_interviewer_profile`
     ADD COLUMN IF NOT EXISTS `availability_close_reason` TEXT COLLATE utf8mb4_unicode_ci,
     ADD COLUMN IF NOT EXISTS `max_interviews_per_day` INT(11) NOT NULL DEFAULT '3',
     ADD COLUMN IF NOT EXISTS `max_interviews_per_week` INT(11) NOT NULL DEFAULT '12',
+    ADD COLUMN IF NOT EXISTS `min_notice_minutes` INT(11) NOT NULL DEFAULT '1440',
     ADD COLUMN IF NOT EXISTS `default_interview_minutes` INT(11) NOT NULL DEFAULT '30',
     ADD COLUMN IF NOT EXISTS `buffer_minutes` INT(11) NOT NULL DEFAULT '15',
     ADD COLUMN IF NOT EXISTS `earliest_time` TIME NOT NULL DEFAULT '09:00:00',

@@ -24,6 +24,7 @@ class NESPWorkflow
         return array(
             array('NESP_WORKFLOW_ENABLED', 'NESP Workflow', 'Craig-reviewed hiring workflow dashboard and task queues.', 0),
             array('NESP_INTERVIEWER_POOL_ENABLED', 'Interviewer Pool', 'Scoped interviewer access to assigned candidates and interviews.', 0),
+            array('NESP_INTERVIEWER_AVAILABILITY_ENABLED', 'Interviewer Availability', 'Interviewer availability windows, block time, and schedule conflict checks.', 0),
             array('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0),
             array('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0),
             array('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0),
@@ -38,6 +39,7 @@ class NESPWorkflow
         return array(
             'NESP_WORKFLOW_ENABLED',
             'NESP_INTERVIEWER_POOL_ENABLED',
+            'NESP_INTERVIEWER_AVAILABILITY_ENABLED',
             'NESP_PRESCREEN_ENABLED',
             'NESP_VAPI_ENABLED',
             'NESP_ZOOM_ENABLED',
@@ -142,7 +144,13 @@ class NESPWorkflow
             'createInterviewer',
             'updateInterviewerSettings',
             'createInterviewerRoleRule',
-            'createCandidateGrant',
+            'createCandidateGrant'
+        )))
+        {
+            return 'NESP_INTERVIEWER_POOL_ENABLED';
+        }
+
+        if (in_array($action, array(
             'createInterviewerAvailability',
             'myAvailability',
             'setInterviewerAvailabilityStatus',
@@ -150,7 +158,7 @@ class NESPWorkflow
             'createInterviewerBlackout'
         )))
         {
-            return 'NESP_INTERVIEWER_POOL_ENABLED';
+            return 'NESP_INTERVIEWER_AVAILABILITY_ENABLED';
         }
 
         if (in_array($action, array('staffingForecast', 'dryRunStaffingImport', 'importApprovedStaffingRows', 'createStaffingRecommendation')))
@@ -714,16 +722,22 @@ class NESPWorkflow
         );
     }
 
-    public static function findSchedulingConflicts($interviewer, $approvedJobIDs, $availabilityBlocks, $blackouts, $existingInterviews, $jobOrderID, $startTime, $endTime)
+    public static function findSchedulingConflicts($interviewer, $approvedJobIDs, $availabilityBlocks, $blackouts, $existingInterviews, $jobOrderID, $startTime, $endTime, $availabilityOverrides = array(), $now = null, $externalBusyWindows = array())
     {
         $conflicts = array();
         $jobOrderID = (int) $jobOrderID;
-        $start = strtotime($startTime);
-        $end = strtotime($endTime);
-        if ($start === false || $end === false || $start >= $end)
+        $timezoneName = isset($interviewer['timezone']) && trim($interviewer['timezone']) !== ''
+            ? trim($interviewer['timezone'])
+            : 'America/New_York';
+        $timezone = self::safeDateTimeZone($timezoneName);
+        $startDateTime = self::localDateTimeFromScheduleValue($startTime, $timezone);
+        $endDateTime = self::localDateTimeFromScheduleValue($endTime, $timezone);
+        if ($startDateTime === null || $endDateTime === null || $startDateTime->getTimestamp() >= $endDateTime->getTimestamp())
         {
             return array('Invalid interview time.');
         }
+        $start = $startDateTime->getTimestamp();
+        $end = $endDateTime->getTimestamp();
 
         if (empty($interviewer) || (int) $interviewer['is_active'] !== 1)
         {
@@ -737,21 +751,72 @@ class NESPWorkflow
         {
             $conflicts[] = 'Interviewer is not approved for this job role.';
         }
+        $minNotice = isset($interviewer['min_notice_minutes']) ? max(0, (int) $interviewer['min_notice_minutes']) : 0;
+        if ($minNotice > 0)
+        {
+            $nowDateTime = self::scheduleNowDateTime($now, $timezone);
+            if (($startDateTime->getTimestamp() - $nowDateTime->getTimestamp()) < ($minNotice * 60))
+            {
+                $conflicts[] = 'Requested time is inside the minimum notice window.';
+            }
+        }
 
         $insideBlock = false;
-        $weekday = date('l', $start);
-        $candidateStart = date('H:i:s', $start);
-        $candidateEnd = date('H:i:s', $end);
-        foreach ($availabilityBlocks as $block)
+        $hasDateSpecificAvailability = false;
+        $hasAllDayAvailability = false;
+        foreach ($availabilityOverrides as $override)
         {
-            if ((int) $block['is_active'] !== 1 || $block['weekday_key'] !== $weekday)
+            if (isset($override['is_active']) && (int) $override['is_active'] !== 1)
             {
                 continue;
             }
-            if ($candidateStart >= $block['start_time'] && $candidateEnd <= $block['end_time'])
+            $overrideTimezone = self::safeDateTimeZone(isset($override['timezone']) ? $override['timezone'] : $timezoneName);
+            $overrideStart = $startDateTime->setTimezone($overrideTimezone);
+            if (!isset($override['override_date']) || $overrideStart->format('Y-m-d') !== $override['override_date'])
+            {
+                continue;
+            }
+            $overrideType = isset($override['override_type_key']) ? $override['override_type_key'] : '';
+            if ($overrideType === 'unavailable' || $overrideType === 'unavailable_all_day')
+            {
+                $conflicts[] = 'Requested date is marked unavailable.';
+                break;
+            }
+            if ($overrideType === 'available_all_day')
             {
                 $insideBlock = true;
-                break;
+                $hasAllDayAvailability = true;
+                continue;
+            }
+            if ($overrideType === 'available')
+            {
+                $hasDateSpecificAvailability = true;
+                if (self::scheduleWindowContains($startDateTime, $endDateTime, $override['override_date'], $override['start_time'], $override['end_time'], $overrideTimezone))
+                {
+                    $insideBlock = true;
+                }
+            }
+        }
+
+        if (!$insideBlock && !$hasDateSpecificAvailability && !$hasAllDayAvailability)
+        {
+            foreach ($availabilityBlocks as $block)
+            {
+                if ((int) $block['is_active'] !== 1)
+                {
+                    continue;
+                }
+                $blockTimezone = self::safeDateTimeZone(isset($block['timezone']) ? $block['timezone'] : $timezoneName);
+                $blockStart = $startDateTime->setTimezone($blockTimezone);
+                if ($block['weekday_key'] !== $blockStart->format('l'))
+                {
+                    continue;
+                }
+                if (self::scheduleWindowContains($startDateTime, $endDateTime, $blockStart->format('Y-m-d'), $block['start_time'], $block['end_time'], $blockTimezone))
+                {
+                    $insideBlock = true;
+                    break;
+                }
             }
         }
         if (!$insideBlock)
@@ -761,11 +826,39 @@ class NESPWorkflow
 
         foreach ($blackouts as $blackout)
         {
-            $blackoutStart = strtotime($blackout['starts_at']);
-            $blackoutEnd = strtotime($blackout['ends_at']);
-            if ($blackoutStart !== false && $blackoutEnd !== false && $start < $blackoutEnd && $end > $blackoutStart)
+            $blackoutTimezone = self::safeDateTimeZone(isset($blackout['timezone']) ? $blackout['timezone'] : $timezoneName);
+            if (isset($blackout['is_all_day']) && (int) $blackout['is_all_day'] === 1)
             {
-                $conflicts[] = 'Requested time overlaps a blackout date.';
+                $blackoutStartDate = self::localDateTimeFromScheduleValue(substr($blackout['starts_at'], 0, 10) . ' 00:00:00', $blackoutTimezone);
+                $blackoutEndDate = self::localDateTimeFromScheduleValue(substr($blackout['ends_at'], 0, 10) . ' 23:59:59', $blackoutTimezone);
+                if ($blackoutStartDate !== null && $blackoutEndDate !== null
+                    && $startDateTime->setTimezone($blackoutTimezone)->getTimestamp() <= $blackoutEndDate->getTimestamp()
+                    && $endDateTime->setTimezone($blackoutTimezone)->getTimestamp() >= $blackoutStartDate->getTimestamp())
+                {
+                    $conflicts[] = 'Requested time overlaps blocked time.';
+                    break;
+                }
+                continue;
+            }
+            $blackoutStart = self::localDateTimeFromScheduleValue($blackout['starts_at'], $blackoutTimezone);
+            $blackoutEnd = self::localDateTimeFromScheduleValue($blackout['ends_at'], $blackoutTimezone);
+            if ($blackoutStart !== null && $blackoutEnd !== null && $start < $blackoutEnd->getTimestamp() && $end > $blackoutStart->getTimestamp())
+            {
+                $conflicts[] = 'Requested time overlaps blocked time.';
+                break;
+            }
+        }
+
+        foreach ($externalBusyWindows as $busyWindow)
+        {
+            $busyTimezone = self::safeDateTimeZone(isset($busyWindow['timezone']) ? $busyWindow['timezone'] : $timezoneName);
+            $busyStartValue = isset($busyWindow['starts_at']) ? $busyWindow['starts_at'] : (isset($busyWindow['busy_start']) ? $busyWindow['busy_start'] : '');
+            $busyEndValue = isset($busyWindow['ends_at']) ? $busyWindow['ends_at'] : (isset($busyWindow['busy_end']) ? $busyWindow['busy_end'] : '');
+            $busyStart = self::localDateTimeFromScheduleValue($busyStartValue, $busyTimezone);
+            $busyEnd = self::localDateTimeFromScheduleValue($busyEndValue, $busyTimezone);
+            if ($busyStart !== null && $busyEnd !== null && $start < $busyEnd->getTimestamp() && $end > $busyStart->getTimestamp())
+            {
+                $conflicts[] = 'Requested time overlaps interviewer external busy time.';
                 break;
             }
         }
@@ -773,9 +866,16 @@ class NESPWorkflow
         $bufferMinutes = isset($interviewer['buffer_minutes']) ? (int) $interviewer['buffer_minutes'] : 15;
         foreach ($existingInterviews as $interview)
         {
-            $existingStart = strtotime($interview['scheduled_start']) - ($bufferMinutes * 60);
-            $existingEnd = strtotime($interview['scheduled_end']) + ($bufferMinutes * 60);
-            if ($existingStart !== false && $existingEnd !== false && $start < $existingEnd && $end > $existingStart)
+            $existingTimezone = self::safeDateTimeZone(isset($interview['timezone']) ? $interview['timezone'] : $timezoneName);
+            $existingStartDateTime = self::localDateTimeFromScheduleValue($interview['scheduled_start'], $existingTimezone);
+            $existingEndDateTime = self::localDateTimeFromScheduleValue($interview['scheduled_end'], $existingTimezone);
+            if ($existingStartDateTime === null || $existingEndDateTime === null)
+            {
+                continue;
+            }
+            $existingStart = $existingStartDateTime->getTimestamp() - ($bufferMinutes * 60);
+            $existingEnd = $existingEndDateTime->getTimestamp() + ($bufferMinutes * 60);
+            if ($start < $existingEnd && $end > $existingStart)
             {
                 $conflicts[] = 'Requested time overlaps an existing interview or buffer.';
                 break;
@@ -786,20 +886,22 @@ class NESPWorkflow
         $weeklyLimit = isset($interviewer['max_interviews_per_week']) ? (int) $interviewer['max_interviews_per_week'] : 12;
         $dayCount = 0;
         $weekCount = 0;
-        $targetDay = date('Y-m-d', $start);
-        $targetWeek = date('o-W', $start);
+        $targetDay = $startDateTime->format('Y-m-d');
+        $targetWeek = $startDateTime->format('o-W');
         foreach ($existingInterviews as $interview)
         {
-            $existingStart = strtotime($interview['scheduled_start']);
-            if ($existingStart === false)
+            $existingTimezone = self::safeDateTimeZone(isset($interview['timezone']) ? $interview['timezone'] : $timezoneName);
+            $existingStart = self::localDateTimeFromScheduleValue($interview['scheduled_start'], $existingTimezone);
+            if ($existingStart === null)
             {
                 continue;
             }
-            if (date('Y-m-d', $existingStart) === $targetDay)
+            $existingInTargetTimezone = $existingStart->setTimezone($timezone);
+            if ($existingInTargetTimezone->format('Y-m-d') === $targetDay)
             {
                 $dayCount++;
             }
-            if (date('o-W', $existingStart) === $targetWeek)
+            if ($existingInTargetTimezone->format('o-W') === $targetWeek)
             {
                 $weekCount++;
             }
@@ -814,6 +916,94 @@ class NESPWorkflow
         }
 
         return $conflicts;
+    }
+
+    private static function safeDateTimeZone($timezone)
+    {
+        try
+        {
+            return new DateTimeZone(trim((string) $timezone) === '' ? 'America/New_York' : trim((string) $timezone));
+        }
+        catch (Exception $e)
+        {
+            return new DateTimeZone('America/New_York');
+        }
+    }
+
+    private static function localDateTimeFromScheduleValue($value, $timezone)
+    {
+        $value = trim((string) $value);
+        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $value))
+        {
+            $value .= ':00';
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $value))
+        {
+            return null;
+        }
+
+        $dateTime = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $value, $timezone);
+        $errors = DateTimeImmutable::getLastErrors();
+        if ($dateTime === false || (is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)))
+        {
+            return null;
+        }
+        if ($dateTime->format('Y-m-d H:i:s') !== $value)
+        {
+            return null;
+        }
+
+        return $dateTime;
+    }
+
+    private static function scheduleNowDateTime($now, $timezone)
+    {
+        if ($now instanceof DateTimeInterface)
+        {
+            return DateTimeImmutable::createFromFormat('U', $now->format('U'))->setTimezone($timezone);
+        }
+        if (is_int($now))
+        {
+            return DateTimeImmutable::createFromFormat('U', (string) $now)->setTimezone($timezone);
+        }
+        if (is_string($now) && trim($now) !== '')
+        {
+            $parsed = self::localDateTimeFromScheduleValue($now, $timezone);
+            if ($parsed !== null)
+            {
+                return $parsed;
+            }
+        }
+
+        return new DateTimeImmutable('now', $timezone);
+    }
+
+    private static function scheduleWindowContains($startDateTime, $endDateTime, $date, $windowStart, $windowEnd, $timezone)
+    {
+        $start = self::localDateTimeFromScheduleValue($date . ' ' . self::normalizeScheduleTimeForDateTime($windowStart), $timezone);
+        $end = self::localDateTimeFromScheduleValue($date . ' ' . self::normalizeScheduleTimeForDateTime($windowEnd), $timezone);
+        if ($start === null || $end === null || $start->getTimestamp() >= $end->getTimestamp())
+        {
+            return false;
+        }
+
+        return $startDateTime->getTimestamp() >= $start->getTimestamp()
+            && $endDateTime->getTimestamp() <= $end->getTimestamp();
+    }
+
+    private static function normalizeScheduleTimeForDateTime($time)
+    {
+        $time = trim((string) $time);
+        if (preg_match('/^\d{2}:\d{2}$/', $time))
+        {
+            return $time . ':00';
+        }
+        if (preg_match('/^\d{2}:\d{2}:\d{2}$/', $time))
+        {
+            return $time;
+        }
+
+        return '';
     }
 
     public static function isValidAvailabilityTime($time)
@@ -1755,7 +1945,7 @@ class NESPWorkflow
             FROM
                 nesp_feature_flag
             WHERE
-                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED")
+                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_INTERVIEWER_AVAILABILITY_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED")
             ORDER BY
                 display_name'
         );
@@ -2344,6 +2534,7 @@ class NESPWorkflow
             'availability_close_reason' => '""',
             'max_interviews_per_day' => '3',
             'max_interviews_per_week' => '12',
+            'min_notice_minutes' => '1440',
             'default_interview_minutes' => '30',
             'buffer_minutes' => '15',
             'earliest_time' => '"09:00:00"',
@@ -2641,6 +2832,12 @@ class NESPWorkflow
             return array('ok' => false, 'error' => 'An active interview already exists for this candidate and role.');
         }
 
+        $conflictResult = $this->checkManualInterviewAvailabilityConflicts($normalized, 0, $input, $actorUserID);
+        if (empty($conflictResult['ok']))
+        {
+            return $conflictResult;
+        }
+
         $invitationCopy = self::buildManualInterviewInvitationCopy(
             $normalized['candidate_first_name'],
             $normalized['role_title'],
@@ -2676,6 +2873,10 @@ class NESPWorkflow
             'interviewer_profile_id' => $normalized['interviewer_profile_id'],
             'zoom_join_url_masked' => self::maskZoomURLForAudit($normalized['manual_zoom_join_url'])
         ));
+        if (!empty($conflictResult['override']))
+        {
+            $this->logManualInterviewAvailabilityOverride($actorUserID, $interviewID, $normalized, $conflictResult);
+        }
 
         return array('ok' => true, 'interview_id' => $interviewID);
     }
@@ -2700,6 +2901,12 @@ class NESPWorkflow
         if (!empty($active))
         {
             return array('ok' => false, 'error' => 'Another active interview already exists for this candidate and role.');
+        }
+
+        $conflictResult = $this->checkManualInterviewAvailabilityConflicts($normalized, (int) $interviewID, $input, $actorUserID);
+        if (empty($conflictResult['ok']))
+        {
+            return $conflictResult;
         }
 
         $invitationCopy = self::buildManualInterviewInvitationCopy(
@@ -2742,8 +2949,169 @@ class NESPWorkflow
             'new_start' => $normalized['scheduled_start'],
             'zoom_join_url_masked' => self::maskZoomURLForAudit($normalized['manual_zoom_join_url'])
         ));
+        if (!empty($conflictResult['override']))
+        {
+            $this->logManualInterviewAvailabilityOverride($actorUserID, $interviewID, $normalized, $conflictResult);
+        }
 
         return array('ok' => true, 'interview_id' => (int) $interviewID);
+    }
+
+    private function checkManualInterviewAvailabilityConflicts($normalized, $excludeInterviewID, $input, $actorUserID)
+    {
+        if (!$this->isFeatureFlagEnabled('NESP_INTERVIEWER_AVAILABILITY_ENABLED'))
+        {
+            return array('ok' => true, 'conflicts' => array(), 'override' => false);
+        }
+
+        $availability = $this->getAvailabilityForProfile($normalized['interviewer_profile_id']);
+        $interviewer = $this->getInterviewerProfileForScheduling($normalized['interviewer_profile_id']);
+        if (!empty($interviewer) && empty($interviewer['timezone']))
+        {
+            $interviewer['timezone'] = $normalized['timezone'];
+        }
+
+        $conflicts = self::findSchedulingConflicts(
+            $interviewer,
+            $this->getApprovedJobOrderIDsForInterviewer($normalized['interviewer_profile_id']),
+            $availability['recurring'],
+            $availability['blackouts'],
+            $this->getActiveInterviewsForInterviewer($normalized['interviewer_profile_id'], $excludeInterviewID),
+            $normalized['joborder_id'],
+            $normalized['scheduled_start'],
+            $normalized['scheduled_end'],
+            $availability['overrides'],
+            null,
+            $this->getExternalBusyWindowsForInterviewer(
+                $normalized['interviewer_profile_id'],
+                $normalized['scheduled_start'],
+                $normalized['scheduled_end']
+            )
+        );
+
+        if (empty($conflicts))
+        {
+            return array('ok' => true, 'conflicts' => array(), 'override' => false);
+        }
+
+        $overrideRequested = isset($input['adminOverrideAvailability'])
+            && in_array((string) $input['adminOverrideAvailability'], array('1', 'on', 'yes'), true);
+        $overrideReason = isset($input['availabilityOverrideReason'])
+            ? substr(trim((string) $input['availabilityOverrideReason']), 0, 1000)
+            : '';
+
+        if (!$overrideRequested)
+        {
+            return array(
+                'ok' => false,
+                'error' => 'Availability conflict: ' . implode(' ', $conflicts),
+                'conflicts' => $conflicts,
+                'override' => false
+            );
+        }
+        if ($overrideReason === '')
+        {
+            return array(
+                'ok' => false,
+                'error' => 'Enter an admin override reason to save through availability conflicts.',
+                'conflicts' => $conflicts,
+                'override' => false
+            );
+        }
+
+        return array(
+            'ok' => true,
+            'conflicts' => $conflicts,
+            'override' => true,
+            'override_reason' => $overrideReason,
+            'actor_user_id' => $actorUserID
+        );
+    }
+
+    private function getInterviewerProfileForScheduling($interviewerProfileID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        if ($interviewerProfileID <= 0)
+        {
+            return array();
+        }
+
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT *
+                 FROM nesp_interviewer_profile
+                 WHERE interviewer_profile_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+
+        return empty($row) ? array() : $row;
+    }
+
+    private function getApprovedJobOrderIDsForInterviewer($interviewerProfileID)
+    {
+        if (!$this->isTableInstalled('nesp_interviewer_job_role'))
+        {
+            return array();
+        }
+
+        $rows = $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT joborder_id
+                 FROM nesp_interviewer_job_role
+                 WHERE interviewer_profile_id = %s
+                   AND is_active = 1',
+                $this->_db->makeQueryInteger((int) $interviewerProfileID)
+            )
+        );
+
+        $jobOrderIDs = array();
+        foreach ($rows as $row)
+        {
+            $jobOrderIDs[] = (int) $row['joborder_id'];
+        }
+        return $jobOrderIDs;
+    }
+
+    private function getActiveInterviewsForInterviewer($interviewerProfileID, $excludeInterviewID)
+    {
+        return $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT interview_id, scheduled_start, scheduled_end, timezone, status_key
+                 FROM nesp_interview
+                 WHERE interviewer_profile_id = %s
+                   AND interview_id <> %s
+                   AND status_key IN ("requested", "scheduled", "invitation_pending", "invitation_sent", "confirmed", "reschedule_needed")
+                 ORDER BY scheduled_start ASC',
+                $this->_db->makeQueryInteger((int) $interviewerProfileID),
+                $this->_db->makeQueryInteger((int) $excludeInterviewID)
+            )
+        );
+    }
+
+    protected function getExternalBusyWindowsForInterviewer($interviewerProfileID, $startTime, $endTime)
+    {
+        return array();
+    }
+
+    protected function getDefaultParticipantJoinURLForInterviewer($interviewerProfileID)
+    {
+        return '';
+    }
+
+    private function logManualInterviewAvailabilityOverride($actorUserID, $interviewID, $normalized, $conflictResult)
+    {
+        $this->logAuditEvent($actorUserID, 'manual_interview_availability_override_used', 'nesp_interview', $interviewID, array(
+            'candidate_id' => (int) $normalized['candidate_id'],
+            'joborder_id' => (int) $normalized['joborder_id'],
+            'interviewer_profile_id' => (int) $normalized['interviewer_profile_id'],
+            'scheduled_start' => $normalized['scheduled_start'],
+            'scheduled_end' => $normalized['scheduled_end'],
+            'timezone' => $normalized['timezone'],
+            'conflicts' => isset($conflictResult['conflicts']) ? $conflictResult['conflicts'] : array(),
+            'override_reason' => isset($conflictResult['override_reason']) ? $conflictResult['override_reason'] : ''
+        ));
     }
 
     public function cancelManualInterview($interviewID, $actorUserID, $cancelReason)
@@ -3409,7 +3777,7 @@ class NESPWorkflow
         }
         $interviewerProfileID = (int) $interviewerProfileID;
         $overrideDate = trim($overrideDate);
-        $overrideTypeKey = in_array($overrideTypeKey, array('available', 'available_all_day', 'unavailable')) ? $overrideTypeKey : 'available';
+        $overrideTypeKey = in_array($overrideTypeKey, array('available', 'available_all_day', 'unavailable', 'unavailable_all_day')) ? $overrideTypeKey : 'available';
         $timezone = trim($timezone) === '' ? 'America/New_York' : trim($timezone);
         if ($interviewerProfileID <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $overrideDate))
         {
@@ -6901,6 +7269,7 @@ class NESPWorkflow
             'availability_close_reason' => isset($options['availability_close_reason']) ? trim($options['availability_close_reason']) : '',
             'max_interviews_per_day' => isset($options['max_interviews_per_day']) ? max(0, min(20, (int) $options['max_interviews_per_day'])) : 3,
             'max_interviews_per_week' => isset($options['max_interviews_per_week']) ? max(0, min(80, (int) $options['max_interviews_per_week'])) : 12,
+            'min_notice_minutes' => isset($options['min_notice_minutes']) ? max(0, min(10080, (int) $options['min_notice_minutes'])) : 1440,
             'default_interview_minutes' => isset($options['default_interview_minutes']) ? max(10, min(180, (int) $options['default_interview_minutes'])) : 30,
             'buffer_minutes' => isset($options['buffer_minutes']) ? max(0, min(120, (int) $options['buffer_minutes'])) : 15,
             'earliest_time' => isset($options['earliest_time']) && self::isValidAvailabilityTime($options['earliest_time']) ? $options['earliest_time'] : '09:00',
@@ -6914,7 +7283,7 @@ class NESPWorkflow
 
     private function sqlValueForInterviewerSetting($column, $value)
     {
-        if (in_array($column, array('max_interviews_per_day', 'max_interviews_per_week', 'default_interview_minutes', 'buffer_minutes', 'craig_must_attend', 'may_recommend')))
+        if (in_array($column, array('max_interviews_per_day', 'max_interviews_per_week', 'min_notice_minutes', 'default_interview_minutes', 'buffer_minutes', 'craig_must_attend', 'may_recommend')))
         {
             return $this->_db->makeQueryInteger($value);
         }
@@ -6934,7 +7303,7 @@ class NESPWorkflow
         }
 
         $safe = array();
-        foreach (array('display_name', 'email', 'role_key', 'is_active', 'account_state_key', 'timezone', 'availability_status_key', 'max_interviews_per_day', 'max_interviews_per_week', 'default_interview_minutes', 'buffer_minutes', 'earliest_time', 'latest_time', 'craig_must_attend', 'may_recommend', 'user_id') as $key)
+        foreach (array('display_name', 'email', 'role_key', 'is_active', 'account_state_key', 'timezone', 'availability_status_key', 'max_interviews_per_day', 'max_interviews_per_week', 'min_notice_minutes', 'default_interview_minutes', 'buffer_minutes', 'earliest_time', 'latest_time', 'craig_must_attend', 'may_recommend', 'user_id') as $key)
         {
             if (isset($row[$key]))
             {

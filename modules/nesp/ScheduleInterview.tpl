@@ -116,6 +116,16 @@
                         Saving creates or updates the internal interview record and invitation preview only. It does not send the invitation.
                     </div>
 
+                    <label class="nesp-checkbox-row">
+                        <input type="checkbox" name="adminOverrideAvailability" value="1" />
+                        Admin override availability conflicts
+                    </label>
+
+                    <label>
+                        Override reason
+                        <textarea name="availabilityOverrideReason" rows="3"></textarea>
+                    </label>
+
                     <div class="nesp-button-row">
                         <button type="submit" class="nesp-primary-button"><?php echo(empty($existing) ? 'Create Interview Preview' : 'Save Reschedule Preview'); ?></button>
                         <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=interviews">Back to Interviews</a>

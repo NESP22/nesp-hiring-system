@@ -1090,6 +1090,7 @@ CREATE TABLE `nesp_feature_flag` (
 
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_WORKFLOW_ENABLED', 'NESP Workflow', 'Craig-reviewed hiring workflow dashboard and task queues.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_INTERVIEWER_POOL_ENABLED', 'Interviewer Pool', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_INTERVIEWER_AVAILABILITY_ENABLED', 'Interviewer Availability', 'Interviewer availability windows, block time, and schedule conflict checks.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0, 1, NOW(), NOW());
@@ -1183,6 +1184,7 @@ CREATE TABLE `nesp_interviewer_profile` (
   `availability_close_reason` TEXT COLLATE utf8mb4_unicode_ci,
   `max_interviews_per_day` INT(11) NOT NULL DEFAULT '3',
   `max_interviews_per_week` INT(11) NOT NULL DEFAULT '12',
+  `min_notice_minutes` INT(11) NOT NULL DEFAULT '1440',
   `default_interview_minutes` INT(11) NOT NULL DEFAULT '30',
   `buffer_minutes` INT(11) NOT NULL DEFAULT '15',
   `earliest_time` TIME NOT NULL DEFAULT '09:00:00',
