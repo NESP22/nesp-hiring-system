@@ -9,6 +9,7 @@
 
 include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
+include_once(LEGACY_ROOT . '/lib/NESPGoogleCalendarFreeBusy.php');
 
 class NESPWorkflow
 {
@@ -29,7 +30,8 @@ class NESPWorkflow
             array('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0),
             array('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0),
             array('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0),
-            array('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0)
+            array('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0),
+            NESPGoogleCalendarFreeBusy::getDefaultFeatureFlag()
         );
     }
 
@@ -43,7 +45,8 @@ class NESPWorkflow
             'NESP_ZOOM_ENABLED',
             'NESP_AI_REVIEW_ENABLED',
             'NESP_STAFFING_FORECAST_ENABLED',
-            'NESP_STAFFING_DRIVE_IMPORT_ENABLED'
+            'NESP_STAFFING_DRIVE_IMPORT_ENABLED',
+            NESPGoogleCalendarFreeBusy::FEATURE_FLAG
         );
     }
 
@@ -90,6 +93,7 @@ class NESPWorkflow
         return array(
             array('vapi', 'Vapi Phone Screening', 'disabled', 'Optional automated phone screen — currently disabled pending final test.'),
             array('zoom', 'Manual Zoom Tracking', 'disabled', 'Manual interview tracking only. No Zoom meetings are created, updated, cancelled, or synced by this app.'),
+            NESPGoogleCalendarFreeBusy::getDefaultIntegrationStatus(),
             array('ai_review', 'AI Candidate Review', 'disabled', 'Disabled in Phase 2. No model calls can run.'),
             array('email', 'Applicant Email', 'disabled', 'Disabled in Phase 2. No outbound applicant email can be sent.')
         );
@@ -199,7 +203,14 @@ class NESPWorkflow
             return 'NESP_WORKFLOW_ENABLED';
         }
 
-        if (in_array($action, array('settings', 'featureFlags', 'saveFeatureFlags')))
+        if (in_array($action, array(
+            'settings',
+            'featureFlags',
+            'saveFeatureFlags',
+            'googleCalendarConnect',
+            'googleCalendarDisconnect',
+            'googleCalendarReauthorize'
+        )))
         {
             return '';
         }
@@ -1755,7 +1766,7 @@ class NESPWorkflow
             FROM
                 nesp_feature_flag
             WHERE
-                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED")
+                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED", "NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED")
             ORDER BY
                 display_name'
         );
@@ -1844,6 +1855,102 @@ class NESPWorkflow
             ORDER BY
                 display_name'
         );
+    }
+
+    public function getGoogleCalendarConfigurationStatus()
+    {
+        return NESPGoogleCalendarFreeBusy::getConfigurationStatus(
+            $this->isFeatureFlagEnabled(NESPGoogleCalendarFreeBusy::FEATURE_FLAG)
+        );
+    }
+
+    public function getGoogleCalendarConnections()
+    {
+        if (!$this->isTableInstalled('nesp_google_calendar_connection'))
+        {
+            return array();
+        }
+
+        $freeBusy = new NESPGoogleCalendarFreeBusy(
+            $this->_db,
+            $this->isFeatureFlagEnabled(NESPGoogleCalendarFreeBusy::FEATURE_FLAG)
+        );
+
+        return $freeBusy->getConnectionSummaries();
+    }
+
+    public function requestGoogleCalendarAuthorization($interviewerProfileID, $actorUserID)
+    {
+        if (!$this->isTableInstalled('nesp_google_calendar_connection'))
+        {
+            return false;
+        }
+
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $interviewer = $this->_db->getAssoc(sprintf(
+            'SELECT display_name, email
+             FROM nesp_interviewer_profile
+             WHERE interviewer_profile_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($interviewerProfileID)
+        ));
+        if (empty($interviewer))
+        {
+            return false;
+        }
+
+        $stateSecret = defined('SESSION_COOKIE') ? SESSION_COOKIE : 'nesp-google-calendar-freebusy';
+        $state = hash_hmac(
+            'sha256',
+            $interviewerProfileID . ':' . $actorUserID . ':' . time(),
+            $stateSecret
+        );
+        $freeBusy = new NESPGoogleCalendarFreeBusy(
+            $this->_db,
+            $this->isFeatureFlagEnabled(NESPGoogleCalendarFreeBusy::FEATURE_FLAG)
+        );
+        $freeBusy->markAuthorizationRequested($interviewerProfileID, $actorUserID);
+        $this->logAuditEvent(
+            $actorUserID,
+            'google_calendar_authorization_requested',
+            'interviewer_profile',
+            $interviewerProfileID,
+            array(
+                'scope' => NESPGoogleCalendarFreeBusy::MINIMUM_SCOPE,
+                'event_creation' => false
+            )
+        );
+
+        return array(
+            'display_name' => $interviewer['display_name'],
+            'authorization_url' => NESPGoogleCalendarFreeBusy::buildAuthorizationURL($state, $interviewer['email'])
+        );
+    }
+
+    public function disconnectGoogleCalendar($interviewerProfileID, $actorUserID)
+    {
+        if (!$this->isTableInstalled('nesp_google_calendar_connection'))
+        {
+            return false;
+        }
+
+        $freeBusy = new NESPGoogleCalendarFreeBusy(
+            $this->_db,
+            $this->isFeatureFlagEnabled(NESPGoogleCalendarFreeBusy::FEATURE_FLAG)
+        );
+        $result = $freeBusy->disconnect($interviewerProfileID, $actorUserID);
+        if ($result)
+        {
+            $this->logAuditEvent(
+                $actorUserID,
+                'google_calendar_disconnected',
+                'interviewer_profile',
+                (int) $interviewerProfileID,
+                array('tokens_removed' => true)
+            );
+        }
+
+        return $result;
     }
 
     public function getInterviewerAccessSummary()

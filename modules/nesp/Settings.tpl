@@ -19,6 +19,12 @@
                 </div>
             <?php endif; ?>
 
+            <?php if (trim($this->googleCalendarMessage) !== ''): ?>
+                <div class="nesp-confirm-box">
+                    <?php $this->_($this->googleCalendarMessage); ?>
+                </div>
+            <?php endif; ?>
+
             <div class="nesp-dashboard-nav">
                 <?php foreach ($this->dashboardNavigation as $navItem): ?>
                     <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
@@ -212,6 +218,67 @@
                 </div>
                 <p class="nesp-help-text">Webhook URL after deployment: <?php $this->_($this->vapiConfiguration['webhook_url']); ?></p>
                 <p><a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=phoneScreenAvailability">Edit Phone Screen Availability</a></p>
+            </div>
+
+            <div class="nesp-panel">
+                <h3>Google Calendar Free/Busy</h3>
+                <div class="nesp-safety-banner">
+                    Free/busy is disabled by default, uses only <?php $this->_($this->googleCalendarConfiguration['minimum_scope']); ?>, stores encrypted tokens only, and never reads event titles, creates events, sends invitations, or writes to calendars.
+                </div>
+                <div class="nesp-card-grid nesp-card-grid-tight">
+                    <div class="nesp-card"><span class="nesp-card-label">Feature Enabled</span><strong><?php echo($this->googleCalendarConfiguration['feature_enabled'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">OAuth Client Configured</span><strong><?php echo($this->googleCalendarConfiguration['client_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Redirect URI Configured</span><strong><?php echo($this->googleCalendarConfiguration['redirect_uri_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Token Encryption Configured</span><strong><?php echo($this->googleCalendarConfiguration['token_encryption_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Calendar Event Creation</span><strong>Disabled</strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Connection State</span><strong><?php $this->_($this->googleCalendarConfiguration['status_key']); ?></strong></div>
+                </div>
+
+                <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=googleCalendarConnect" class="nesp-form">
+                    <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                    <label>
+                        Interviewer
+                        <select name="interviewerProfileID">
+                            <?php foreach ($this->interviewerProfiles as $profile): ?>
+                                <option value="<?php echo((int) $profile['interviewer_profile_id']); ?>"><?php $this->_($profile['display_name']); ?> - <?php $this->_($profile['email']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <button type="submit" class="nesp-secondary-button">Prepare Free/Busy OAuth</button>
+                    <span class="nesp-help-text">This prepares a consent URL for approved testing only. Token exchange remains an encrypted-storage integration step and is not run from this page.</span>
+                </form>
+
+                <table class="nesp-table">
+                    <tr>
+                        <th>Interviewer</th>
+                        <th>Status</th>
+                        <th>Scope</th>
+                        <th>Calendar</th>
+                        <th>Last Error</th>
+                        <th>Action</th>
+                    </tr>
+                    <?php foreach ($this->googleCalendarConnections as $connection): ?>
+                    <tr>
+                        <td><?php $this->_($connection['display_name']); ?><br /><span class="nesp-muted"><?php $this->_($connection['email']); ?></span></td>
+                        <td><?php $this->_($connection['status_key']); ?></td>
+                        <td><?php $this->_($connection['token_scope']); ?></td>
+                        <td><?php $this->_($connection['calendar_id_hash'] === '' ? 'primary calendar hash pending' : $connection['calendar_id_hash']); ?></td>
+                        <td><?php $this->_($connection['last_error']); ?></td>
+                        <td>
+                            <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=googleCalendarDisconnect">
+                                <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $connection['interviewer_profile_id']); ?>" />
+                                <button type="submit" class="nesp-secondary-button">Disconnect</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($this->googleCalendarConnections)): ?>
+                    <tr>
+                        <td colspan="6">No Google Calendar free/busy connections have been prepared.</td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
             </div>
 
             <div class="nesp-panel">
