@@ -21,6 +21,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_scorecard_template',
             'nesp_scorecard_response',
             'nesp_integration_status',
+            'nesp_google_calendar_connection',
             'nesp_recruiting_campaign_control',
             'nesp_vapi_phone_screen',
             'nesp_vapi_phone_screen_setting',
@@ -52,11 +53,12 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
 
     public function testNESPWorkflowSeedDataIsSafeByDefault()
     {
-        $this->assertSame(8, $this->countRows('nesp_feature_flag'));
+        $this->assertSame(9, $this->countRows('nesp_feature_flag'));
         $this->assertSame(0, $this->countRowsWhere('nesp_feature_flag', 'is_enabled = 1'));
         $this->assertSame(17, $this->countRows('nesp_workflow_stage'));
-        $this->assertSame(4, $this->countRowsWhere('nesp_integration_status', "status_key = 'disabled'"));
+        $this->assertSame(5, $this->countRowsWhere('nesp_integration_status', "status_key = 'disabled'"));
         $this->assertSame(0, $this->countRows('nesp_interviewer_profile'));
+        $this->assertSame(0, $this->countRows('nesp_google_calendar_connection'));
         $this->assertSame(0, $this->countRows('nesp_interviewer_role_rule'));
         $this->assertSame(0, $this->countRows('nesp_interviewer_job_role'));
         $this->assertSame(0, $this->countRows('nesp_interviewer_availability'));
@@ -66,7 +68,9 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
         $this->assertSame(0, $this->countRows('nesp_recruiting_campaign_control'));
         $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
-        $this->assertSame(8, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
+        $this->assertSame(9, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_feature_flag', "flag_key = 'NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED' AND is_enabled = 0"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_integration_status', "integration_key = 'google_calendar_freebusy' AND status_key = 'disabled'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'timezone' AND setting_value = 'America/New_York'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'slot_minutes' AND setting_value = '15'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'call_duration_minutes' AND setting_value = '10'"));
