@@ -269,6 +269,51 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('Zoom creation remain disabled', $template['notes']);
     }
 
+    public function testManualInterviewStatusesCoverFullTrackingLifecycle()
+    {
+        $statuses = NESPWorkflow::getManualInterviewStatusLabels();
+        $outcomes = NESPWorkflow::getManualInterviewOutcomeLabels();
+
+        $this->assertSame('Interview Requested', $statuses['requested']);
+        $this->assertSame('Reschedule Needed', $statuses['reschedule_needed']);
+        $this->assertSame('No Show', $statuses['no_show']);
+        $this->assertSame('Advance to Next Step', $outcomes['advance_to_next_step']);
+        $this->assertSame('Not Moving Forward', $outcomes['not_moving_forward']);
+    }
+
+    public function testManualZoomJoinURLValidationRejectsHostLinks()
+    {
+        $valid = NESPWorkflow::validateZoomApplicantJoinURL('https://us06web.zoom.us/j/12345678901?pwd=safe');
+        $hostPath = NESPWorkflow::validateZoomApplicantJoinURL('https://us06web.zoom.us/start/12345678901?zak=secret');
+        $hostQuery = NESPWorkflow::validateZoomApplicantJoinURL('https://us06web.zoom.us/j/12345678901?start_url=https%3A%2F%2Fzoom.us%2Fs%2Fsecret');
+        $nonZoom = NESPWorkflow::validateZoomApplicantJoinURL('https://example.test/j/12345678901');
+
+        $this->assertTrue($valid['ok']);
+        $this->assertFalse($hostPath['ok']);
+        $this->assertFalse($hostQuery['ok']);
+        $this->assertFalse($nonZoom['ok']);
+    }
+
+    public function testManualInterviewInvitationCopyUsesApplicantJoinLinkOnly()
+    {
+        $copy = NESPWorkflow::buildManualInterviewInvitationCopy(
+            'Craig',
+            'Weekend Sports Photographer',
+            '2026-09-12 10:30:00',
+            30,
+            'America/New_York',
+            'https://us06web.zoom.us/j/12345678901?pwd=safe'
+        );
+
+        $this->assertStringContainsString('Hi Craig', $copy);
+        $this->assertStringContainsString('Weekend Sports Photographer', $copy);
+        $this->assertStringContainsString('Saturday, September 12, 2026', $copy);
+        $this->assertStringContainsString('https://us06web.zoom.us/j/12345678901?pwd=safe', $copy);
+        $this->assertStringContainsString('no automated hiring decision', $copy);
+        $this->assertStringNotContainsString('start_url', $copy);
+        $this->assertStringNotContainsString('zak=', $copy);
+    }
+
     public function testApprovedRealInterviewerSeedsKeepBrandonInactiveAndUnconfirmed()
     {
         $profiles = NESPWorkflow::getApprovedRealInterviewerSeedProfiles();

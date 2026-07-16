@@ -31,7 +31,8 @@ SET `message` = 'Disabled in Phase 2. No calls can be placed.',
 WHERE `integration_key` = 'vapi';
 
 UPDATE `nesp_integration_status`
-SET `message` = 'Disabled in Phase 2. No meetings can be created.',
+SET `display_name` = 'Manual Zoom Tracking',
+    `message` = 'Manual interview tracking only. No Zoom meetings are created, updated, cancelled, or synced by this app.',
     `date_modified` = NOW()
 WHERE `integration_key` = 'zoom';
 
@@ -60,6 +61,19 @@ ALTER TABLE `nesp_candidate_workflow`
     ADD INDEX IF NOT EXISTS `IDX_nesp_waiting_on` (`waiting_on_key`);
 
 ALTER TABLE `nesp_interview`
+    ADD COLUMN IF NOT EXISTS `manual_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS `timezone` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'America/New_York',
+    ADD COLUMN IF NOT EXISTS `invitation_status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_generated',
+    ADD COLUMN IF NOT EXISTS `invitation_preview_text` TEXT COLLATE utf8mb4_unicode_ci,
+    ADD COLUMN IF NOT EXISTS `internal_notes` TEXT COLLATE utf8mb4_unicode_ci,
+    ADD COLUMN IF NOT EXISTS `outcome_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS `outcome_notes` TEXT COLLATE utf8mb4_unicode_ci,
+    ADD COLUMN IF NOT EXISTS `scheduled_by_user_id` INT(11),
+    ADD COLUMN IF NOT EXISTS `reschedule_count` INT(11) NOT NULL DEFAULT '0',
+    ADD COLUMN IF NOT EXISTS `cancelled_at` DATETIME,
+    ADD COLUMN IF NOT EXISTS `completed_at` DATETIME,
+    ADD INDEX IF NOT EXISTS `IDX_nesp_interview_invitation_status` (`invitation_status_key`),
+    ADD INDEX IF NOT EXISTS `IDX_nesp_interview_outcome` (`outcome_key`),
     ADD INDEX IF NOT EXISTS `IDX_nesp_interview_schedule` (`scheduled_start`, `status_key`);
 
 ALTER TABLE `nesp_scorecard_response`

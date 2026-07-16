@@ -51,7 +51,20 @@ ALTER TABLE `nesp_scorecard_response`
     DROP COLUMN IF EXISTS `lock_reason`;
 
 ALTER TABLE `nesp_interview`
-    DROP INDEX IF EXISTS `IDX_nesp_interview_schedule`;
+    DROP INDEX IF EXISTS `IDX_nesp_interview_schedule`,
+    DROP INDEX IF EXISTS `IDX_nesp_interview_invitation_status`,
+    DROP INDEX IF EXISTS `IDX_nesp_interview_outcome`,
+    DROP COLUMN IF EXISTS `manual_zoom_join_url`,
+    DROP COLUMN IF EXISTS `timezone`,
+    DROP COLUMN IF EXISTS `invitation_status_key`,
+    DROP COLUMN IF EXISTS `invitation_preview_text`,
+    DROP COLUMN IF EXISTS `internal_notes`,
+    DROP COLUMN IF EXISTS `outcome_key`,
+    DROP COLUMN IF EXISTS `outcome_notes`,
+    DROP COLUMN IF EXISTS `scheduled_by_user_id`,
+    DROP COLUMN IF EXISTS `reschedule_count`,
+    DROP COLUMN IF EXISTS `cancelled_at`,
+    DROP COLUMN IF EXISTS `completed_at`;
 
 ALTER TABLE `nesp_interviewer_profile`
     DROP COLUMN IF EXISTS `can_add_notes`,

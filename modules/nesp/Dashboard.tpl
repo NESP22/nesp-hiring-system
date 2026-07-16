@@ -153,18 +153,24 @@
                                     <th>Time</th>
                                     <th>Duration</th>
                                     <th>Status</th>
-                                    <th>Action</th>
+                                    <th>Actions</th>
                                 </tr>
                                 <?php foreach ($this->upcomingInterviews as $interview): ?>
                                 <tr>
-                                    <td><?php $this->_($interview['candidate_name']); ?></td>
-                                    <td><?php $this->_($interview['role_title']); ?></td>
-                                    <td><?php $this->_($interview['interviewer_name']); ?></td>
-                                    <td><?php $this->_(date('M j, Y', strtotime($interview['scheduled_start']))); ?></td>
-                                    <td><?php $this->_(date('g:i A', strtotime($interview['scheduled_start']))); ?></td>
-                                    <td><?php $this->_((int) $interview['duration_minutes'] . ' min'); ?></td>
-                                    <td><?php $this->_($interview['status_key']); ?></td>
-                                    <td><a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=candidates&amp;a=show&amp;candidateID=<?php echo((int) $interview['candidate_id']); ?>">Open</a></td>
+                                    <td data-label="Candidate"><?php $this->_($interview['candidate_name']); ?></td>
+                                    <td data-label="Role"><?php $this->_($interview['role_title']); ?></td>
+                                    <td data-label="Interviewer"><?php $this->_($interview['interviewer_name']); ?></td>
+                                    <td data-label="Date"><?php $this->_(date('M j, Y', strtotime($interview['scheduled_start']))); ?></td>
+                                    <td data-label="Time"><?php $this->_(date('g:i A', strtotime($interview['scheduled_start']))); ?></td>
+                                    <td data-label="Duration"><?php $this->_((int) $interview['duration_minutes'] . ' min'); ?></td>
+                                    <td data-label="Status"><?php $this->_($interview['status_label']); ?></td>
+                                    <td data-label="Actions">
+                                        <div class="nesp-button-row">
+                                            <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=recordInterviewOutcome&amp;interviewID=<?php echo((int) $interview['interview_id']); ?>">Track</a>
+                                            <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=scheduleInterview&amp;interviewID=<?php echo((int) $interview['interview_id']); ?>">Reschedule</a>
+                                            <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=cancelInterview&amp;interviewID=<?php echo((int) $interview['interview_id']); ?>">Cancel</a>
+                                        </div>
+                                    </td>
                                 </tr>
                                 <?php endforeach; ?>
                             </table>
@@ -188,13 +194,24 @@
                                             <dt>Last activity</dt>
                                             <dd><?php $this->_($card['last_activity']); ?></dd>
                                         </dl>
-                                        <a class="nesp-primary-action" href="<?php echo($card['candidate_url']); ?>"><?php $this->_($card['next_action_label']); ?></a>
-                                        <div class="nesp-secondary-actions">
+                                        <?php if (!empty($card['scheduled_start'])): ?>
+                                            <div class="nesp-task-next">
+                                                Interview: <?php $this->_(date('M j, g:i A', strtotime($card['scheduled_start']))); ?>
+                                                <?php if (!empty($card['interview_status_label'])): ?> · <?php $this->_($card['interview_status_label']); ?><?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <a class="nesp-primary-action" href="<?php echo($card['primary_action_url']); ?>"><?php $this->_($card['next_action_label']); ?></a>
+                                        <details class="nesp-secondary-actions">
+                                            <summary>Details</summary>
                                             <a href="<?php echo($card['candidate_url']); ?>">Candidate</a>
                                             <a href="<?php echo($card['job_url']); ?>">Role</a>
-                                            <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmQuestionnaire&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Invite to Screening Questionnaire</a>
-                                            <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmPhoneScreen&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Invite to Schedule Phone Screen</a>
-                                        </div>
+                                            <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmQuestionnaire&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Questionnaire</a>
+                                            <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmPhoneScreen&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Phone Screen</a>
+                                            <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=scheduleInterview&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Schedule Interview</a>
+                                            <?php if (!empty($card['interview_id'])): ?>
+                                                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=recordInterviewOutcome&amp;interviewID=<?php echo((int) $card['interview_id']); ?>">Interview Tracking</a>
+                                            <?php endif; ?>
+                                        </details>
                                     </div>
                                 <?php endforeach; ?>
                             </div>

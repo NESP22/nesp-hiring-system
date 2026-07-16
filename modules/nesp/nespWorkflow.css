@@ -407,6 +407,34 @@
     margin-top: 8px;
 }
 
+.nesp-workflow details.nesp-secondary-actions {
+    display: block;
+    border-top: 1px solid var(--nesp-dashboard-line-soft);
+    padding-top: 8px;
+}
+
+.nesp-workflow details.nesp-secondary-actions summary {
+    color: var(--nesp-dashboard-link);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.nesp-workflow details.nesp-secondary-actions[open] {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.nesp-workflow .nesp-task-next {
+    background: #081d39;
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    color: var(--nesp-dashboard-muted);
+    font-size: 12px;
+    line-height: 1.35;
+    margin: 0 0 10px;
+    padding: 8px;
+}
+
 .nesp-workflow .nesp-button-row {
     display: flex;
     flex-wrap: wrap;

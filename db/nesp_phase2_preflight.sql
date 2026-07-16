@@ -59,6 +59,7 @@ FROM information_schema.columns
 WHERE table_schema = DATABASE()
   AND (
     (table_name = 'nesp_candidate_workflow' AND column_name IN ('summary', 'next_action_label', 'due_at'))
+    OR (table_name = 'nesp_interview' AND column_name IN ('manual_zoom_join_url', 'timezone', 'invitation_status_key', 'outcome_key'))
     OR (table_name = 'nesp_staffing_import_batch' AND column_name IN ('status_key', 'undone_at'))
     OR (table_name = 'nesp_staffing_import_row' AND column_name IN ('source_row_hash', 'raw_source_text', 'unresolved_json'))
     OR (table_name = 'nesp_staffing_import_issue' AND column_name IN ('status_key', 'severity_key'))
