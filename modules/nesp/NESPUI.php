@@ -68,6 +68,17 @@ class NESPUI extends UserInterface
                 $this->saveFeatureFlags();
                 break;
 
+            case 'googleCalendarConnect':
+            case 'googleCalendarReauthorize':
+                $this->requirePostCSRF();
+                $this->googleCalendarConnect();
+                break;
+
+            case 'googleCalendarDisconnect':
+                $this->requirePostCSRF();
+                $this->googleCalendarDisconnect();
+                break;
+
             case 'createInterviewer':
                 $this->adminOnly();
                 $this->requirePostCSRF();
@@ -104,6 +115,11 @@ class NESPUI extends UserInterface
             case 'setInterviewerAvailabilityStatus':
                 $this->requirePostCSRF();
                 $this->setInterviewerAvailabilityStatus();
+                break;
+
+            case 'updateInterviewerZoomLink':
+                $this->requirePostCSRF();
+                $this->updateInterviewerZoomLink();
                 break;
 
             case 'createInterviewerAvailabilityOverride':
@@ -412,6 +428,12 @@ class NESPUI extends UserInterface
         $this->_template->assign('scorecards', $this->_workflow->getScorecardSummaries(50));
         $this->_template->assign('summary', $this->_workflow->getInterviewerAccessSummary());
         $this->_template->assign('vapiConfiguration', $this->_workflow->getVapiConfigurationStatus());
+        $googleCalendarMessage = isset($_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'])
+            ? $_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'] : '';
+        unset($_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE']);
+        $this->_template->assign('googleCalendarMessage', $googleCalendarMessage);
+        $this->_template->assign('googleCalendarConfiguration', $this->_workflow->getGoogleCalendarConfigurationStatus());
+        $this->_template->assign('googleCalendarConnections', $this->_workflow->getGoogleCalendarConnections());
         $this->_template->display('./modules/nesp/Settings.tpl');
     }
 
@@ -432,6 +454,51 @@ class NESPUI extends UserInterface
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
     }
 
+    private function googleCalendarConnect()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can manage only your own Google Calendar free/busy connection.');
+            }
+        }
+
+        $result = $this->_workflow->requestGoogleCalendarAuthorization($interviewerProfileID, $this->_userID);
+        if ($result === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an interviewer before preparing Google Calendar authorization.');
+        }
+
+        $_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'] =
+            'Authorization prepared for ' . $result['display_name'] . '. Use the Google consent URL only in an approved test environment: ' . $result['authorization_url'];
+
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
+    }
+
+    private function googleCalendarDisconnect()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can manage only your own Google Calendar free/busy connection.');
+            }
+        }
+
+        if ($interviewerProfileID <= 0 || !$this->_workflow->disconnectGoogleCalendar($interviewerProfileID, $this->_userID))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an interviewer calendar connection to disconnect.');
+        }
+
+        $_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'] = 'Google Calendar free/busy connection disconnected and stored tokens removed.';
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
+    }
+
     private function createInterviewer()
     {
         $displayName = isset($_POST['displayName']) ? $_POST['displayName'] : '';
@@ -444,6 +511,7 @@ class NESPUI extends UserInterface
             'timezone' => isset($_POST['timezone']) ? $_POST['timezone'] : 'America/New_York',
             'max_interviews_per_day' => isset($_POST['maxInterviewsPerDay']) ? $_POST['maxInterviewsPerDay'] : 3,
             'max_interviews_per_week' => isset($_POST['maxInterviewsPerWeek']) ? $_POST['maxInterviewsPerWeek'] : 12,
+            'min_notice_minutes' => isset($_POST['minNoticeMinutes']) ? $_POST['minNoticeMinutes'] : 1440,
             'default_interview_minutes' => isset($_POST['defaultInterviewMinutes']) ? $_POST['defaultInterviewMinutes'] : 30,
             'buffer_minutes' => isset($_POST['bufferMinutes']) ? $_POST['bufferMinutes'] : 15,
             'earliest_time' => isset($_POST['earliestTime']) ? $_POST['earliestTime'] : '09:00',
@@ -452,6 +520,7 @@ class NESPUI extends UserInterface
             'may_recommend' => isset($_POST['mayRecommend']) ? 1 : 0,
             'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
             'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
+            'default_zoom_join_url' => isset($_POST['defaultZoomJoinURL']) ? $_POST['defaultZoomJoinURL'] : '',
             'temporary_password' => isset($_POST['temporaryPassword']) ? $_POST['temporaryPassword'] : ''
         );
 
@@ -459,6 +528,10 @@ class NESPUI extends UserInterface
         if ($result === false)
         {
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Interviewer display name is required.');
+        }
+        if (is_array($result) && isset($result['ok']) && empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to create interviewer profile.');
         }
         if (is_array($result) && !empty($result['temporary_login_message']))
         {
@@ -484,6 +557,7 @@ class NESPUI extends UserInterface
             'timezone' => isset($_POST['timezone']) ? $_POST['timezone'] : 'America/New_York',
             'max_interviews_per_day' => isset($_POST['maxInterviewsPerDay']) ? $_POST['maxInterviewsPerDay'] : 3,
             'max_interviews_per_week' => isset($_POST['maxInterviewsPerWeek']) ? $_POST['maxInterviewsPerWeek'] : 12,
+            'min_notice_minutes' => isset($_POST['minNoticeMinutes']) ? $_POST['minNoticeMinutes'] : 1440,
             'default_interview_minutes' => isset($_POST['defaultInterviewMinutes']) ? $_POST['defaultInterviewMinutes'] : 30,
             'buffer_minutes' => isset($_POST['bufferMinutes']) ? $_POST['bufferMinutes'] : 15,
             'earliest_time' => isset($_POST['earliestTime']) ? $_POST['earliestTime'] : '09:00',
@@ -492,6 +566,7 @@ class NESPUI extends UserInterface
             'may_recommend' => isset($_POST['mayRecommend']) ? 1 : 0,
             'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
             'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
+            'default_zoom_join_url' => isset($_POST['defaultZoomJoinURL']) ? $_POST['defaultZoomJoinURL'] : '',
             'approved_joborder_ids' => isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array(),
             'temporary_password' => isset($_POST['temporaryPassword']) ? $_POST['temporaryPassword'] : ''
         );
@@ -500,6 +575,10 @@ class NESPUI extends UserInterface
         if ($result === false)
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to update interviewer settings.');
+        }
+        if (is_array($result) && isset($result['ok']) && empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to update interviewer settings.');
         }
         if (is_array($result) && !empty($result['temporary_login_message']))
         {
@@ -539,6 +618,8 @@ class NESPUI extends UserInterface
         $this->_template->assign('profile', $profile);
         $this->_template->assign('availability', $this->_workflow->getAvailabilityForProfile($profile['interviewer_profile_id']));
         $this->_template->assign('availabilityTemplate', NESPWorkflow::getDefaultAvailabilityTemplate());
+        $this->_template->assign('googleCalendarConfiguration', $this->_workflow->getGoogleCalendarConfigurationStatus());
+        $this->_template->assign('googleCalendarConnection', $this->_workflow->getGoogleCalendarConnectionForInterviewer($profile['interviewer_profile_id']));
         $this->_template->display('./modules/nesp/MyAvailability.tpl');
     }
 
@@ -560,6 +641,28 @@ class NESPUI extends UserInterface
         if ($this->_workflow->setInterviewerAvailabilityStatus($interviewerProfileID, $statusKey, $reason, $closedUntil, $this->_userID) === false)
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to update availability status.');
+        }
+
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
+    }
+
+    private function updateInterviewerZoomLink()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can edit only your own Zoom participant link.');
+            }
+        }
+
+        $joinURL = isset($_POST['defaultZoomJoinURL']) ? $_POST['defaultZoomJoinURL'] : '';
+        $result = $this->_workflow->updateInterviewerDefaultZoomJoinURL($interviewerProfileID, $joinURL, $this->_userID);
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to update Zoom participant link.');
         }
 
         CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');

@@ -18,6 +18,7 @@ ALTER TABLE `nesp_interviewer_profile`
     DROP COLUMN IF EXISTS `availability_close_reason`,
     DROP COLUMN IF EXISTS `max_interviews_per_day`,
     DROP COLUMN IF EXISTS `max_interviews_per_week`,
+    DROP COLUMN IF EXISTS `min_notice_minutes`,
     DROP COLUMN IF EXISTS `default_interview_minutes`,
     DROP COLUMN IF EXISTS `buffer_minutes`,
     DROP COLUMN IF EXISTS `earliest_time`,
@@ -26,4 +27,5 @@ ALTER TABLE `nesp_interviewer_profile`
     DROP COLUMN IF EXISTS `may_recommend`,
     DROP COLUMN IF EXISTS `private_admin_notes`,
     DROP COLUMN IF EXISTS `last_login_at`,
-    DROP COLUMN IF EXISTS `email_warning`;
+    DROP COLUMN IF EXISTS `email_warning`,
+    DROP COLUMN IF EXISTS `default_zoom_join_url`;

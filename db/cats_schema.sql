@@ -1090,12 +1090,15 @@ CREATE TABLE `nesp_feature_flag` (
 
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_WORKFLOW_ENABLED', 'NESP Workflow', 'Craig-reviewed hiring workflow dashboard and task queues.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_INTERVIEWER_POOL_ENABLED', 'Interviewer Pool', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_INTERVIEWER_AVAILABILITY_ENABLED', 'Interviewer Availability', 'Interviewer availability windows, block time, and schedule conflict checks.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED', 'Interviewer Zoom Links', 'Disabled participant-link helper. No Zoom API, OAuth, meeting creation, cancellation, rescheduling, or invitations are sent.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED', 'Google Calendar Free/Busy', 'Optional interviewer availability lookup using only Google Calendar free/busy scope. No event details are read and no events are created.', 0, 1, NOW(), NOW());
 
 /* Table structure for table `nesp_workflow_stage` */
 
@@ -1183,6 +1186,7 @@ CREATE TABLE `nesp_interviewer_profile` (
   `availability_close_reason` TEXT COLLATE utf8mb4_unicode_ci,
   `max_interviews_per_day` INT(11) NOT NULL DEFAULT '3',
   `max_interviews_per_week` INT(11) NOT NULL DEFAULT '12',
+  `min_notice_minutes` INT(11) NOT NULL DEFAULT '1440',
   `default_interview_minutes` INT(11) NOT NULL DEFAULT '30',
   `buffer_minutes` INT(11) NOT NULL DEFAULT '15',
   `earliest_time` TIME NOT NULL DEFAULT '09:00:00',
@@ -1192,6 +1196,7 @@ CREATE TABLE `nesp_interviewer_profile` (
   `private_admin_notes` TEXT COLLATE utf8mb4_unicode_ci,
   `last_login_at` DATETIME,
   `email_warning` TEXT COLLATE utf8mb4_unicode_ci,
+  `default_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   PRIMARY KEY (`interviewer_profile_id`),
@@ -1476,8 +1481,41 @@ CREATE TABLE `nesp_integration_status` (
 
 INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('vapi', 'Vapi Phone Screening', 'disabled', 'Optional automated phone screen — currently disabled pending final test.', NOW(), NOW());
 INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('zoom', 'Manual Zoom Tracking', 'disabled', 'Manual interview tracking only. No Zoom meetings are created, updated, cancelled, or synced by this app.', NOW(), NOW());
+INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('google_calendar_freebusy', 'Google Calendar Free/Busy', 'disabled', 'Optional interviewer availability lookup. Uses only free/busy scope and never creates calendar events.', NOW(), NOW());
 INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('ai_review', 'AI Candidate Review', 'disabled', 'Disabled in Phase 2. No model calls can run.', NOW(), NOW());
 INSERT INTO `nesp_integration_status` (`integration_key`, `display_name`, `status_key`, `message`, `date_created`, `date_modified`) VALUES ('email', 'Applicant Email', 'disabled', 'Disabled in Phase 2. No outbound applicant email can be sent.', NOW(), NOW());
+
+/* Table structure for table `nesp_google_calendar_connection` */
+
+CREATE TABLE `nesp_google_calendar_connection` (
+  `google_calendar_connection_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `interviewer_profile_id` INT(11) NOT NULL,
+  `user_id` INT(11),
+  `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'disconnected',
+  `google_subject_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `encrypted_calendar_id` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+  `calendar_id_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `token_scope` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'https://www.googleapis.com/auth/calendar.freebusy',
+  `encrypted_access_token` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+  `encrypted_refresh_token` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+  `access_token_fingerprint` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `refresh_token_fingerprint` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `token_expires_at` DATETIME,
+  `connected_at` DATETIME,
+  `disconnected_at` DATETIME,
+  `reauthorize_required_at` DATETIME,
+  `last_freebusy_check_at` DATETIME,
+  `last_error` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `created_by_user_id` INT(11),
+  `modified_by_user_id` INT(11),
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`google_calendar_connection_id`),
+  UNIQUE KEY `IDX_google_calendar_interviewer` (`interviewer_profile_id`),
+  KEY `IDX_google_calendar_user` (`user_id`),
+  KEY `IDX_status_key` (`status_key`),
+  KEY `IDX_reauthorize_required_at` (`reauthorize_required_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /* Table structure for table `nesp_recruiting_campaign_control` */
 

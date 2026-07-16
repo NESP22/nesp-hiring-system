@@ -6,6 +6,7 @@ include_once(LEGACY_ROOT . '/config.php');
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
+include_once(LEGACY_ROOT . '/lib/NESPGoogleCalendarFreeBusy.php');
 
 class NESPWorkflowTest extends TestCase
 {
@@ -14,7 +15,7 @@ class NESPWorkflowTest extends TestCase
         $flags = NESPWorkflow::getDefaultFeatureFlags();
         $keys = array();
 
-        $this->assertCount(8, $flags);
+        $this->assertCount(11, $flags);
         foreach ($flags as $flag)
         {
             $keys[] = $flag[0];
@@ -28,7 +29,7 @@ class NESPWorkflowTest extends TestCase
     {
         $statuses = NESPWorkflow::getDefaultIntegrationStatuses();
 
-        $this->assertCount(4, $statuses);
+        $this->assertCount(5, $statuses);
         foreach ($statuses as $status)
         {
             $this->assertSame('disabled', $status[2]);
@@ -47,6 +48,32 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'NESP_VAPI_ENABLED'));
     }
 
+    public function testInterviewerZoomLinksEnvDefaultIsDisabled()
+    {
+        putenv('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
+        $this->assertFalse(NESPWorkflow::isInterviewerZoomLinksEnabledByDefault());
+
+        putenv('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED=true');
+        $this->assertTrue(NESPWorkflow::isInterviewerZoomLinksEnabledByDefault());
+
+        putenv('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
+    }
+
+    public function testZoomParticipantLinkValidationRejectsHostLinks()
+    {
+        $valid = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?pwd=abc');
+        $http = NESPWorkflow::validateZoomApplicantJoinURL('http://nesp.zoom.us/j/123456789');
+        $startPath = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/start/123456789');
+        $startURL = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?start_url=https%3A%2F%2Fexample.test');
+        $zak = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?zak=secret');
+
+        $this->assertTrue($valid['ok']);
+        $this->assertFalse($http['ok']);
+        $this->assertFalse($startPath['ok']);
+        $this->assertFalse($startURL['ok']);
+        $this->assertFalse($zak['ok']);
+    }
+
     public function testFeatureGateMappingKeepsSettingsOpen()
     {
         $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('settings'));
@@ -62,7 +89,128 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreenAvailability'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('markPhoneScreenInvitationCopied'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('allowPhoneScreenReschedule'));
+        $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('updateInterviewerZoomLink'));
+        $this->assertSame('NESP_INTERVIEWER_AVAILABILITY_ENABLED', NESPWorkflow::getFeatureFlagForAction('myAvailability'));
+        $this->assertSame('NESP_INTERVIEWER_AVAILABILITY_ENABLED', NESPWorkflow::getFeatureFlagForAction('createInterviewerBlackout'));
+        $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('googleCalendarConnect'));
+        $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('googleCalendarDisconnect'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('unexpectedAction'));
+    }
+
+    public function testGoogleCalendarFreeBusyDefaultsAreReadOnlyAndDisabled()
+    {
+        $this->assertSame('NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED', NESPGoogleCalendarFreeBusy::FEATURE_FLAG);
+        $this->assertSame(
+            array('https://www.googleapis.com/auth/calendar.freebusy'),
+            NESPGoogleCalendarFreeBusy::getRequiredOAuthScopes()
+        );
+
+        $status = NESPGoogleCalendarFreeBusy::getConfigurationStatus(false);
+        $this->assertFalse($status['feature_enabled']);
+        $this->assertFalse($status['event_creation_enabled']);
+        $this->assertSame('disabled', $status['status_key']);
+
+        $this->assertSame(array(
+            'disconnected' => 'Not Connected',
+            'connected' => 'Connected',
+            'reauthorize_required' => 'Reauthorization Required',
+            'error' => 'Error'
+        ), NESPGoogleCalendarFreeBusy::getConnectionStateLabels());
+    }
+
+    public function testGoogleCalendarFreeBusyAdapterFailsClosedWhenDisabled()
+    {
+        $adapter = new NESPGoogleCalendarFreeBusy(null, false);
+        $result = $adapter->queryFreeBusy(
+            'access-token',
+            array('primary'),
+            '2026-07-16T12:00:00Z',
+            '2026-07-16T13:00:00Z',
+            'UTC',
+            function () {
+                return array('status_code' => 200, 'body' => array());
+            }
+        );
+
+        $this->assertSame('disabled', $result['status_key']);
+        $this->assertSame(array(), $result['busy']);
+    }
+
+    public function testGoogleCalendarFreeBusyAdapterReturnsOnlyBusyWindows()
+    {
+        $adapter = new NESPGoogleCalendarFreeBusy(null, true);
+        $result = $adapter->queryFreeBusy(
+            'access-token',
+            array('primary'),
+            '2026-07-16T12:00:00Z',
+            '2026-07-16T13:00:00Z',
+            'UTC',
+            function () {
+                return array(
+                    'status_code' => 200,
+                    'body' => array(
+                        'calendars' => array(
+                            'primary' => array(
+                                'busy' => array(
+                                    array(
+                                        'start' => '2026-07-16T12:15:00Z',
+                                        'end' => '2026-07-16T12:45:00Z',
+                                        'summary' => 'Private Interview'
+                                    )
+                                )
+                            )
+                        )
+                    )
+                );
+            }
+        );
+
+        $this->assertSame('busy', $result['status_key']);
+        $this->assertSame(array(
+            array(
+                'start' => '2026-07-16T12:15:00Z',
+                'end' => '2026-07-16T12:45:00Z',
+                'source_key' => 'google_calendar_freebusy'
+            )
+        ), $result['busy']);
+        $this->assertStringNotContainsString('Private Interview', json_encode($result));
+        $this->assertArrayHasKey(hash('sha256', 'primary'), $result['calendars']);
+        $this->assertArrayNotHasKey('primary', $result['calendars']);
+    }
+
+    public function testGoogleCalendarFreeBusyAdapterHandlesRevokedAuth()
+    {
+        $adapter = new NESPGoogleCalendarFreeBusy(null, true);
+        $result = $adapter->queryFreeBusy(
+            'revoked-token',
+            array('primary'),
+            '2026-07-16T12:00:00Z',
+            '2026-07-16T13:00:00Z',
+            'UTC',
+            function () {
+                return array('status_code' => 401, 'body' => array());
+            }
+        );
+
+        $this->assertSame('reauthorize_required', $result['status_key']);
+        $this->assertContains('google_auth_revoked', $result['errors']);
+    }
+
+    public function testGoogleCalendarTokenEncryptionDoesNotExposeTokenValue()
+    {
+        putenv('NESP_GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY=unit-test-google-calendar-token-key');
+        $token = 'unit-test-google-calendar-token';
+        $encrypted = NESPGoogleCalendarFreeBusy::encryptToken($token);
+
+        if ($encrypted === false)
+        {
+            $this->markTestSkipped('OpenSSL is required for Google Calendar token encryption.');
+        }
+
+        $this->assertStringNotContainsString($token, $encrypted);
+        $this->assertSame($token, NESPGoogleCalendarFreeBusy::decryptToken($encrypted));
+        $this->assertSame(hash('sha256', $token), NESPGoogleCalendarFreeBusy::tokenFingerprint($token));
+        putenv('NESP_GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY');
     }
 
     public function testDashboardNavigationIncludesTaskViews()
@@ -412,9 +560,120 @@ class NESPWorkflowTest extends TestCase
         );
 
         $this->assertContains('Interviewer is closed for interviews.', $conflicts);
-        $this->assertContains('Requested time overlaps a blackout date.', $conflicts);
+        $this->assertContains('Requested time overlaps blocked time.', $conflicts);
         $this->assertContains('Maximum daily interviews would be exceeded.', $conflicts);
         $this->assertContains('Maximum weekly interviews would be exceeded.', $conflicts);
+    }
+
+    public function testSchedulingConflictsRespectDSTAndTimezone()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'open',
+            'timezone' => 'America/New_York',
+            'max_interviews_per_day' => 3,
+            'max_interviews_per_week' => 12,
+            'buffer_minutes' => 15
+        );
+        $blocks = array(
+            array('weekday_key' => 'Sunday', 'start_time' => '01:00:00', 'end_time' => '03:00:00', 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+
+        $fallBack = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), array(), 41002, '2026-11-01 01:30:00', '2026-11-01 02:00:00');
+        $springForward = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), array(), 41002, '2026-03-08 02:30:00', '2026-03-08 03:00:00');
+
+        $this->assertSame(array(), $fallBack);
+        $this->assertSame(array('Invalid interview time.'), $springForward);
+    }
+
+    public function testSchedulingConflictsDetectBuffersAndOutsideAvailability()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'open',
+            'timezone' => 'America/New_York',
+            'max_interviews_per_day' => 3,
+            'max_interviews_per_week' => 12,
+            'buffer_minutes' => 15
+        );
+        $blocks = array(
+            array('weekday_key' => 'Tuesday', 'start_time' => '09:00:00', 'end_time' => '17:00:00', 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+        $existing = array(
+            array('scheduled_start' => '2026-07-14 10:00:00', 'scheduled_end' => '2026-07-14 10:30:00', 'timezone' => 'America/New_York')
+        );
+
+        $bufferConflicts = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), $existing, 41002, '2026-07-14 10:40:00', '2026-07-14 11:00:00');
+        $outsideConflicts = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), array(), 41002, '2026-07-14 08:30:00', '2026-07-14 09:00:00');
+
+        $this->assertContains('Requested time overlaps an existing interview or buffer.', $bufferConflicts);
+        $this->assertContains('Requested time is outside available blocks.', $outsideConflicts);
+    }
+
+    public function testSchedulingConflictsUseOverridesAndMinimumNotice()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'open',
+            'timezone' => 'America/New_York',
+            'max_interviews_per_day' => 3,
+            'max_interviews_per_week' => 12,
+            'min_notice_minutes' => 120,
+            'buffer_minutes' => 15
+        );
+        $overrides = array(
+            array('override_date' => '2026-07-14', 'override_type_key' => 'available', 'start_time' => '12:00:00', 'end_time' => '13:00:00', 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+        $unavailable = array(
+            array('override_date' => '2026-07-14', 'override_type_key' => 'unavailable_all_day', 'start_time' => null, 'end_time' => null, 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+
+        $available = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), array(), array(), array(), 41002, '2026-07-14 12:00:00', '2026-07-14 12:30:00', $overrides, '2026-07-14 09:00:00');
+        $tooSoon = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), array(), array(), array(), 41002, '2026-07-14 12:00:00', '2026-07-14 12:30:00', $overrides, '2026-07-14 11:00:00');
+        $blocked = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), array(), array(), array(), 41002, '2026-07-14 12:00:00', '2026-07-14 12:30:00', $unavailable, '2026-07-14 09:00:00');
+
+        $this->assertSame(array(), $available);
+        $this->assertContains('Requested time is inside the minimum notice window.', $tooSoon);
+        $this->assertContains('Requested date is marked unavailable.', $blocked);
+    }
+
+    public function testSchedulingConflictsAcceptPerInterviewerExternalBusyWindows()
+    {
+        $interviewer = array(
+            'is_active' => 1,
+            'availability_status_key' => 'open',
+            'timezone' => 'America/New_York',
+            'max_interviews_per_day' => 3,
+            'max_interviews_per_week' => 12,
+            'buffer_minutes' => 15
+        );
+        $blocks = array(
+            array('weekday_key' => 'Tuesday', 'start_time' => '09:00:00', 'end_time' => '17:00:00', 'timezone' => 'America/New_York', 'is_active' => 1)
+        );
+        $externalBusy = array(
+            array('interviewer_profile_id' => 88, 'starts_at' => '2026-07-14 13:00:00', 'ends_at' => '2026-07-14 13:30:00', 'timezone' => 'America/New_York', 'source_key' => 'external_calendar')
+        );
+
+        $conflicts = NESPWorkflow::findSchedulingConflicts($interviewer, array(41002), $blocks, array(), array(), 41002, '2026-07-14 13:15:00', '2026-07-14 13:45:00', array(), null, $externalBusy);
+
+        $this->assertContains('Requested time overlaps interviewer external busy time.', $conflicts);
+    }
+
+    public function testManualInterviewAvailabilityOverrideRequiresAuditAndProtectedPost()
+    {
+        $workflowSource = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $uiSource = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $templateSource = file_get_contents(LEGACY_ROOT . '/modules/nesp/ScheduleInterview.tpl');
+
+        $this->assertStringContainsString('manual_interview_availability_override_used', $workflowSource);
+        $this->assertStringContainsString("case 'saveManualInterview'", $uiSource);
+        $this->assertStringContainsString('$this->adminOnly();', $uiSource);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $uiSource);
+        $this->assertStringContainsString('name="adminOverrideAvailability"', $templateSource);
+        $this->assertStringContainsString('name="availabilityOverrideReason"', $templateSource);
+        $this->assertStringContainsString('unavailable_all_day', $workflowSource);
+        $this->assertStringContainsString('getExternalBusyWindowsForInterviewer', $workflowSource);
+        $this->assertStringContainsString('getDefaultParticipantJoinURLForInterviewer', $workflowSource);
     }
 
     public function testAvailabilityTimeValidationRejectsImpossibleTimes()

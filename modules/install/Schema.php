@@ -2110,6 +2110,7 @@ class CATSSchema
                   `can_view_other_interviewer_notes` TINYINT(1) NOT NULL DEFAULT '0',
                   `can_add_notes` TINYINT(1) NOT NULL DEFAULT '1',
                   `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1',
+                  `default_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
                   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   PRIMARY KEY (`interviewer_profile_id`),
@@ -2718,6 +2719,11 @@ class CATSSchema
 
                 INSERT INTO nesp_feature_flag
                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'NESP_INTERVIEWER_AVAILABILITY_ENABLED', 'Interviewer Availability', 'Interviewer availability windows, block time, and schedule conflict checks.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_INTERVIEWER_AVAILABILITY_ENABLED');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
                 SELECT 'NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW()
                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_PRESCREEN_ENABLED');
 
@@ -2730,6 +2736,11 @@ class CATSSchema
                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
                 SELECT 'NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0, 1, NOW(), NOW()
                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_ZOOM_ENABLED');
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT 'NESP_INTERVIEWER_ZOOM_LINKS_ENABLED', 'Interviewer Zoom Links', 'Disabled participant-link helper. No Zoom API, OAuth, meeting creation, cancellation, rescheduling, or invitations are sent.', 0, 1, NOW(), NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
 
                 INSERT INTO nesp_feature_flag
                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
@@ -2941,6 +2952,84 @@ class CATSSchema
                 SELECT 'email', 'Applicant Email', 'disabled', 'Disabled in Phase 1. No outbound applicant email can be sent.', NOW(), NOW()
                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_integration_status WHERE integration_key = 'email');
             ",
+            '395' => '
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                VALUES
+                    (\'NESP_INTERVIEWER_AVAILABILITY_ENABLED\', \'Interviewer Availability\', \'Interviewer availability windows, block time, and schedule conflict checks.\', 0, 1, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE
+                    display_name = VALUES(display_name),
+                    description = VALUES(description),
+                    is_enabled = 0,
+                    requires_admin_approval = 1,
+                    date_modified = NOW();
+
+                ALTER TABLE `nesp_interviewer_profile`
+                    ADD COLUMN IF NOT EXISTS `min_notice_minutes` INT(11) NOT NULL DEFAULT \'1440\';
+
+                CREATE TABLE IF NOT EXISTS nesp_google_calendar_connection (
+                  google_calendar_connection_id INT(11) NOT NULL AUTO_INCREMENT,
+                  interviewer_profile_id INT(11) NOT NULL,
+                  user_id INT(11),
+                  status_key VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'disconnected\',
+                  google_subject_hash CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\',
+                  encrypted_calendar_id MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+                  calendar_id_hash CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\',
+                  token_scope VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'https://www.googleapis.com/auth/calendar.freebusy\',
+                  encrypted_access_token MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+                  encrypted_refresh_token MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
+                  access_token_fingerprint CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\',
+                  refresh_token_fingerprint CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\',
+                  token_expires_at DATETIME,
+                  connected_at DATETIME,
+                  disconnected_at DATETIME,
+                  reauthorize_required_at DATETIME,
+                  last_freebusy_check_at DATETIME,
+                  last_error VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\',
+                  created_by_user_id INT(11),
+                  modified_by_user_id INT(11),
+                  date_created DATETIME NOT NULL DEFAULT \'1000-01-01 00:00:00\',
+                  date_modified DATETIME NOT NULL DEFAULT \'1000-01-01 00:00:00\',
+                  PRIMARY KEY (google_calendar_connection_id),
+                  UNIQUE KEY IDX_google_calendar_interviewer (interviewer_profile_id),
+                  KEY IDX_google_calendar_user (user_id),
+                  KEY IDX_status_key (status_key),
+                  KEY IDX_reauthorize_required_at (reauthorize_required_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+                INSERT INTO nesp_feature_flag
+                    (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+                SELECT
+                    \'NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED\',
+                    \'Google Calendar Free/Busy\',
+                    \'Optional interviewer availability lookup using only Google Calendar free/busy scope. No event details are read and no events are created.\',
+                    0,
+                    1,
+                    NOW(),
+                    NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = \'NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED\');
+
+                UPDATE nesp_feature_flag
+                SET is_enabled = 0,
+                    date_modified = NOW()
+                WHERE flag_key = \'NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED\';
+
+                UPDATE nesp_feature_flag
+                SET is_enabled = 0,
+                    date_modified = NOW()
+                WHERE flag_key = \'NESP_CALENDAR_EVENT_CREATION_ENABLED\';
+
+                INSERT INTO nesp_integration_status
+                    (integration_key, display_name, status_key, message, date_created, date_modified)
+                SELECT
+                    \'google_calendar_freebusy\',
+                    \'Google Calendar Free/Busy\',
+                    \'disabled\',
+                    \'Optional interviewer availability lookup. Uses only free/busy scope and never creates calendar events.\',
+                    NOW(),
+                    NOW()
+                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_integration_status WHERE integration_key = \'google_calendar_freebusy\');
+            ',
 
         );
     }

@@ -19,6 +19,12 @@
                 </div>
             <?php endif; ?>
 
+            <?php if (trim($this->googleCalendarMessage) !== ''): ?>
+                <div class="nesp-confirm-box">
+                    <?php $this->_($this->googleCalendarMessage); ?>
+                </div>
+            <?php endif; ?>
+
             <div class="nesp-dashboard-nav">
                 <?php foreach ($this->dashboardNavigation as $navItem): ?>
                     <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
@@ -141,8 +147,17 @@
                             <input type="text" name="maxInterviewsPerWeek" value="12" />
                         </label>
                         <label>
+                            Min notice minutes
+                            <input type="text" name="minNoticeMinutes" value="1440" />
+                        </label>
+                        <label>
                             Default interview minutes
                             <input type="text" name="defaultInterviewMinutes" value="30" />
+                        </label>
+                        <label>
+                            Default Zoom participant link
+                            <input type="url" name="defaultZoomJoinURL" placeholder="https://*.zoom.us/j/..." />
+                            <span class="nesp-help-text">Optional. Participant join link only; host/start URLs are rejected.</span>
                         </label>
                         <label>
                             Buffer minutes
@@ -215,6 +230,67 @@
             </div>
 
             <div class="nesp-panel">
+                <h3>Google Calendar Free/Busy</h3>
+                <div class="nesp-safety-banner">
+                    Free/busy is disabled by default, uses only <?php $this->_($this->googleCalendarConfiguration['minimum_scope']); ?>, stores encrypted tokens only, and never reads event titles, creates events, sends invitations, or writes to calendars.
+                </div>
+                <div class="nesp-card-grid nesp-card-grid-tight">
+                    <div class="nesp-card"><span class="nesp-card-label">Feature Enabled</span><strong><?php echo($this->googleCalendarConfiguration['feature_enabled'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">OAuth Client Configured</span><strong><?php echo($this->googleCalendarConfiguration['client_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Redirect URI Configured</span><strong><?php echo($this->googleCalendarConfiguration['redirect_uri_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Token Encryption Configured</span><strong><?php echo($this->googleCalendarConfiguration['token_encryption_configured'] ? 'Yes' : 'No'); ?></strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Calendar Event Creation</span><strong>Disabled</strong></div>
+                    <div class="nesp-card"><span class="nesp-card-label">Connection State</span><strong><?php $this->_($this->googleCalendarConfiguration['status_key']); ?></strong></div>
+                </div>
+
+                <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=googleCalendarConnect" class="nesp-form">
+                    <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                    <label>
+                        Interviewer
+                        <select name="interviewerProfileID">
+                            <?php foreach ($this->interviewerProfiles as $profile): ?>
+                                <option value="<?php echo((int) $profile['interviewer_profile_id']); ?>"><?php $this->_($profile['display_name']); ?> - <?php $this->_($profile['email']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <button type="submit" class="nesp-secondary-button">Prepare Free/Busy OAuth</button>
+                    <span class="nesp-help-text">This prepares a consent URL for approved testing only. Token exchange remains an encrypted-storage integration step and is not run from this page.</span>
+                </form>
+
+                <table class="nesp-table">
+                    <tr>
+                        <th>Interviewer</th>
+                        <th>Status</th>
+                        <th>Scope</th>
+                        <th>Calendar</th>
+                        <th>Last Error</th>
+                        <th>Action</th>
+                    </tr>
+                    <?php foreach ($this->googleCalendarConnections as $connection): ?>
+                    <tr>
+                        <td><?php $this->_($connection['display_name']); ?><br /><span class="nesp-muted"><?php $this->_($connection['email']); ?></span></td>
+                        <td><?php $this->_($connection['status_key']); ?></td>
+                        <td><?php $this->_($connection['token_scope']); ?></td>
+                        <td><?php $this->_($connection['calendar_id_hash'] === '' ? 'primary calendar hash pending' : $connection['calendar_id_hash']); ?></td>
+                        <td><?php $this->_($connection['last_error']); ?></td>
+                        <td>
+                            <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=googleCalendarDisconnect">
+                                <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $connection['interviewer_profile_id']); ?>" />
+                                <button type="submit" class="nesp-secondary-button">Disconnect</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($this->googleCalendarConnections)): ?>
+                    <tr>
+                        <td colspan="6">No Google Calendar free/busy connections have been prepared.</td>
+                    </tr>
+                    <?php endif; ?>
+                </table>
+            </div>
+
+            <div class="nesp-panel">
                 <h3>Interviewer Profiles</h3>
                 <table class="nesp-table">
                     <tr>
@@ -225,6 +301,7 @@
                         <th>Status</th>
                         <th>Active Grants</th>
                         <th>Capacity</th>
+                        <th>Zoom Link</th>
                         <th>Last Change</th>
                         <th>Action</th>
                     </tr>
@@ -243,13 +320,14 @@
                         <td><?php echo(((int) $profile['is_active'] === 1) ? 'Active' : 'Inactive'); ?></td>
                         <td><?php $this->_($profile['active_grants']); ?></td>
                         <td><?php $this->_((int) $profile['max_interviews_per_day'] . '/day, ' . (int) $profile['max_interviews_per_week'] . '/week'); ?></td>
+                        <td><?php $this->_($profile['default_zoom_join_url'] === '' ? 'None' : NESPWorkflow::maskZoomURLForAudit($profile['default_zoom_join_url'])); ?></td>
                         <td><?php $this->_($profile['date_modified']); ?></td>
                         <td><a class="nesp-secondary-action" href="#interviewer-<?php echo((int) $profile['interviewer_profile_id']); ?>">Edit</a></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (!count($this->interviewerProfiles)): ?>
                     <tr>
-                        <td colspan="9">No interviewer profiles have been created.</td>
+                        <td colspan="10">No interviewer profiles have been created.</td>
                     </tr>
                     <?php endif; ?>
                 </table>
@@ -330,8 +408,17 @@
                             <input type="text" name="maxInterviewsPerWeek" value="<?php echo((int) $profile['max_interviews_per_week']); ?>" />
                         </label>
                         <label>
+                            Min notice minutes
+                            <input type="text" name="minNoticeMinutes" value="<?php echo((int) $profile['min_notice_minutes']); ?>" />
+                        </label>
+                        <label>
                             Default duration
                             <input type="text" name="defaultInterviewMinutes" value="<?php echo((int) $profile['default_interview_minutes']); ?>" />
+                        </label>
+                        <label>
+                            Default Zoom participant link
+                            <input type="url" name="defaultZoomJoinURL" value="<?php echo(htmlspecialchars($profile['default_zoom_join_url'], ENT_QUOTES, 'UTF-8')); ?>" placeholder="https://*.zoom.us/j/..." />
+                            <span class="nesp-help-text">Optional. Used as a scheduling default only when NESP_INTERVIEWER_ZOOM_LINKS_ENABLED is enabled. Participant join link only; host/start URLs are rejected.</span>
                         </label>
                         <label>
                             Buffer minutes
@@ -588,7 +675,7 @@
                             <select name="overrideTypeKey">
                                 <option value="available">Available custom hours</option>
                                 <option value="available_all_day">Available all day</option>
-                                <option value="unavailable">Unavailable</option>
+                                <option value="unavailable_all_day">Unavailable all day</option>
                             </select>
                         </label>
                         <label>
