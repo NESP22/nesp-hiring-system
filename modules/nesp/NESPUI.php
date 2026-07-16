@@ -70,13 +70,11 @@ class NESPUI extends UserInterface
 
             case 'googleCalendarConnect':
             case 'googleCalendarReauthorize':
-                $this->adminOnly();
                 $this->requirePostCSRF();
                 $this->googleCalendarConnect();
                 break;
 
             case 'googleCalendarDisconnect':
-                $this->adminOnly();
                 $this->requirePostCSRF();
                 $this->googleCalendarDisconnect();
                 break;
@@ -459,6 +457,15 @@ class NESPUI extends UserInterface
     private function googleCalendarConnect()
     {
         $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can manage only your own Google Calendar free/busy connection.');
+            }
+        }
+
         $result = $this->_workflow->requestGoogleCalendarAuthorization($interviewerProfileID, $this->_userID);
         if ($result === false)
         {
@@ -468,19 +475,28 @@ class NESPUI extends UserInterface
         $_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'] =
             'Authorization prepared for ' . $result['display_name'] . '. Use the Google consent URL only in an approved test environment: ' . $result['authorization_url'];
 
-        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
     }
 
     private function googleCalendarDisconnect()
     {
         $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can manage only your own Google Calendar free/busy connection.');
+            }
+        }
+
         if ($interviewerProfileID <= 0 || !$this->_workflow->disconnectGoogleCalendar($interviewerProfileID, $this->_userID))
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an interviewer calendar connection to disconnect.');
         }
 
         $_SESSION['NESP_GOOGLE_CALENDAR_MESSAGE'] = 'Google Calendar free/busy connection disconnected and stored tokens removed.';
-        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
     }
 
     private function createInterviewer()
@@ -602,6 +618,8 @@ class NESPUI extends UserInterface
         $this->_template->assign('profile', $profile);
         $this->_template->assign('availability', $this->_workflow->getAvailabilityForProfile($profile['interviewer_profile_id']));
         $this->_template->assign('availabilityTemplate', NESPWorkflow::getDefaultAvailabilityTemplate());
+        $this->_template->assign('googleCalendarConfiguration', $this->_workflow->getGoogleCalendarConfigurationStatus());
+        $this->_template->assign('googleCalendarConnection', $this->_workflow->getGoogleCalendarConnectionForInterviewer($profile['interviewer_profile_id']));
         $this->_template->display('./modules/nesp/MyAvailability.tpl');
     }
 

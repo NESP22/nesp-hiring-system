@@ -2084,6 +2084,26 @@ class NESPWorkflow
         return $freeBusy->getConnectionSummaries();
     }
 
+    public function getGoogleCalendarConnectionForInterviewer($interviewerProfileID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        foreach ($this->getGoogleCalendarConnections() as $connection)
+        {
+            if ((int) $connection['interviewer_profile_id'] === $interviewerProfileID)
+            {
+                return $connection;
+            }
+        }
+
+        return array(
+            'interviewer_profile_id' => $interviewerProfileID,
+            'status_key' => 'disconnected',
+            'token_scope' => NESPGoogleCalendarFreeBusy::MINIMUM_SCOPE,
+            'calendar_id_hash' => '',
+            'last_error' => ''
+        );
+    }
+
     public function requestGoogleCalendarAuthorization($interviewerProfileID, $actorUserID)
     {
         if (!$this->isTableInstalled('nesp_google_calendar_connection'))

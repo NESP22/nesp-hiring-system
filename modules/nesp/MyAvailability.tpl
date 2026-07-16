@@ -53,6 +53,31 @@
                 </div>
 
                 <div class="nesp-panel">
+                    <h3>Google Calendar Free/Busy</h3>
+                    <div class="nesp-safety-banner">
+                        Reads Busy/Available windows only. No event titles, details, invitations, or calendar writes.
+                    </div>
+                    <p>
+                        Status:
+                        <strong><?php $this->_(isset($this->googleCalendarConnection['status_key']) ? $this->googleCalendarConnection['status_key'] : 'disconnected'); ?></strong>
+                    </p>
+                    <p class="nesp-help-text">Scope: <?php $this->_($this->googleCalendarConfiguration['minimum_scope']); ?></p>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=googleCalendarConnect" class="nesp-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $this->profile['interviewer_profile_id']); ?>" />
+                        <button type="submit" class="nesp-secondary-button">Prepare Calendar Free/Busy</button>
+                        <span class="nesp-help-text">Creates a consent URL for approved testing. Token exchange is not run from this page.</span>
+                    </form>
+                    <?php if (isset($this->googleCalendarConnection['status_key']) && $this->googleCalendarConnection['status_key'] !== 'disconnected'): ?>
+                        <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=googleCalendarDisconnect" class="nesp-form">
+                            <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $this->profile['interviewer_profile_id']); ?>" />
+                            <button type="submit" class="nesp-secondary-button">Disconnect Calendar</button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+
+                <div class="nesp-panel">
                     <h3>Add Weekly Time Block</h3>
                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createInterviewerAvailability" class="nesp-form">
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
