@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS `nesp_screening_questionnaire` (
   `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_invited',
   `question_set_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `question_set_version` INT(11) NOT NULL DEFAULT 1,
+  `question_set_version_id` INT(11),
+  `question_snapshot_json` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
   `token_hash` CHAR(64) COLLATE utf8mb4_unicode_ci,
   `token_expires_at` DATETIME,
   `token_revoked_at` DATETIME,
@@ -35,6 +37,7 @@ CREATE TABLE IF NOT EXISTS `nesp_screening_questionnaire` (
   UNIQUE KEY `IDX_questionnaire_token_hash` (`token_hash`),
   KEY `IDX_questionnaire_candidate_job` (`candidate_id`, `joborder_id`),
   KEY `IDX_questionnaire_status` (`status_key`),
+  KEY `IDX_questionnaire_set_version` (`question_set_version_id`),
   KEY `IDX_questionnaire_reviewer` (`reviewer_profile_id`, `review_status_key`),
   KEY `IDX_questionnaire_submitted` (`submitted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

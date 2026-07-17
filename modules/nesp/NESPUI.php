@@ -23,6 +23,7 @@ class NESPUI extends UserInterface
             'Waiting' => CATSUtility::getIndexName() . '?m=nesp&amp;a=waiting*al=' . ACCESS_LEVEL_READ,
             'Interviews' => CATSUtility::getIndexName() . '?m=nesp&amp;a=interviews*al=' . ACCESS_LEVEL_READ,
             'Questionnaires' => CATSUtility::getIndexName() . '?m=nesp&amp;a=questionnaires*al=' . ACCESS_LEVEL_READ,
+            'Manage Question Sets' => CATSUtility::getIndexName() . '?m=nesp&amp;a=questionSets*al=' . ACCESS_LEVEL_SA,
             'Phone Screens' => CATSUtility::getIndexName() . '?m=nesp&amp;a=phoneScreens*al=' . ACCESS_LEVEL_READ,
             'Job Ads' => CATSUtility::getIndexName() . '?m=nesp&amp;a=jobAds*al=' . ACCESS_LEVEL_READ,
             'Completed' => CATSUtility::getIndexName() . '?m=nesp&amp;a=completed*al=' . ACCESS_LEVEL_READ,
@@ -91,6 +92,17 @@ class NESPUI extends UserInterface
                 $this->updateInterviewerSettings();
                 break;
 
+            case 'prepareInterviewerLogin':
+            case 'activateInterviewerLogin':
+            case 'suspendInterviewerLogin':
+            case 'reactivateInterviewerLogin':
+            case 'resetInterviewerTempPassword':
+            case 'disableInterviewerLogin':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->interviewerLoginAction($action);
+                break;
+
             case 'createInterviewerRoleRule':
                 $this->adminOnly();
                 $this->requirePostCSRF();
@@ -101,6 +113,12 @@ class NESPUI extends UserInterface
                 $this->adminOnly();
                 $this->requirePostCSRF();
                 $this->createCandidateGrant();
+                break;
+
+            case 'revokeCandidateGrant':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->revokeCandidateGrant();
                 break;
 
             case 'createInterviewerAvailability':
@@ -169,6 +187,35 @@ class NESPUI extends UserInterface
             case 'questionnaires':
                 $this->adminOnly();
                 $this->questionnaires();
+                break;
+
+            case 'questionSets':
+                $this->adminOnly();
+                $this->questionSets();
+                break;
+
+            case 'duplicateQuestionSetDraft':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->duplicateQuestionSetDraft();
+                break;
+
+            case 'saveQuestionSetDraft':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->saveQuestionSetDraft();
+                break;
+
+            case 'publishQuestionSetDraft':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->publishQuestionSetDraft();
+                break;
+
+            case 'archiveQuestionSet':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->archiveQuestionSet();
                 break;
 
             case 'confirmQuestionnaire':
@@ -404,7 +451,7 @@ class NESPUI extends UserInterface
         $this->_template->display('./modules/nesp/Dashboard.tpl');
     }
 
-    private function settings()
+    private function settings($oneTimeLoginDetails = array())
     {
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Interviewer Settings');
@@ -413,9 +460,11 @@ class NESPUI extends UserInterface
             ? $_SESSION['NESP_INTERVIEWER_TEMP_LOGIN_MESSAGE'] : '';
         unset($_SESSION['NESP_INTERVIEWER_TEMP_LOGIN_MESSAGE']);
         $this->_template->assign('temporaryLoginMessage', $temporaryLoginMessage);
+        $this->_template->assign('oneTimeLoginDetails', $oneTimeLoginDetails);
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('featureFlags', $this->_workflow->getFeatureFlags());
         $this->_template->assign('interviewerProfiles', $this->_workflow->getInterviewerProfiles());
+        $this->_template->assign('candidateGrants', $this->_workflow->getActiveCandidateGrants());
         $this->_template->assign('jobRoleOptions', NESPWorkflow::getInterviewerJobRoleOptions());
         $this->_template->assign('accountStates', NESPWorkflow::getInterviewerAccountStates());
         $this->_template->assign('seedProfiles', NESPWorkflow::getApprovedRealInterviewerSeedProfiles());
@@ -506,7 +555,7 @@ class NESPUI extends UserInterface
         $roleKey = isset($_POST['roleKey']) ? $_POST['roleKey'] : 'interviewer';
         $approvedJobs = isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array();
         $options = array(
-            'account_state_key' => isset($_POST['accountStateKey']) ? $_POST['accountStateKey'] : 'profile_created',
+            'account_state_key' => 'profile_created',
             'approved_joborder_ids' => $approvedJobs,
             'timezone' => isset($_POST['timezone']) ? $_POST['timezone'] : 'America/New_York',
             'max_interviews_per_day' => isset($_POST['maxInterviewsPerDay']) ? $_POST['maxInterviewsPerDay'] : 3,
@@ -535,7 +584,8 @@ class NESPUI extends UserInterface
         }
         if (is_array($result) && !empty($result['temporary_login_message']))
         {
-            $_SESSION['NESP_INTERVIEWER_TEMP_LOGIN_MESSAGE'] = $result['temporary_login_message'];
+            $this->settings(isset($result['one_time_login_details']) ? $result['one_time_login_details'] : array());
+            return;
         }
 
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
@@ -548,9 +598,6 @@ class NESPUI extends UserInterface
             'display_name' => isset($_POST['displayName']) ? $_POST['displayName'] : '',
             'email' => isset($_POST['email']) ? $_POST['email'] : '',
             'role_key' => isset($_POST['roleKey']) ? $_POST['roleKey'] : 'interviewer',
-            'is_active' => isset($_POST['isActive']) ? 1 : 0,
-            'user_id' => isset($_POST['linkedUserID']) ? (int) $_POST['linkedUserID'] : 0,
-            'account_state_key' => isset($_POST['accountStateKey']) ? $_POST['accountStateKey'] : 'profile_created',
             'availability_status_key' => isset($_POST['availabilityStatusKey']) ? $_POST['availabilityStatusKey'] : 'open',
             'availability_closed_until' => isset($_POST['availabilityClosedUntil']) ? $_POST['availabilityClosedUntil'] : '',
             'availability_close_reason' => isset($_POST['availabilityCloseReason']) ? $_POST['availabilityCloseReason'] : '',
@@ -567,8 +614,7 @@ class NESPUI extends UserInterface
             'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
             'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
             'default_zoom_join_url' => isset($_POST['defaultZoomJoinURL']) ? $_POST['defaultZoomJoinURL'] : '',
-            'approved_joborder_ids' => isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array(),
-            'temporary_password' => isset($_POST['temporaryPassword']) ? $_POST['temporaryPassword'] : ''
+            'approved_joborder_ids' => isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array()
         );
 
         $result = $this->_workflow->updateInterviewerSettings($interviewerProfileID, $settings, $this->_userID);
@@ -580,11 +626,23 @@ class NESPUI extends UserInterface
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to update interviewer settings.');
         }
-        if (is_array($result) && !empty($result['temporary_login_message']))
-        {
-            $_SESSION['NESP_INTERVIEWER_TEMP_LOGIN_MESSAGE'] = $result['temporary_login_message'];
-        }
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
 
+    private function interviewerLoginAction($action)
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        $temporaryPassword = isset($_POST['temporaryPassword']) ? $_POST['temporaryPassword'] : '';
+        $result = $this->_workflow->interviewerLoginLifecycleAction($interviewerProfileID, $action, $temporaryPassword, $this->_userID);
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to update interviewer login.');
+        }
+        if (!empty($result['one_time_login_details']))
+        {
+            $this->settings($result['one_time_login_details']);
+            return;
+        }
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
     }
 
@@ -741,6 +799,17 @@ class NESPUI extends UserInterface
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
     }
 
+    private function revokeCandidateGrant()
+    {
+        $grantID = isset($_POST['grantID']) ? (int) $_POST['grantID'] : 0;
+        if ($this->_workflow->revokeCandidateGrant($grantID, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an active candidate grant to revoke.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
     private function createInterviewerAvailability()
     {
         $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
@@ -856,6 +925,77 @@ class NESPUI extends UserInterface
         $this->_template->assign('questionnaireQueues', $this->_workflow->getQuestionnaireQueues());
         $this->_template->assign('questionnaires', $this->_workflow->getQuestionnaireSummaries(100));
         $this->_template->display('./modules/nesp/Questionnaires.tpl');
+    }
+
+    private function questionSets($selectedVersionID = 0)
+    {
+        $this->_workflow->ensureDefaultQuestionSetsSeeded($this->_userID);
+        $selectedVersionID = $selectedVersionID > 0
+            ? $selectedVersionID
+            : (isset($_GET['versionID']) ? (int) $_GET['versionID'] : 0);
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Questionnaires');
+        $this->_template->assign('viewKey', 'questionSets');
+        $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
+        $this->_template->assign('questionSets', $this->_workflow->getQuestionSetAdminRows());
+        $this->_template->assign('selectedVersion', $selectedVersionID > 0 ? $this->_workflow->getQuestionSetVersionDetail($selectedVersionID) : array());
+        $this->_template->display('./modules/nesp/QuestionSets.tpl');
+    }
+
+    private function duplicateQuestionSetDraft()
+    {
+        $questionSetID = isset($_POST['questionSetID']) ? (int) $_POST['questionSetID'] : 0;
+        $sourceVersionID = isset($_POST['sourceVersionID']) ? (int) $_POST['sourceVersionID'] : 0;
+        $draftID = $this->_workflow->createQuestionSetDraftFromVersion($questionSetID, $sourceVersionID, $this->_userID);
+        if ($draftID === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a published question set to duplicate.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=questionSets&versionID=' . (int) $draftID);
+    }
+
+    private function saveQuestionSetDraft()
+    {
+        $versionID = isset($_POST['versionID']) ? (int) $_POST['versionID'] : 0;
+        $roleMatches = array();
+        $matchTexts = isset($_POST['roleMatchText']) && is_array($_POST['roleMatchText']) ? $_POST['roleMatchText'] : array();
+        foreach ($matchTexts as $index => $matchText)
+        {
+            $roleMatches[] = array(
+                'match_text' => $matchText,
+                'joborder_id' => isset($_POST['roleMatchJobOrderID'][$index]) ? (int) $_POST['roleMatchJobOrderID'][$index] : 0
+            );
+        }
+        $_POST['roleMatches'] = $roleMatches;
+
+        $result = $this->_workflow->saveQuestionSetDraft($versionID, $_POST, $this->_userID);
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to save question-set draft.');
+        }
+        CATSUtility::transferRelativeURI('m=nesp&a=questionSets&versionID=' . (int) $versionID);
+    }
+
+    private function publishQuestionSetDraft()
+    {
+        $versionID = isset($_POST['versionID']) ? (int) $_POST['versionID'] : 0;
+        if ($this->_workflow->publishQuestionSetDraft($versionID, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a draft question-set version to publish.');
+        }
+        CATSUtility::transferRelativeURI('m=nesp&a=questionSets');
+    }
+
+    private function archiveQuestionSet()
+    {
+        $questionSetID = isset($_POST['questionSetID']) ? (int) $_POST['questionSetID'] : 0;
+        if ($this->_workflow->archiveQuestionSet($questionSetID, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a question set to archive.');
+        }
+        CATSUtility::transferRelativeURI('m=nesp&a=questionSets');
     }
 
     private function confirmQuestionnaire()

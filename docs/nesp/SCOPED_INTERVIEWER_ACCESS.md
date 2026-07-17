@@ -44,6 +44,17 @@ An interviewer can view a candidate only when:
 - POST routes require CSRF.
 - Feature-gated routes fail closed when flags are off.
 
+## Operator Steps
+
+1. Create or edit the interviewer profile from `NESP Hiring > Interviewer Settings`.
+2. Approve at least one job role before activation.
+3. Use `Prepare Login` to create a disabled `nesp_interviewer` OpenCATS account. Copy-only login details are shown once; the app does not email them.
+4. Use `Activate Login` only after Craig approves access. Activation rejects admin, site-admin, root, non-`nesp_interviewer`, and higher-than-read-only linked users.
+5. Use `Suspend` or `Permanently Disable` to block login while preserving history. Both force the OpenCATS user to disabled access and mark the profile inactive.
+6. Revoke active candidate access from the visible grant list when an interviewer should no longer see a candidate/job.
+
+Legacy forgot-password email recovery is blocked for `nesp_interviewer` accounts. Temporary password resets must be performed from Interviewer Settings and shared manually only after approval.
+
 ## Real Interviewer Role Guardrails
 
 - Suthir can be approved only for Staff Photographer `41002` and Freelance Photographer `41003` unless Craig edits the settings.

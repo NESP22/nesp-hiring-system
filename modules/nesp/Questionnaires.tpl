@@ -17,6 +17,7 @@
 
             <div class="nesp-safety-banner">
                 Human-reviewed only: questionnaires do not rank, reject, approve, hire, email, text, call, publish ads, or move candidates automatically.
+                Question wording is managed separately in <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=questionSets">Manage Question Sets</a>.
             </div>
 
             <div class="nesp-dashboard-nav">
@@ -38,7 +39,8 @@
                     'ready' => 'Questionnaire Links Ready',
                     'waiting' => 'Waiting for Questionnaire',
                     'completed' => 'Completed Questionnaires',
-                    'human_follow_up' => 'Human Follow-Up Requested'
+                    'human_follow_up' => 'Human Follow-Up Requested',
+                    'revoked_expired' => 'Revoked or Expired'
                 );
             ?>
             <div class="nesp-card-grid nesp-card-grid-tight">

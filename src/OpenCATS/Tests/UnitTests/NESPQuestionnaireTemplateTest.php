@@ -7,6 +7,7 @@ class NESPQuestionnaireTemplateTest extends TestCase
     {
         $templates = array(
             'modules/nesp/Questionnaires.tpl',
+            'modules/nesp/QuestionSets.tpl',
             'modules/nesp/QuestionnaireConfirm.tpl',
             'modules/nesp/QuestionnaireReview.tpl'
         );
@@ -38,16 +39,48 @@ class NESPQuestionnaireTemplateTest extends TestCase
     {
         $confirm = file_get_contents('modules/nesp/QuestionnaireConfirm.tpl');
         $review = file_get_contents('modules/nesp/QuestionnaireReview.tpl');
+        $sets = file_get_contents('modules/nesp/QuestionSets.tpl');
         $public = file_get_contents('modules/nesp/screeningQuestionnaire.php');
 
         $this->assertStringContainsString('a=requestQuestionnaire', $confirm);
         $this->assertStringContainsString('name="csrfToken"', $confirm);
         $this->assertStringContainsString('a=saveQuestionnaireReview', $review);
         $this->assertStringContainsString('name="csrfToken"', $review);
+        $this->assertStringContainsString('a=publishQuestionSetDraft', $sets);
+        $this->assertStringContainsString('name="csrfToken"', $sets);
+        $this->assertStringContainsString('Published versions are immutable', $sets);
         $this->assertStringContainsString('submitQuestionnaireFromToken($token, $answers)', $public);
         $this->assertStringContainsString('requestQuestionnaireHumanFollowUpFromToken($token)', $public);
         $this->assertStringNotContainsString('link_url', $confirm . $review . $public);
         $this->assertStringNotContainsString('invitation_copy_text', $confirm . $review . $public);
+    }
+
+    public function testInterviewerSettingsUsesStateGatedLifecycleActions()
+    {
+        $settings = file_get_contents('modules/nesp/Settings.tpl');
+        $controller = file_get_contents('modules/nesp/NESPUI.php');
+
+        foreach (array('prepareInterviewerLogin', 'activateInterviewerLogin', 'suspendInterviewerLogin', 'reactivateInterviewerLogin', 'resetInterviewerTempPassword', 'disableInterviewerLogin', 'revokeCandidateGrant') as $action)
+        {
+            $this->assertStringContainsString('a=' . $action, $settings);
+            $this->assertStringContainsString("case '" . $action . "'", $controller);
+        }
+        $this->assertStringContainsString('Copy-only login details.', $settings);
+        $this->assertStringContainsString('The app has not sent this to anyone.', $settings);
+        $this->assertStringContainsString('Copy Login Details', $settings);
+        $this->assertStringContainsString('data-label="Name"', $settings);
+        $this->assertStringContainsString('data-label="Candidate"', $settings);
+        $this->assertStringNotContainsString('name="linkedUserID"', $settings);
+        $this->assertStringNotContainsString('name="isActive"', $settings);
+    }
+
+    public function testLegacyForgotPasswordBlocksNespInterviewerMailerPath()
+    {
+        $source = file_get_contents('modules/login/LoginUI.php');
+
+        $this->assertStringContainsString('forgotPasswordBlockedForScopedInterviewer', $source);
+        $this->assertStringContainsString("trim((string) \$row['categories']) === 'nesp_interviewer'", $source);
+        $this->assertMatchesRegularExpression('/forgotPasswordBlockedForScopedInterviewer\(\$username\).*?return;.*?\$user = new Users\(\)/s', $source);
     }
 
     public function testNespWorkflowCssKeepsBrandSelectorsScoped()

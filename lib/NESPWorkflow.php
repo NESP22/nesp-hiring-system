@@ -61,6 +61,7 @@ class NESPWorkflow
             array('key' => 'waiting', 'label' => 'Waiting', 'action' => 'waiting'),
             array('key' => 'interviews', 'label' => 'Interviews', 'action' => 'interviews'),
             array('key' => 'questionnaires', 'label' => 'Questionnaires', 'action' => 'questionnaires'),
+            array('key' => 'questionSets', 'label' => 'Manage Question Sets', 'action' => 'questionSets'),
             array('key' => 'phoneScreens', 'label' => 'Phone Screens', 'action' => 'phoneScreens'),
             array('key' => 'jobAds', 'label' => 'Job Ads', 'action' => 'jobAds'),
             array('key' => 'completed', 'label' => 'Completed', 'action' => 'completed'),
@@ -149,8 +150,15 @@ class NESPWorkflow
             'interviewerAccess',
             'createInterviewer',
             'updateInterviewerSettings',
+            'prepareInterviewerLogin',
+            'activateInterviewerLogin',
+            'suspendInterviewerLogin',
+            'reactivateInterviewerLogin',
+            'resetInterviewerTempPassword',
+            'disableInterviewerLogin',
             'createInterviewerRoleRule',
             'createCandidateGrant',
+            'revokeCandidateGrant',
             'updateInterviewerZoomLink'
         )))
         {
@@ -175,6 +183,11 @@ class NESPWorkflow
 
         if (in_array($action, array(
             'questionnaires',
+            'questionSets',
+            'duplicateQuestionSetDraft',
+            'saveQuestionSetDraft',
+            'publishQuestionSetDraft',
+            'archiveQuestionSet',
             'confirmQuestionnaire',
             'requestQuestionnaire',
             'reviewQuestionnaire',
@@ -441,20 +454,51 @@ class NESPWorkflow
     public static function getQuestionnaireQuestionSets()
     {
         return array(
-            'weekend_sports_photographer' => array(
-                'label' => 'Weekend Sports Photographer',
-                'match' => array('weekend sports photographer', 'staff photographer', 'freelance photographer', 'sports photographer', 'photographer'),
+            'photography_assistant_poser' => array(
+                'label' => 'Field Staff Pre-Interview',
+                'match' => array('table greeter', 'field assistant', 'field staff', 'assistant', 'poser'),
+                'intro' => 'Spring 2026 Pre-Zoom Meeting Info and Survey. Please complete prior to the Zoom meeting. Try to answer all questions to the best of your ability and knowledge. Remember to hit Submit at the end, otherwise it will not record your information. Events take place in the New England area of the United States: Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.',
                 'questions' => array(
-                    array('key' => 'weekend_availability', 'label' => 'Are you available on Saturdays and Sundays?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'travel_areas', 'label' => 'What towns or areas can you reliably travel to?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'transportation', 'label' => 'Do you have reliable transportation?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'camera_ownership', 'label' => 'Do you own a DSLR or mirrorless camera?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'photography_experience', 'label' => 'Describe your photography experience.', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'youth_sports_comfort', 'label' => 'Are you comfortable photographing children and youth sports?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'lifting_ability', 'label' => 'Can you lift and carry approximately 25-40 pounds of equipment?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
-                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true),
-                    array('key' => 'interest', 'label' => 'Why are you interested in working with NESP?', 'type' => 'textarea', 'required' => true)
+                    array('key' => 'confirmed_email', 'label' => 'Email address.', 'type' => 'text', 'required' => true),
+                    array('key' => 'confirmed_name', 'label' => 'Your name.', 'type' => 'text', 'required' => true),
+                    array('key' => 'new_england_spring_availability', 'label' => 'Are you or will you be in the New England area during April, May, and early June? Events are in Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'position_for_zoom', 'label' => 'Which position are you scheduling a Zoom meeting for? Photographer or Table Greeter / Field Assistant?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'current_date_time', 'label' => 'Current date and time.', 'type' => 'text', 'required' => true),
+                    array('key' => 'primary_work', 'label' => 'Primary work, if any.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'talking_with_families', 'label' => 'Are you comfortable talking to and answering questions from kids and adults?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'organization_and_instructions', 'label' => 'Are you comfortable staying organized, checking in paperwork, and giving players, coaches, and parents the instructions they need at events?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'youth_age_comfort', 'label' => 'Do you have experience working with, or are you comfortable working with, kids from kindergarten through high school age?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'posing_and_gear_direction', 'label' => 'Are you comfortable talking to, giving directions to, and helping players from kindergarten through high school get into the correct picture positions while making sure gear, equipment, and uniforms look good?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'driver_license_vehicle', 'label' => 'This role requires driving to youth sports league locations. Do you have a valid driver\'s license and reliable access to a personal vehicle for these assignments?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'travel_distance', 'label' => 'Events are around New England. Most events average 45-60 minutes of travel time depending on location, but some available events could be further away. Select or describe all options you are willing to travel: at least 60 minutes, around 90 minutes, or further than 90 minutes.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'field_staff_interest', 'label' => 'Briefly write what interested you in looking into work at picture day events with NESP.', 'type' => 'textarea', 'required' => true)
+                )
+            ),
+            'weekend_sports_photographer' => array(
+                'label' => 'Photographer Pre-Interview',
+                'match' => array('weekend sports photographer', 'staff photographer', 'freelance photographer', 'sports photographer', 'photographer'),
+                'intro' => 'Spring 2026 Pre-Zoom Meeting Info and Survey. Please complete prior to the Zoom meeting. Try to answer all questions to the best of your ability and knowledge. Remember to hit Submit at the end, otherwise it will not record your information. Events take place in the New England area of the United States: Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.',
+                'questions' => array(
+                    array('key' => 'confirmed_email', 'label' => 'Email address.', 'type' => 'text', 'required' => true),
+                    array('key' => 'confirmed_name', 'label' => 'Your name.', 'type' => 'text', 'required' => true),
+                    array('key' => 'new_england_spring_availability', 'label' => 'Are you or will you be in the New England area during April, May, and early June? Events are in Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'position_for_zoom', 'label' => 'Which position are you scheduling a Zoom meeting for? Photographer or Table Greeter / Field Assistant?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'current_date_time', 'label' => 'Current date and time.', 'type' => 'text', 'required' => true),
+                    array('key' => 'primary_work', 'label' => 'Primary work, if any.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'last_five_photography_events', 'label' => 'Last 5 photography events. If fewer than 5, list what you have been on.', 'type' => 'textarea', 'required' => false),
+                    array('key' => 'portfolio_link', 'label' => 'Your online portfolio or website link, if applicable.', 'type' => 'text', 'required' => false),
+                    array('key' => 'linkedin_link', 'label' => 'Your LinkedIn link, if applicable.', 'type' => 'text', 'required' => false),
+                    array('key' => 'years_freelancing', 'label' => 'How many years have you been freelancing?', 'type' => 'text', 'required' => true),
+                    array('key' => 'camera_bodies', 'label' => 'List your camera body or bodies make and model. Example: Canon 5D Mark IV.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'lenses', 'label' => 'List your lens or lenses make, focal length, and aperture range. Example: Tamron 28-75 f2.8.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'owns_flash', 'label' => 'Do you own a flash? Yes or No.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'indoor_lighting_experience', 'label' => 'Do you have experience with indoor photography lighting using 2 or more monolights? Yes or No.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'driver_license_vehicle', 'label' => 'This role requires driving to youth sports league locations. Do you have a valid driver\'s license and reliable access to a personal vehicle for these assignments?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'travel_distance', 'label' => 'Most events involve 45-75 minutes of travel time depending on location, though some available events may be farther away. Select or describe all travel ranges you would be comfortable with: at least 60 minutes, around 90 minutes, or further than 90 minutes.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'early_weekend_mornings', 'label' => 'Picture days start early on weekends, including travel time. Are you willing and able to get up early on weekend mornings to go to NESP events?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'youth_age_comfort', 'label' => 'Do you have experience working with, or are you comfortable working with, kids from kindergarten through high school age?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'early_arrival_plan', 'label' => 'If your first scheduled group begins at 7:30 AM, what time would you plan to arrive at the event location and why?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'photographer_interest', 'label' => 'So, what about being a youth sports team and portrait photographer interested you?', 'type' => 'textarea', 'required' => true)
                 )
             ),
             'school_photographer' => array(
@@ -467,20 +511,6 @@ class NESPWorkflow
                     array('key' => 'children_experience', 'label' => 'Describe your experience working with children.', 'type' => 'textarea', 'required' => true),
                     array('key' => 'high_volume_comfort', 'label' => 'Are you comfortable with repetitive posing and high-volume photography?', 'type' => 'textarea', 'required' => true),
                     array('key' => 'travel_range', 'label' => 'What travel range can you reliably cover?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
-                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true)
-                )
-            ),
-            'photography_assistant_poser' => array(
-                'label' => 'Photography Assistant / Poser',
-                'match' => array('assistant', 'poser', 'field assistant'),
-                'questions' => array(
-                    array('key' => 'availability', 'label' => 'What weekend and weekday availability do you have?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'children_comfort', 'label' => 'Are you comfortable working with children?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'standing', 'label' => 'Are you able to stand for long periods?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'carry_equipment', 'label' => 'Are you able to carry equipment as needed?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'transportation', 'label' => 'Do you have reliable transportation?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'customer_service', 'label' => 'Describe any customer-service experience.', 'type' => 'textarea', 'required' => true),
                     array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
                     array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true)
                 )
@@ -577,6 +607,60 @@ class NESPWorkflow
         return $questions;
     }
 
+    public static function getQuestionnaireIntroForSet($questionSetKey)
+    {
+        $sets = self::getQuestionnaireQuestionSets();
+        if (!isset($sets[$questionSetKey]))
+        {
+            $questionSetKey = 'weekend_sports_photographer';
+        }
+
+        return isset($sets[$questionSetKey]['intro']) ? $sets[$questionSetKey]['intro'] : '';
+    }
+
+    public static function normalizeQuestionnaireSnapshotQuestions($questions)
+    {
+        $clean = array();
+        $seen = array();
+        $sortOrder = 10;
+        foreach ((array) $questions as $question)
+        {
+            $key = isset($question['key']) ? preg_replace('/[^a-z0-9_]+/', '_', strtolower(trim((string) $question['key']))) : '';
+            $label = isset($question['label']) ? trim((string) $question['label']) : '';
+            if ($key === '' || $label === '' || isset($seen[$key]))
+            {
+                continue;
+            }
+            $type = isset($question['type']) ? trim((string) $question['type']) : 'textarea';
+            if ($type === 'select')
+            {
+                $type = 'single_choice';
+            }
+            if ($type === 'checkbox')
+            {
+                $type = 'multiple_choice';
+            }
+            if (!in_array($type, array('text', 'textarea', 'yes_no', 'single_choice', 'multiple_choice', 'number'), true))
+            {
+                $type = 'textarea';
+            }
+            $choices = isset($question['choices']) && is_array($question['choices']) ? array_values($question['choices']) : array();
+            $clean[] = array(
+                'key' => substr($key, 0, 96),
+                'label' => substr($label, 0, 255),
+                'help' => isset($question['help']) ? substr(trim((string) $question['help']), 0, 1000) : '',
+                'type' => $type,
+                'required' => !empty($question['required']),
+                'choices' => $choices,
+                'sort_order' => isset($question['sort_order']) ? (int) $question['sort_order'] : $sortOrder
+            );
+            $seen[$key] = true;
+            $sortOrder += 10;
+        }
+
+        return $clean;
+    }
+
     public static function validateQuestionnaireAnswers($questions, $answers)
     {
         $clean = array();
@@ -584,7 +668,12 @@ class NESPWorkflow
         foreach ($questions as $question)
         {
             $key = $question['key'];
-            $value = isset($answers[$key]) ? trim((string) $answers[$key]) : '';
+            $value = isset($answers[$key]) ? $answers[$key] : '';
+            if (is_array($value))
+            {
+                $value = implode(', ', array_map('trim', $value));
+            }
+            $value = trim((string) $value);
             if (!empty($question['required']) && $value === '')
             {
                 $errors[] = $key;
@@ -710,7 +799,8 @@ class NESPWorkflow
             'awaiting_craig_activation' => 'Awaiting Craig Activation',
             'active' => 'Active',
             'suspended' => 'Suspended',
-            'deactivated' => 'Deactivated'
+            'deactivated' => 'Deactivated',
+            'permanently_disabled' => 'Permanently Disabled'
         );
     }
 
@@ -1915,6 +2005,10 @@ class NESPWorkflow
             'nesp_vapi_blackout_date',
             'nesp_vapi_scheduling_activity',
             'nesp_vapi_webhook_event',
+            'nesp_question_set',
+            'nesp_question_set_version',
+            'nesp_question_set_question',
+            'nesp_question_set_role_match',
             'nesp_screening_questionnaire',
             'nesp_screening_questionnaire_answer',
             'nesp_screening_questionnaire_activity',
@@ -1965,6 +2059,8 @@ class NESPWorkflow
             array('nesp_vapi_webhook_event', 'provider_event_id'),
             array('nesp_screening_questionnaire', 'token_hash'),
             array('nesp_screening_questionnaire', 'question_set_key'),
+            array('nesp_screening_questionnaire', 'question_set_version_id'),
+            array('nesp_screening_questionnaire', 'question_snapshot_json'),
             array('nesp_screening_questionnaire', 'reviewer_profile_id'),
             array('nesp_screening_questionnaire_answer', 'answer_text'),
             array('nesp_screening_questionnaire_activity', 'activity_key'),
@@ -2718,6 +2814,10 @@ class NESPWorkflow
             'ip.can_view_resume',
             'ip.can_add_notes',
             'ip.can_submit_scorecard',
+            'u.user_name AS username',
+            'u.access_level AS user_access_level',
+            'u.categories AS user_categories',
+            'MAX(ul.date) AS login_last_seen_at',
             'ip.date_modified'
         );
 
@@ -2754,13 +2854,18 @@ class NESPWorkflow
             ? 'LEFT JOIN nesp_interviewer_job_role ijr ON ijr.interviewer_profile_id = ip.interviewer_profile_id AND ijr.is_active = 1'
             : '';
 
-        return $this->_db->getAllAssoc(
+        $rows = $this->_db->getAllAssoc(
             'SELECT
                 ' . implode(",\n                ", $profileSelect) . ',
                 COUNT(DISTINCT cg.grant_id) AS active_grants
                 , ' . $jobRoleSelect . '
              FROM
                 nesp_interviewer_profile ip
+             LEFT JOIN user u
+                ON u.user_id = ip.user_id
+             LEFT JOIN user_login ul
+                ON ul.user_id = ip.user_id
+                AND ul.successful = 1
              LEFT JOIN nesp_interviewer_candidate_grant cg
                 ON cg.interviewer_profile_id = ip.interviewer_profile_id
                 AND cg.date_revoked IS NULL
@@ -2771,6 +2876,37 @@ class NESPWorkflow
                 ip.is_active DESC,
                 ip.display_name ASC'
         );
+
+        foreach ($rows as $index => $row)
+        {
+            $state = isset($row['account_state_key']) ? $row['account_state_key'] : 'profile_created';
+            $rows[$index]['last_login_display'] = empty($row['login_last_seen_at']) ? $row['last_login_at'] : $row['login_last_seen_at'];
+            if ((int) $row['is_active'] === 1 && $state === 'active')
+            {
+                $rows[$index]['state_badge'] = 'Active';
+            }
+            else if ((int) $row['user_id'] > 0 && in_array($state, array('account_prepared', 'temporary_password_set', 'awaiting_craig_activation'), true))
+            {
+                $rows[$index]['state_badge'] = 'Prepared but not active';
+            }
+            else if (in_array($state, array('suspended', 'deactivated', 'permanently_disabled'), true))
+            {
+                $rows[$index]['state_badge'] = 'Suspended/deactivated';
+            }
+            else
+            {
+                $rows[$index]['state_badge'] = 'Profile only';
+            }
+            $rows[$index]['can_prepare_login'] = (int) $row['user_id'] <= 0;
+            $rows[$index]['can_activate_login'] = (int) $row['user_id'] > 0 && in_array($state, array('account_prepared', 'temporary_password_set', 'awaiting_craig_activation'), true);
+            $rows[$index]['can_suspend_login'] = (int) $row['is_active'] === 1 && $state === 'active';
+            $rows[$index]['can_reactivate_login'] = (int) $row['user_id'] > 0 && in_array($state, array('suspended', 'deactivated'), true);
+            $rows[$index]['can_reset_temp_password'] = (int) $row['user_id'] > 0 && $state !== 'permanently_disabled';
+            $rows[$index]['can_disable_login'] = (int) $row['user_id'] > 0 && $state !== 'permanently_disabled';
+            $rows[$index]['can_revoke_grants'] = (int) $row['active_grants'] > 0;
+        }
+
+        return $rows;
     }
 
     public function getInterviewerRoleRules()
@@ -2927,6 +3063,66 @@ class NESPWorkflow
         );
 
         return $grantID;
+    }
+
+    public function getActiveCandidateGrants()
+    {
+        return $this->_db->getAllAssoc(
+            'SELECT
+                cg.grant_id,
+                cg.interviewer_profile_id,
+                cg.candidate_id,
+                cg.joborder_id,
+                cg.date_granted,
+                ip.display_name AS interviewer_name,
+                ip.email AS interviewer_email,
+                CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                c.email1 AS candidate_email,
+                jo.title AS role_title
+             FROM nesp_interviewer_candidate_grant cg
+             INNER JOIN nesp_interviewer_profile ip
+                ON ip.interviewer_profile_id = cg.interviewer_profile_id
+             INNER JOIN candidate c
+                ON c.candidate_id = cg.candidate_id
+             INNER JOIN joborder jo
+                ON jo.joborder_id = cg.joborder_id
+             WHERE cg.date_revoked IS NULL
+             ORDER BY ip.display_name ASC, c.last_name ASC, c.first_name ASC'
+        );
+    }
+
+    public function revokeCandidateGrant($grantID, $actorUserID)
+    {
+        $grantID = (int) $grantID;
+        if ($grantID <= 0)
+        {
+            return false;
+        }
+        $grant = $this->_db->getAssoc(sprintf(
+            'SELECT *
+             FROM nesp_interviewer_candidate_grant
+             WHERE grant_id = %s
+               AND date_revoked IS NULL
+             LIMIT 1',
+            $this->_db->makeQueryInteger($grantID)
+        ));
+        if (empty($grant))
+        {
+            return false;
+        }
+        $this->_db->query(sprintf(
+            'UPDATE nesp_interviewer_candidate_grant
+             SET date_revoked = NOW()
+             WHERE grant_id = %s
+               AND date_revoked IS NULL',
+            $this->_db->makeQueryInteger($grantID)
+        ));
+        $this->logAuditEvent($actorUserID, 'interviewer_candidate_grant_revoked', 'interviewer_candidate_grant', $grantID, array(
+            'interviewer_profile_id' => (int) $grant['interviewer_profile_id'],
+            'candidate_id' => (int) $grant['candidate_id'],
+            'joborder_id' => (int) $grant['joborder_id']
+        ));
+        return $this->_db->getAffectedRows() === 1;
     }
 
     public function getCandidateInterviewPreview($candidateID, $jobOrderID, $interviewID = 0)
@@ -3965,16 +4161,6 @@ class NESPWorkflow
         {
             $sets[] = 'role_key = ' . $this->_db->makeQueryString(trim($settings['role_key']));
         }
-        if (isset($settings['is_active']))
-        {
-            $sets[] = 'is_active = ' . (((int) $settings['is_active']) === 1 ? '1' : '0');
-        }
-        if (isset($settings['user_id']))
-        {
-            $userID = (int) $settings['user_id'];
-            $sets[] = 'user_id = ' . ($userID > 0 ? $this->_db->makeQueryInteger($userID) : 'NULL');
-        }
-
         if (!empty($sets))
         {
             $sets[] = 'date_modified = NOW()';
@@ -3992,27 +4178,6 @@ class NESPWorkflow
         if (isset($settings['approved_joborder_ids']) && is_array($settings['approved_joborder_ids']))
         {
             $this->replaceInterviewerJobRoles($interviewerProfileID, $settings['approved_joborder_ids'], $actorUserID);
-        }
-
-        $accountResult = array();
-        if (!empty($settings['temporary_password']))
-        {
-            $accountResult = $this->createOrResetInterviewerUser(
-                $interviewerProfileID,
-                isset($settings['display_name']) ? $settings['display_name'] : $before['display_name'],
-                isset($settings['email']) ? $settings['email'] : $before['email'],
-                $settings['temporary_password'],
-                !empty($settings['is_active']),
-                $actorUserID
-            );
-            if ($accountResult === false)
-            {
-                return false;
-            }
-        }
-        elseif (isset($settings['is_active']))
-        {
-            $this->syncInterviewerUserAccess($interviewerProfileID, !empty($settings['is_active']), $actorUserID);
         }
 
         $after = $this->_db->getAssoc(sprintf(
@@ -4035,6 +4200,68 @@ class NESPWorkflow
             'ok' => true,
             'temporary_login_message' => isset($accountResult['temporary_login_message']) ? $accountResult['temporary_login_message'] : ''
         );
+    }
+
+    public function interviewerLoginLifecycleAction($interviewerProfileID, $action, $temporaryPassword, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $profile = $this->getInterviewerLoginProfile($interviewerProfileID);
+        if (empty($profile))
+        {
+            return array('ok' => false, 'error' => 'Choose an interviewer profile.');
+        }
+
+        switch ($action)
+        {
+            case 'prepareInterviewerLogin':
+                if ((int) $profile['user_id'] > 0)
+                {
+                    return array('ok' => false, 'error' => 'This interviewer already has a prepared login.');
+                }
+                return $this->prepareInterviewerLoginWithPassword($profile, $temporaryPassword, false, $actorUserID, 'interviewer_login_prepared');
+
+            case 'resetInterviewerTempPassword':
+                if ((int) $profile['user_id'] <= 0)
+                {
+                    return array('ok' => false, 'error' => 'Prepare a login before resetting a temporary password.');
+                }
+                $validation = $this->validateInterviewerLinkedUser($profile, false);
+                if (empty($validation['ok']))
+                {
+                    return $validation;
+                }
+                return $this->prepareInterviewerLoginWithPassword($profile, $temporaryPassword, false, $actorUserID, 'interviewer_temp_password_reset');
+
+            case 'activateInterviewerLogin':
+                if (!in_array($profile['account_state_key'], array('account_prepared', 'temporary_password_set', 'awaiting_craig_activation'), true))
+                {
+                    return array('ok' => false, 'error' => 'Only prepared interviewer logins can be activated.');
+                }
+                return $this->setInterviewerLoginActiveState($profile, true, 'active', $actorUserID, 'interviewer_login_activated');
+
+            case 'reactivateInterviewerLogin':
+                if (!in_array($profile['account_state_key'], array('suspended', 'deactivated'), true))
+                {
+                    return array('ok' => false, 'error' => 'Only suspended or deactivated interviewer logins can be reactivated.');
+                }
+                return $this->setInterviewerLoginActiveState($profile, true, 'active', $actorUserID, 'interviewer_login_reactivated');
+
+            case 'suspendInterviewerLogin':
+                if ((int) $profile['is_active'] !== 1)
+                {
+                    return array('ok' => false, 'error' => 'Only active interviewer logins can be suspended.');
+                }
+                return $this->setInterviewerLoginActiveState($profile, false, 'suspended', $actorUserID, 'interviewer_login_suspended');
+
+            case 'disableInterviewerLogin':
+                if ($profile['account_state_key'] === 'permanently_disabled')
+                {
+                    return array('ok' => false, 'error' => 'This interviewer login is already permanently disabled.');
+                }
+                return $this->setInterviewerLoginActiveState($profile, false, 'permanently_disabled', $actorUserID, 'interviewer_login_permanently_disabled');
+        }
+
+        return array('ok' => false, 'error' => 'Unknown interviewer login action.');
     }
 
     public function setInterviewerAvailabilityStatus($interviewerProfileID, $statusKey, $reason, $closedUntil, $actorUserID)
@@ -5168,12 +5395,630 @@ class NESPWorkflow
         }
 
         $row['candidate_name'] = trim($row['first_name'] . ' ' . $row['last_name']);
-        $set = self::getQuestionnaireSetForRole($row['title']);
-        $row['question_set_key'] = $set['key'];
-        $row['question_set_label'] = $set['label'];
-        $row['questions'] = self::getQuestionnaireQuestionsForSet($set['key']);
+        $version = $this->getPublishedQuestionSetVersionForRole($row['title'], $jobOrderID);
+        $row['question_set_key'] = $version['set_key'];
+        $row['question_set_label'] = $version['display_name'];
+        $row['question_set_intro'] = isset($version['description']) && trim((string) $version['description']) !== ''
+            ? (string) $version['description']
+            : self::getQuestionnaireIntroForSet($version['set_key']);
+        $row['question_set_version'] = (int) $version['version_number'];
+        $row['question_set_version_id'] = (int) $version['question_set_version_id'];
+        $row['questions'] = $version['questions'];
+        $row['question_snapshot_json'] = json_encode($row['questions']);
         $row['estimated_minutes'] = '5-10 minutes';
         return $row;
+    }
+
+    public function ensureDefaultQuestionSetsSeeded($actorUserID = null)
+    {
+        if (!$this->isTableInstalled('nesp_question_set')
+            || !$this->isTableInstalled('nesp_question_set_version')
+            || !$this->isTableInstalled('nesp_question_set_question')
+            || !$this->isTableInstalled('nesp_question_set_role_match'))
+        {
+            return false;
+        }
+
+        $defaults = self::getQuestionnaireQuestionSets();
+        foreach ($defaults as $setKey => $set)
+        {
+            $setRow = $this->_db->getAssoc(sprintf(
+                'SELECT question_set_id FROM nesp_question_set WHERE set_key = %s LIMIT 1',
+                $this->_db->makeQueryString($setKey)
+            ));
+            if (empty($setRow))
+            {
+                $this->_db->query(sprintf(
+                    'INSERT INTO nesp_question_set
+                        (set_key, display_name, description, status_key, created_by_user_id, date_created, date_modified)
+                     VALUES
+                        (%s, %s, %s, "active", %s, NOW(), NOW())',
+                    $this->_db->makeQueryString($setKey),
+                    $this->_db->makeQueryString($set['label']),
+                    $this->_db->makeQueryString(isset($set['intro']) ? $set['intro'] : 'Seeded default NESP question set.'),
+                    $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+                ));
+                $questionSetID = (int) $this->_db->getLastInsertID();
+            }
+            else
+            {
+                $questionSetID = (int) $setRow['question_set_id'];
+            }
+
+            $versionRow = $this->_db->getAssoc(sprintf(
+                'SELECT question_set_version_id
+                 FROM nesp_question_set_version
+                 WHERE question_set_id = %s
+                   AND version_number = 1
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($questionSetID)
+            ));
+            if (empty($versionRow))
+            {
+                $questions = self::normalizeQuestionnaireSnapshotQuestions(self::getQuestionnaireQuestionsForSet($setKey));
+                $snapshotJSON = json_encode($questions);
+                $roleMatches = array();
+                $priority = 10;
+                foreach ((array) $set['match'] as $matchText)
+                {
+                    $roleMatches[] = array('match_text' => $matchText, 'joborder_id' => null, 'priority' => $priority, 'is_active' => 1);
+                    $priority += 10;
+                }
+                $this->_db->query(sprintf(
+                    'INSERT INTO nesp_question_set_version
+                        (question_set_id, version_number, status_key, display_name, description, role_match_snapshot_json, snapshot_json, created_by_user_id, published_by_user_id, published_at, date_created, date_modified)
+                     VALUES
+                        (%s, 1, "published", %s, %s, %s, %s, %s, %s, UTC_TIMESTAMP(), NOW(), NOW())',
+                    $this->_db->makeQueryInteger($questionSetID),
+                    $this->_db->makeQueryString($set['label']),
+                    $this->_db->makeQueryString(isset($set['intro']) ? $set['intro'] : ''),
+                    $this->_db->makeQueryString(json_encode($roleMatches)),
+                    $this->_db->makeQueryString($snapshotJSON),
+                    $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID),
+                    $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+                ));
+                $versionID = (int) $this->_db->getLastInsertID();
+                $this->replaceQuestionSetVersionQuestions($versionID, $questions);
+                $this->_db->query(sprintf(
+                    'UPDATE nesp_question_set
+                     SET current_version_id = %s,
+                         date_modified = NOW()
+                     WHERE question_set_id = %s',
+                    $this->_db->makeQueryInteger($versionID),
+                    $this->_db->makeQueryInteger($questionSetID)
+                ));
+            }
+
+            $priority = 10;
+            foreach ((array) $set['match'] as $matchText)
+            {
+                $matchText = trim((string) $matchText);
+                if ($matchText === '')
+                {
+                    continue;
+                }
+                $existingMatch = $this->_db->getAssoc(sprintf(
+                    'SELECT question_set_role_match_id
+                     FROM nesp_question_set_role_match
+                     WHERE question_set_id = %s
+                       AND match_text = %s
+                       AND joborder_id IS NULL
+                     LIMIT 1',
+                    $this->_db->makeQueryInteger($questionSetID),
+                    $this->_db->makeQueryString($matchText)
+                ));
+                if (empty($existingMatch))
+                {
+                    $this->_db->query(sprintf(
+                        'INSERT INTO nesp_question_set_role_match
+                            (question_set_id, match_text, joborder_id, priority, is_active, date_created, date_modified)
+                         VALUES
+                            (%s, %s, NULL, %s, 1, NOW(), NOW())',
+                        $this->_db->makeQueryInteger($questionSetID),
+                        $this->_db->makeQueryString($matchText),
+                        $this->_db->makeQueryInteger($priority)
+                    ));
+                }
+                $priority += 10;
+            }
+        }
+
+        return true;
+    }
+
+    public function getQuestionSetAdminRows()
+    {
+        $this->ensureDefaultQuestionSetsSeeded();
+        if (!$this->isTableInstalled('nesp_question_set'))
+        {
+            return array();
+        }
+
+        $rows = $this->_db->getAllAssoc(
+            'SELECT
+                qs.question_set_id,
+                qs.set_key,
+                qs.display_name,
+                qs.description,
+                qs.status_key,
+                qs.current_version_id,
+                qsv.version_number AS current_version_number,
+                qsv.status_key AS current_version_status,
+                COUNT(DISTINCT draft.question_set_version_id) AS draft_count,
+                COUNT(DISTINCT issued.screening_questionnaire_id) AS issued_count,
+                GROUP_CONCAT(DISTINCT
+                    CASE
+                        WHEN rm.joborder_id IS NOT NULL THEN CONCAT("job ", rm.joborder_id)
+                        ELSE rm.match_text
+                    END
+                    ORDER BY rm.priority ASC SEPARATOR ", "
+                ) AS role_matches
+             FROM nesp_question_set qs
+             LEFT JOIN nesp_question_set_version qsv
+                ON qsv.question_set_version_id = qs.current_version_id
+             LEFT JOIN nesp_question_set_version draft
+                ON draft.question_set_id = qs.question_set_id
+               AND draft.status_key = "draft"
+             LEFT JOIN nesp_question_set_role_match rm
+                ON rm.question_set_id = qs.question_set_id
+               AND rm.is_active = 1
+             LEFT JOIN nesp_screening_questionnaire issued
+                ON issued.question_set_version_id = qs.current_version_id
+             GROUP BY qs.question_set_id
+             ORDER BY qs.status_key ASC, qs.display_name ASC'
+        );
+
+        return $rows;
+    }
+
+    public function getQuestionSetVersionDetail($versionID)
+    {
+        $versionID = (int) $versionID;
+        if ($versionID <= 0 || !$this->isTableInstalled('nesp_question_set_version'))
+        {
+            return array();
+        }
+        $detail = $this->_db->getAssoc(sprintf(
+            'SELECT qsv.*,
+                    qs.set_key,
+                    COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
+                    COALESCE(qsv.description, qs.description) AS description,
+                    qs.status_key AS set_status_key
+             FROM nesp_question_set_version qsv
+             INNER JOIN nesp_question_set qs
+                ON qs.question_set_id = qsv.question_set_id
+             WHERE qsv.question_set_version_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($versionID)
+        ));
+        if (empty($detail))
+        {
+            return array();
+        }
+        $detail['questions'] = $this->getQuestionsForQuestionSetVersion($detail);
+        $draftMatches = !empty($detail['role_match_snapshot_json']) ? json_decode((string) $detail['role_match_snapshot_json'], true) : null;
+        $detail['role_matches'] = is_array($draftMatches) ? $this->normalizeQuestionSetRoleMatches($draftMatches) : $this->getQuestionSetRoleMatches((int) $detail['question_set_id']);
+        return $detail;
+    }
+
+    public function createQuestionSetDraftFromVersion($questionSetID, $sourceVersionID, $actorUserID)
+    {
+        $this->ensureDefaultQuestionSetsSeeded($actorUserID);
+        $questionSetID = (int) $questionSetID;
+        $sourceVersionID = (int) $sourceVersionID;
+        if ($sourceVersionID <= 0 && $questionSetID > 0)
+        {
+            $source = $this->_db->getAssoc(sprintf(
+                'SELECT current_version_id FROM nesp_question_set WHERE question_set_id = %s LIMIT 1',
+                $this->_db->makeQueryInteger($questionSetID)
+            ));
+            $sourceVersionID = empty($source) ? 0 : (int) $source['current_version_id'];
+        }
+        $sourceDetail = $this->getQuestionSetVersionDetail($sourceVersionID);
+        if (empty($sourceDetail))
+        {
+            return false;
+        }
+        $existingDraft = $this->_db->getAssoc(sprintf(
+            'SELECT question_set_version_id
+             FROM nesp_question_set_version
+             WHERE question_set_id = %s
+               AND status_key = "draft"
+             ORDER BY question_set_version_id DESC
+             LIMIT 1',
+            $this->_db->makeQueryInteger((int) $sourceDetail['question_set_id'])
+        ));
+        if (!empty($existingDraft))
+        {
+            return (int) $existingDraft['question_set_version_id'];
+        }
+
+        $nextVersionRow = $this->_db->getColumn(sprintf(
+            'SELECT COALESCE(MAX(version_number), 0) + 1
+             FROM nesp_question_set_version
+             WHERE question_set_id = %s',
+            $this->_db->makeQueryInteger((int) $sourceDetail['question_set_id'])
+        ), 0, 0);
+        $nextVersion = is_array($nextVersionRow) && isset($nextVersionRow[0])
+            ? (int) $nextVersionRow[0]
+            : 1;
+        $questions = self::normalizeQuestionnaireSnapshotQuestions($sourceDetail['questions']);
+        $roleMatches = $this->normalizeQuestionSetRoleMatches($sourceDetail['role_matches']);
+        $this->_db->query(sprintf(
+            'INSERT INTO nesp_question_set_version
+                (question_set_id, version_number, status_key, display_name, description, role_match_snapshot_json, snapshot_json, draft_source_version_id, created_by_user_id, date_created, date_modified)
+             VALUES
+                (%s, %s, "draft", %s, %s, %s, %s, %s, %s, NOW(), NOW())',
+            $this->_db->makeQueryInteger((int) $sourceDetail['question_set_id']),
+            $this->_db->makeQueryInteger($nextVersion),
+            $this->_db->makeQueryString((string) $sourceDetail['display_name']),
+            $this->_db->makeQueryString((string) $sourceDetail['description']),
+            $this->_db->makeQueryString(json_encode($roleMatches)),
+            $this->_db->makeQueryString(json_encode($questions)),
+            $this->_db->makeQueryInteger($sourceVersionID),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+        ));
+        $draftID = (int) $this->_db->getLastInsertID();
+        $this->replaceQuestionSetVersionQuestions($draftID, $questions);
+        $this->logAuditEvent($actorUserID, 'question_set_draft_created', 'question_set_version', $draftID, array('source_version_id' => $sourceVersionID));
+        return $draftID;
+    }
+
+    public function saveQuestionSetDraft($versionID, $input, $actorUserID)
+    {
+        $detail = $this->getQuestionSetVersionDetail($versionID);
+        if (empty($detail) || $detail['status_key'] !== 'draft')
+        {
+            return array('ok' => false, 'error' => 'Only draft question-set versions can be edited.');
+        }
+
+        $displayName = isset($input['displayName']) ? trim((string) $input['displayName']) : $detail['display_name'];
+        if ($displayName === '')
+        {
+            return array('ok' => false, 'error' => 'Question set name is required.');
+        }
+        $description = isset($input['description']) ? trim((string) $input['description']) : '';
+        $questions = $this->normalizeQuestionSetEditorQuestions($input);
+        if (empty($questions))
+        {
+            return array('ok' => false, 'error' => 'At least one question is required.');
+        }
+
+        $roleMatches = $this->normalizeQuestionSetRoleMatches(isset($input['roleMatches']) ? $input['roleMatches'] : array());
+        $this->_db->query(sprintf(
+            'UPDATE nesp_question_set_version
+             SET display_name = %s,
+                 description = %s,
+                 role_match_snapshot_json = %s,
+                 snapshot_json = %s,
+                 date_modified = NOW()
+             WHERE question_set_version_id = %s
+               AND status_key = "draft"',
+            $this->_db->makeQueryString($displayName),
+            $this->_db->makeQueryString($description),
+            $this->_db->makeQueryString(json_encode($roleMatches)),
+            $this->_db->makeQueryString(json_encode($questions)),
+            $this->_db->makeQueryInteger((int) $versionID)
+        ));
+        $this->replaceQuestionSetVersionQuestions((int) $versionID, $questions);
+        $this->logAuditEvent($actorUserID, 'question_set_draft_saved', 'question_set_version', (int) $versionID, array('question_count' => count($questions)));
+        return array('ok' => true, 'version_id' => (int) $versionID);
+    }
+
+    public function publishQuestionSetDraft($versionID, $actorUserID)
+    {
+        $detail = $this->getQuestionSetVersionDetail($versionID);
+        if (empty($detail) || $detail['status_key'] !== 'draft')
+        {
+            return false;
+        }
+        $questions = self::normalizeQuestionnaireSnapshotQuestions($detail['questions']);
+        if (empty($questions))
+        {
+            return false;
+        }
+        $this->_db->query(sprintf(
+            'UPDATE nesp_question_set_version
+             SET status_key = "published",
+                 snapshot_json = %s,
+                 published_by_user_id = %s,
+                 published_at = UTC_TIMESTAMP(),
+                 date_modified = NOW()
+             WHERE question_set_version_id = %s
+               AND status_key = "draft"',
+            $this->_db->makeQueryString(json_encode($questions)),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID),
+            $this->_db->makeQueryInteger((int) $versionID)
+        ));
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            return false;
+        }
+        $this->_db->query(sprintf(
+            'UPDATE nesp_question_set
+             SET display_name = %s,
+                 description = %s,
+                 current_version_id = %s,
+                 status_key = "active",
+                 date_modified = NOW()
+             WHERE question_set_id = %s',
+            $this->_db->makeQueryString((string) $detail['display_name']),
+            $this->_db->makeQueryString((string) $detail['description']),
+            $this->_db->makeQueryInteger((int) $versionID),
+            $this->_db->makeQueryInteger((int) $detail['question_set_id'])
+        ));
+        $this->replaceQuestionSetRoleMatches((int) $detail['question_set_id'], $detail['role_matches']);
+        $this->logAuditEvent($actorUserID, 'question_set_version_published', 'question_set_version', (int) $versionID, array('version_number' => (int) $detail['version_number']));
+        return true;
+    }
+
+    public function archiveQuestionSet($questionSetID, $actorUserID)
+    {
+        $questionSetID = (int) $questionSetID;
+        if ($questionSetID <= 0)
+        {
+            return false;
+        }
+        $this->_db->query(sprintf(
+            'UPDATE nesp_question_set
+             SET status_key = "archived",
+                 date_modified = NOW()
+             WHERE question_set_id = %s',
+            $this->_db->makeQueryInteger($questionSetID)
+        ));
+        $this->logAuditEvent($actorUserID, 'question_set_archived', 'question_set', $questionSetID, array());
+        return $this->_db->getAffectedRows() === 1;
+    }
+
+    private function getPublishedQuestionSetVersionForRole($roleTitle, $jobOrderID)
+    {
+        $this->ensureDefaultQuestionSetsSeeded();
+        if ($this->isTableInstalled('nesp_question_set_version'))
+        {
+            $matchSQL = sprintf(
+                'SELECT qsv.*,
+                        qs.set_key,
+                        COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
+                        COALESCE(qsv.description, qs.description) AS description
+                 FROM nesp_question_set_role_match rm
+                 INNER JOIN nesp_question_set qs
+                    ON qs.question_set_id = rm.question_set_id
+                   AND qs.status_key = "active"
+                 INNER JOIN nesp_question_set_version qsv
+                    ON qsv.question_set_version_id = qs.current_version_id
+                   AND qsv.status_key = "published"
+                 WHERE rm.is_active = 1
+                   AND (rm.joborder_id = %s OR (rm.joborder_id IS NULL AND %s LIKE CONCAT("%%", rm.match_text, "%%")))
+                 ORDER BY CASE WHEN rm.joborder_id = %s THEN 0 ELSE 1 END, rm.priority ASC
+                 LIMIT 1',
+                $this->_db->makeQueryInteger((int) $jobOrderID),
+                $this->_db->makeQueryString(strtolower((string) $roleTitle)),
+                $this->_db->makeQueryInteger((int) $jobOrderID)
+            );
+            $row = $this->_db->getAssoc($matchSQL);
+            if (empty($row))
+            {
+                $row = $this->_db->getAssoc(
+                    'SELECT qsv.*,
+                            qs.set_key,
+                            COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
+                            COALESCE(qsv.description, qs.description) AS description
+                     FROM nesp_question_set qs
+                     INNER JOIN nesp_question_set_version qsv
+                        ON qsv.question_set_version_id = qs.current_version_id
+                       AND qsv.status_key = "published"
+                     WHERE qs.set_key = "weekend_sports_photographer"
+                       AND qs.status_key = "active"
+                     LIMIT 1'
+                );
+            }
+            if (!empty($row))
+            {
+                $row['questions'] = $this->getQuestionsForQuestionSetVersion($row);
+                return $row;
+            }
+        }
+
+        $fallback = self::getQuestionnaireSetForRole($roleTitle);
+        return array(
+            'question_set_version_id' => 0,
+            'set_key' => $fallback['key'],
+            'display_name' => $fallback['label'],
+            'description' => self::getQuestionnaireIntroForSet($fallback['key']),
+            'version_number' => 1,
+            'questions' => self::getQuestionnaireQuestionsForSet($fallback['key'])
+        );
+    }
+
+    private function getQuestionsForQuestionSetVersion($versionRow)
+    {
+        if (!empty($versionRow['snapshot_json']))
+        {
+            $decoded = json_decode($versionRow['snapshot_json'], true);
+            if (is_array($decoded))
+            {
+                return self::normalizeQuestionnaireSnapshotQuestions($decoded);
+            }
+        }
+        if (!empty($versionRow['question_set_version_id']) && $this->isTableInstalled('nesp_question_set_question'))
+        {
+            $rows = $this->_db->getAllAssoc(sprintf(
+                'SELECT question_key, question_label, help_text, question_type, is_required, choices_json, sort_order
+                 FROM nesp_question_set_question
+                 WHERE question_set_version_id = %s
+                 ORDER BY sort_order ASC, question_set_question_id ASC',
+                $this->_db->makeQueryInteger((int) $versionRow['question_set_version_id'])
+            ));
+            $questions = array();
+            foreach ($rows as $row)
+            {
+                $choices = json_decode((string) $row['choices_json'], true);
+                $questions[] = array(
+                    'key' => $row['question_key'],
+                    'label' => $row['question_label'],
+                    'help' => $row['help_text'],
+                    'type' => $row['question_type'],
+                    'required' => ((int) $row['is_required']) === 1,
+                    'choices' => is_array($choices) ? $choices : array(),
+                    'sort_order' => (int) $row['sort_order']
+                );
+            }
+            return self::normalizeQuestionnaireSnapshotQuestions($questions);
+        }
+        return self::getQuestionnaireQuestionsForSet(isset($versionRow['set_key']) ? $versionRow['set_key'] : '');
+    }
+
+    private function questionnaireQuestionsForIssuedRow($row)
+    {
+        if (!empty($row['question_snapshot_json']))
+        {
+            $decoded = json_decode($row['question_snapshot_json'], true);
+            if (is_array($decoded))
+            {
+                return self::normalizeQuestionnaireSnapshotQuestions($decoded);
+            }
+        }
+        if (!empty($row['question_set_version_id']))
+        {
+            $detail = $this->getQuestionSetVersionDetail((int) $row['question_set_version_id']);
+            if (!empty($detail))
+            {
+                return $detail['questions'];
+            }
+        }
+        return self::getQuestionnaireQuestionsForSet($row['question_set_key']);
+    }
+
+    private function replaceQuestionSetVersionQuestions($versionID, $questions)
+    {
+        $versionID = (int) $versionID;
+        $this->_db->query(sprintf(
+            'DELETE FROM nesp_question_set_question WHERE question_set_version_id = %s',
+            $this->_db->makeQueryInteger($versionID)
+        ));
+        foreach (self::normalizeQuestionnaireSnapshotQuestions($questions) as $question)
+        {
+            $this->_db->query(sprintf(
+                'INSERT INTO nesp_question_set_question
+                    (question_set_version_id, question_key, question_label, help_text, question_type, is_required, choices_json, sort_order, date_created, date_modified)
+                 VALUES
+                    (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())',
+                $this->_db->makeQueryInteger($versionID),
+                $this->_db->makeQueryString($question['key']),
+                $this->_db->makeQueryString($question['label']),
+                $this->_db->makeQueryString($question['help']),
+                $this->_db->makeQueryString($question['type']),
+                !empty($question['required']) ? '1' : '0',
+                $this->_db->makeQueryString(json_encode($question['choices'])),
+                $this->_db->makeQueryInteger((int) $question['sort_order'])
+            ));
+        }
+    }
+
+    private function normalizeQuestionSetEditorQuestions($input)
+    {
+        $rows = array();
+        $keys = isset($input['questionKey']) && is_array($input['questionKey']) ? $input['questionKey'] : array();
+        foreach ($keys as $index => $key)
+        {
+            $choicesText = isset($input['questionChoices'][$index]) ? trim((string) $input['questionChoices'][$index]) : '';
+            $choices = array();
+            if ($choicesText !== '')
+            {
+                foreach (preg_split('/\r\n|\n|\r/', $choicesText) as $choice)
+                {
+                    $choice = trim($choice);
+                    if ($choice !== '')
+                    {
+                        $choices[] = $choice;
+                    }
+                }
+            }
+            $rows[] = array(
+                'key' => $key,
+                'label' => isset($input['questionLabel'][$index]) ? $input['questionLabel'][$index] : '',
+                'help' => isset($input['questionHelp'][$index]) ? $input['questionHelp'][$index] : '',
+                'type' => isset($input['questionType'][$index]) ? $input['questionType'][$index] : 'textarea',
+                'required' => isset($input['questionRequired'][$index]) && (string) $input['questionRequired'][$index] === '1',
+                'choices' => $choices,
+                'sort_order' => isset($input['questionSortOrder'][$index]) ? (int) $input['questionSortOrder'][$index] : (($index + 1) * 10)
+            );
+        }
+        return self::normalizeQuestionnaireSnapshotQuestions($rows);
+    }
+
+    private function getQuestionSetRoleMatches($questionSetID)
+    {
+        if (!$this->isTableInstalled('nesp_question_set_role_match'))
+        {
+            return array();
+        }
+        return $this->_db->getAllAssoc(sprintf(
+            'SELECT question_set_role_match_id, match_text, joborder_id, priority, is_active
+             FROM nesp_question_set_role_match
+             WHERE question_set_id = %s
+             ORDER BY is_active DESC, priority ASC, question_set_role_match_id ASC',
+            $this->_db->makeQueryInteger((int) $questionSetID)
+        ));
+    }
+
+    private function normalizeQuestionSetRoleMatches($matches)
+    {
+        $clean = array();
+        $priority = 10;
+        foreach ((array) $matches as $match)
+        {
+            $matchText = isset($match['match_text']) ? trim((string) $match['match_text']) : '';
+            $jobOrderID = isset($match['joborder_id']) ? (int) $match['joborder_id'] : 0;
+            if ($matchText === '' && $jobOrderID <= 0)
+            {
+                continue;
+            }
+            $clean[] = array(
+                'match_text' => substr($matchText, 0, 160),
+                'joborder_id' => $jobOrderID > 0 ? $jobOrderID : null,
+                'priority' => isset($match['priority']) ? (int) $match['priority'] : $priority,
+                'is_active' => isset($match['is_active']) ? (int) $match['is_active'] : 1
+            );
+            $priority += 10;
+        }
+        return $clean;
+    }
+
+    private function replaceQuestionSetRoleMatches($questionSetID, $matches)
+    {
+        if (!$this->isTableInstalled('nesp_question_set_role_match'))
+        {
+            return;
+        }
+        $this->_db->query(sprintf(
+            'UPDATE nesp_question_set_role_match
+             SET is_active = 0,
+                 date_modified = NOW()
+             WHERE question_set_id = %s',
+            $this->_db->makeQueryInteger((int) $questionSetID)
+        ));
+        $priority = 10;
+        foreach ((array) $matches as $match)
+        {
+            $matchText = isset($match['match_text']) ? trim((string) $match['match_text']) : '';
+            $jobOrderID = isset($match['joborder_id']) ? (int) $match['joborder_id'] : 0;
+            if ($matchText === '' && $jobOrderID <= 0)
+            {
+                continue;
+            }
+            $this->_db->query(sprintf(
+                'INSERT INTO nesp_question_set_role_match
+                    (question_set_id, match_text, joborder_id, priority, is_active, date_created, date_modified)
+                 VALUES
+                    (%s, %s, %s, %s, 1, NOW(), NOW())',
+                $this->_db->makeQueryInteger((int) $questionSetID),
+                $this->_db->makeQueryString($matchText),
+                $jobOrderID > 0 ? $this->_db->makeQueryInteger($jobOrderID) : 'NULL',
+                $this->_db->makeQueryInteger($priority)
+            ));
+            $priority += 10;
+        }
     }
 
     public function requestQuestionnaire($candidateID, $jobOrderID, $actorUserID)
@@ -5190,11 +6035,14 @@ class NESPWorkflow
                  FROM nesp_screening_questionnaire
                  WHERE candidate_id = %s
                    AND joborder_id = %s
-                   AND status_key IN ("link_ready", "waiting", "in_progress", "completed", "human_follow_up_requested")
+                   AND status_key IN ("link_ready", "waiting", "in_progress", "human_follow_up_requested")
+                   AND (%s = 0 OR question_set_version_id = %s)
                  ORDER BY screening_questionnaire_id DESC
                  LIMIT 1',
                 $this->_db->makeQueryInteger($candidateID),
-                $this->_db->makeQueryInteger($jobOrderID)
+                $this->_db->makeQueryInteger($jobOrderID),
+                $this->_db->makeQueryInteger((int) $preview['question_set_version_id']),
+                $this->_db->makeQueryInteger((int) $preview['question_set_version_id'])
             )
         );
         if (!empty($existing))
@@ -5211,24 +6059,47 @@ class NESPWorkflow
         $link = self::getQuestionnaireLink($token);
         $invitation = self::buildQuestionnaireInvitationCopy($preview['first_name'], $preview['title'], $link);
 
-        $this->_db->query(
-            sprintf(
-                'INSERT INTO nesp_screening_questionnaire
-                    (candidate_id, joborder_id, status_key, question_set_key, question_set_version, token_hash, token_expires_at, link_created_at, requested_by_user_id, review_status_key, date_created, date_modified)
-                 VALUES
-                    (%s, %s, "link_ready", %s, 1, %s, DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s HOUR), UTC_TIMESTAMP(), %s, "not_started", NOW(), NOW())',
-                $this->_db->makeQueryInteger($candidateID),
-                $this->_db->makeQueryInteger($jobOrderID),
-                $this->_db->makeQueryString($preview['question_set_key']),
-                $this->_db->makeQueryString($tokenHash),
-                $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()),
-                $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
-            )
+        $columns = array('candidate_id', 'joborder_id', 'status_key', 'question_set_key', 'question_set_version');
+        $values = array(
+            $this->_db->makeQueryInteger($candidateID),
+            $this->_db->makeQueryInteger($jobOrderID),
+            '"link_ready"',
+            $this->_db->makeQueryString($preview['question_set_key']),
+            $this->_db->makeQueryInteger((int) $preview['question_set_version'])
         );
+        if ($this->isColumnInstalled('nesp_screening_questionnaire', 'question_set_version_id'))
+        {
+            $columns[] = 'question_set_version_id';
+            $values[] = ((int) $preview['question_set_version_id']) > 0 ? $this->_db->makeQueryInteger((int) $preview['question_set_version_id']) : 'NULL';
+        }
+        if ($this->isColumnInstalled('nesp_screening_questionnaire', 'question_snapshot_json'))
+        {
+            $columns[] = 'question_snapshot_json';
+            $values[] = $this->_db->makeQueryString(json_encode(self::normalizeQuestionnaireSnapshotQuestions($preview['questions'])));
+        }
+        $columns = array_merge($columns, array('token_hash', 'token_expires_at', 'link_created_at', 'requested_by_user_id', 'review_status_key', 'date_created', 'date_modified'));
+        $values = array_merge($values, array(
+            $this->_db->makeQueryString($tokenHash),
+            'DATE_ADD(UTC_TIMESTAMP(), INTERVAL ' . $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()) . ' HOUR)',
+            'UTC_TIMESTAMP()',
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID),
+            '"not_started"',
+            'NOW()',
+            'NOW()'
+        ));
+
+        $this->_db->query(sprintf(
+            'INSERT INTO nesp_screening_questionnaire
+                (%s)
+             VALUES
+                (%s)',
+            implode(', ', $columns),
+            implode(', ', $values)
+        ));
 
         $questionnaireID = (int) $this->_db->getLastInsertID();
         $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'link_created', array('expires_at_hours' => self::getQuestionnaireDefaultExpirationHours()));
-        $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_created', 'screening_questionnaire', $questionnaireID, array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID, 'question_set_key' => $preview['question_set_key']));
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_created', 'screening_questionnaire', $questionnaireID, array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID, 'question_set_key' => $preview['question_set_key'], 'question_set_version_id' => (int) $preview['question_set_version_id']));
 
         return array(
             'questionnaire_id' => $questionnaireID,
@@ -5280,7 +6151,8 @@ class NESPWorkflow
             'ready' => array(),
             'waiting' => array(),
             'completed' => array(),
-            'human_follow_up' => array()
+            'human_follow_up' => array(),
+            'revoked_expired' => array()
         );
         foreach ($rows as $row)
         {
@@ -5299,6 +6171,10 @@ class NESPWorkflow
             if ($row['status_key'] === 'human_follow_up_requested')
             {
                 $queues['human_follow_up'][] = $row;
+            }
+            if ($row['status_key'] === 'revoked' || $row['status_key'] === 'expired')
+            {
+                $queues['revoked_expired'][] = $row;
             }
         }
         return $queues;
@@ -5336,7 +6212,7 @@ class NESPWorkflow
         }
 
         $detail = $this->decorateQuestionnaireRow($detail);
-        $detail['questions'] = self::getQuestionnaireQuestionsForSet($detail['question_set_key']);
+        $detail['questions'] = $this->questionnaireQuestionsForIssuedRow($detail);
         $answers = $this->_db->getAllAssoc(
             sprintf(
                 'SELECT question_key, question_label, answer_text, sort_order
@@ -5483,7 +6359,7 @@ class NESPWorkflow
         );
         $this->logQuestionnaireActivity($row['screening_questionnaire_id'], $tokenHash, 'page_viewed', array());
         $row = $this->decorateQuestionnaireRow($row);
-        $row['questions'] = self::getQuestionnaireQuestionsForSet($row['question_set_key']);
+        $row['questions'] = $this->questionnaireQuestionsForIssuedRow($row);
         return array('ok' => true, 'state' => 'valid', 'questionnaire' => $row);
     }
 
@@ -5497,7 +6373,7 @@ class NESPWorkflow
 
         $questionnaire = $page['questionnaire'];
         $tokenHash = self::questionnaireTokenHash($token);
-        $questions = self::getQuestionnaireQuestionsForSet($questionnaire['question_set_key']);
+        $questions = $this->questionnaireQuestionsForIssuedRow($questionnaire);
         $validation = self::validateQuestionnaireAnswers($questions, $answers);
         if (empty($validation['ok']))
         {
@@ -6761,6 +7637,30 @@ class NESPWorkflow
         }
         $sets = self::getQuestionnaireQuestionSets();
         $row['question_set_label'] = isset($sets[$row['question_set_key']]) ? $sets[$row['question_set_key']]['label'] : $set['label'];
+        if (!empty($row['question_set_version_id']) && $this->isTableInstalled('nesp_question_set_version'))
+        {
+            $versionLabel = $this->_db->getAssoc(sprintf(
+                'SELECT COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
+                        COALESCE(qsv.description, qs.description) AS description,
+                        qsv.version_number
+                 FROM nesp_question_set_version qsv
+                 INNER JOIN nesp_question_set qs
+                    ON qs.question_set_id = qsv.question_set_id
+                 WHERE qsv.question_set_version_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger((int) $row['question_set_version_id'])
+            ));
+            if (!empty($versionLabel))
+            {
+                $row['question_set_label'] = $versionLabel['display_name'];
+                $row['question_set_version'] = (int) $versionLabel['version_number'];
+                $row['question_set_intro'] = isset($versionLabel['description']) ? (string) $versionLabel['description'] : '';
+            }
+        }
+        if (empty($row['question_set_intro']))
+        {
+            $row['question_set_intro'] = self::getQuestionnaireIntroForSet($row['question_set_key']);
+        }
         $row['candidate_name'] = isset($row['candidate_name']) ? trim($row['candidate_name']) : '';
         $row['reviewer_name'] = empty($row['reviewer_name']) ? 'Unassigned' : $row['reviewer_name'];
         $row['has_active_link'] = !empty($row['token_hash'])
@@ -7572,8 +8472,149 @@ class NESPWorkflow
         return array(
             'user_id' => $userID,
             'username' => $username,
-            'temporary_login_message' => $this->buildTemporaryLoginMessage($displayName, $username, $active)
+            'temporary_login_message' => $this->buildTemporaryLoginMessage($displayName, $username, $active),
+            'one_time_login_details' => $this->buildOneTimeLoginDetails($displayName, $username, $temporaryPassword, $active)
         );
+    }
+
+    private function getInterviewerLoginProfile($interviewerProfileID)
+    {
+        return $this->_db->getAssoc(sprintf(
+            'SELECT
+                ip.*,
+                u.user_name,
+                u.access_level AS linked_access_level,
+                u.categories AS linked_categories
+             FROM nesp_interviewer_profile ip
+             LEFT JOIN user u
+                ON u.user_id = ip.user_id
+             WHERE ip.interviewer_profile_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger((int) $interviewerProfileID)
+        ));
+    }
+
+    private function prepareInterviewerLoginWithPassword($profile, $temporaryPassword, $active, $actorUserID, $auditEvent)
+    {
+        $temporaryPassword = trim((string) $temporaryPassword);
+        if ($temporaryPassword === '')
+        {
+            $temporaryPassword = $this->generateTemporaryInterviewerPassword();
+        }
+        $result = $this->createOrResetInterviewerUser(
+            (int) $profile['interviewer_profile_id'],
+            $profile['display_name'],
+            $profile['email'],
+            $temporaryPassword,
+            false,
+            $actorUserID
+        );
+        if ($result === false)
+        {
+            return array('ok' => false, 'error' => 'Unable to prepare a safe interviewer login. Check email uniqueness and password length.');
+        }
+        $this->_db->query(sprintf(
+            'UPDATE nesp_interviewer_profile
+             SET is_active = 0,
+                 account_state_key = "account_prepared",
+                 date_modified = NOW()
+             WHERE interviewer_profile_id = %s',
+            $this->_db->makeQueryInteger((int) $profile['interviewer_profile_id'])
+        ));
+        $this->logAuditEvent($actorUserID, $auditEvent, 'interviewer_profile', (int) $profile['interviewer_profile_id'], array(
+            'user_id' => (int) $result['user_id'],
+            'temporary_password_length' => strlen($temporaryPassword)
+        ));
+        return array(
+            'ok' => true,
+            'one_time_login_details' => $result['one_time_login_details']
+        );
+    }
+
+    private function setInterviewerLoginActiveState($profile, $active, $stateKey, $actorUserID, $auditEvent)
+    {
+        $validation = $this->validateInterviewerLinkedUser($profile, $active);
+        if (empty($validation['ok']))
+        {
+            return $validation;
+        }
+        if ($active && count($this->getApprovedJobOrderIDsForInterviewer((int) $profile['interviewer_profile_id'])) === 0)
+        {
+            return array('ok' => false, 'error' => 'Approve at least one job role before activating this interviewer.');
+        }
+
+        $accessLevel = $active ? ACCESS_LEVEL_READ : ACCESS_LEVEL_DISABLED;
+        $this->_db->query(sprintf(
+            'UPDATE user
+             SET access_level = %s,
+                 categories = "nesp_interviewer"
+             WHERE user_id = %s
+               AND access_level < %s',
+            $this->_db->makeQueryInteger($accessLevel),
+            $this->_db->makeQueryInteger((int) $profile['user_id']),
+            $this->_db->makeQueryInteger(ACCESS_LEVEL_SA)
+        ));
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            return array('ok' => false, 'error' => 'Unable to update a safe non-admin interviewer account.');
+        }
+        $this->_db->query(sprintf(
+            'UPDATE nesp_interviewer_profile
+             SET is_active = %s,
+                 account_state_key = %s,
+                 date_modified = NOW()
+             WHERE interviewer_profile_id = %s',
+            $active ? '1' : '0',
+            $this->_db->makeQueryString($stateKey),
+            $this->_db->makeQueryInteger((int) $profile['interviewer_profile_id'])
+        ));
+        $this->logAuditEvent($actorUserID, $auditEvent, 'interviewer_profile', (int) $profile['interviewer_profile_id'], array(
+            'user_id' => (int) $profile['user_id'],
+            'access_level' => $accessLevel,
+            'account_state_key' => $stateKey
+        ));
+        return array('ok' => true);
+    }
+
+    private function validateInterviewerLinkedUser($profile, $activating)
+    {
+        if (empty($profile) || (int) $profile['user_id'] <= 0)
+        {
+            return array('ok' => false, 'error' => 'Prepare a login before changing interviewer access.');
+        }
+        $user = $this->_db->getAssoc(sprintf(
+            'SELECT user_id, access_level, categories
+             FROM user
+             WHERE user_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger((int) $profile['user_id'])
+        ));
+        if (empty($user))
+        {
+            return array('ok' => false, 'error' => 'Linked OpenCATS user was not found.');
+        }
+        if ((int) $user['access_level'] >= ACCESS_LEVEL_SA)
+        {
+            return array('ok' => false, 'error' => 'Admin, site-admin, and root accounts cannot be used as interviewers.');
+        }
+        if (trim((string) $user['categories']) !== 'nesp_interviewer')
+        {
+            return array('ok' => false, 'error' => 'Interviewer accounts must have exactly the nesp_interviewer category.');
+        }
+        if ($activating && (int) $user['access_level'] > ACCESS_LEVEL_READ)
+        {
+            return array('ok' => false, 'error' => 'Interviewer access cannot be higher than read-only.');
+        }
+        return array('ok' => true);
+    }
+
+    private function generateTemporaryInterviewerPassword()
+    {
+        if (function_exists('random_bytes'))
+        {
+            return substr(strtr(base64_encode(random_bytes(18)), '+/', 'Aa'), 0, 18);
+        }
+        return substr(hash('sha256', uniqid('', true) . mt_rand()), 0, 18);
     }
 
     private function syncInterviewerUserAccess($interviewerProfileID, $active, $actorUserID)
@@ -7653,6 +8694,33 @@ class NESPWorkflow
             . $username
             . '. Share the temporary password manually and ask the interviewer to change it after first login. Account access is '
             . ($active ? 'enabled.' : 'disabled until Craig activates it.');
+    }
+
+    private function buildOneTimeLoginDetails($displayName, $username, $temporaryPassword, $active)
+    {
+        return array(
+            'display_name' => trim((string) $displayName),
+            'login_url' => $this->getOpenCATSLoginURL(),
+            'username' => $username,
+            'temporary_password' => (string) $temporaryPassword,
+            'is_active' => $active ? 1 : 0
+        );
+    }
+
+    private function getOpenCATSLoginURL()
+    {
+        $baseURL = getenv('NESP_OPENCATS_BASE_URL');
+        $baseURL = $baseURL === false ? '' : trim((string) $baseURL);
+        if ($baseURL === '')
+        {
+            $publicBase = getenv('NESP_PUBLIC_BASE_URL');
+            $baseURL = $publicBase === false ? '' : trim((string) $publicBase);
+        }
+        if ($baseURL === '')
+        {
+            return CATSUtility::getIndexName();
+        }
+        return rtrim($baseURL, '/') . '/' . CATSUtility::getIndexName();
     }
 
     private function normalizeInterviewerSettingsOptions($options)

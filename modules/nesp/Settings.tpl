@@ -19,6 +19,21 @@
                 </div>
             <?php endif; ?>
 
+            <?php if (!empty($this->oneTimeLoginDetails)): ?>
+                <?php
+                    $copyLoginDetails = "Login URL: " . $this->oneTimeLoginDetails['login_url'] . "\n"
+                        . "Username: " . $this->oneTimeLoginDetails['username'] . "\n"
+                        . "Temporary password: " . $this->oneTimeLoginDetails['temporary_password'];
+                ?>
+                <div class="nesp-confirm-box">
+                    <strong>Copy-only login details.</strong>
+                    The app has not sent this to anyone. This message is shown one time. Share manually only after Craig approves activation.
+                    <label class="nesp-field-label" for="oneTimeLoginDetails">Login details</label>
+                    <textarea id="oneTimeLoginDetails" rows="4" readonly><?php echo(htmlspecialchars($copyLoginDetails, ENT_QUOTES, 'UTF-8')); ?></textarea>
+                    <p><button type="button" class="nesp-secondary-action" onclick="document.getElementById('oneTimeLoginDetails').select(); document.execCommand('copy');">Copy Login Details</button></p>
+                </div>
+            <?php endif; ?>
+
             <?php if (trim($this->googleCalendarMessage) !== ''): ?>
                 <div class="nesp-confirm-box">
                     <?php $this->_($this->googleCalendarMessage); ?>
@@ -40,6 +55,23 @@
                     ?>
                     <a class="<?php echo($isActive ? 'active' : ''); ?>" href="<?php echo($navURL); ?>"><?php $this->_($navItem['label']); ?></a>
                 <?php endforeach; ?>
+            </div>
+
+            <div class="nesp-card-grid nesp-card-grid-tight">
+                <?php
+                    $settingsStateCounts = array('Active' => 0, 'Prepared but not active' => 0, 'Suspended/deactivated' => 0);
+                    foreach ($this->interviewerProfiles as $profile)
+                    {
+                        if (isset($settingsStateCounts[$profile['state_badge']]))
+                        {
+                            $settingsStateCounts[$profile['state_badge']]++;
+                        }
+                    }
+                ?>
+                <div class="nesp-card"><span class="nesp-card-label">Active</span><strong><?php echo((int) $settingsStateCounts['Active']); ?></strong></div>
+                <div class="nesp-card"><span class="nesp-card-label">Prepared but not active</span><strong><?php echo((int) $settingsStateCounts['Prepared but not active']); ?></strong></div>
+                <div class="nesp-card"><span class="nesp-card-label">Suspended/deactivated</span><strong><?php echo((int) $settingsStateCounts['Suspended/deactivated']); ?></strong></div>
+                <div class="nesp-card"><span class="nesp-card-label">Active candidate grants</span><strong><?php echo((int) $this->summary['candidateGrants']); ?></strong></div>
             </div>
 
             <div class="nesp-two-column">
@@ -117,14 +149,7 @@
                                 <option value="field_trainer">Field trainer</option>
                             </select>
                         </label>
-                        <label>
-                            Account state
-                            <select name="accountStateKey">
-                                <?php foreach ($this->accountStates as $stateKey => $stateLabel): ?>
-                                    <option value="<?php $this->_($stateKey); ?>"><?php $this->_($stateLabel); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
+                        <div class="nesp-confirm-box">New profiles start inactive. Login activation is a separate audited action.</div>
                         <fieldset class="nesp-fieldset">
                             <legend>Approved job roles</legend>
                             <?php foreach ($this->jobRoleOptions as $roleOption): ?>
@@ -296,38 +321,42 @@
                     <tr>
                         <th>Name</th>
                         <th>Email</th>
+                        <th>Username</th>
                         <th>Account</th>
                         <th>Approved Jobs</th>
                         <th>Status</th>
                         <th>Active Grants</th>
                         <th>Capacity</th>
                         <th>Zoom Link</th>
+                        <th>Last Login</th>
                         <th>Last Change</th>
                         <th>Action</th>
                     </tr>
                     <?php foreach ($this->interviewerProfiles as $profile): ?>
                     <tr>
-                        <td><?php $this->_($profile['display_name']); ?></td>
-                        <td><?php $this->_($profile['email']); ?></td>
-                        <td>
+                        <td data-label="Name"><?php $this->_($profile['display_name']); ?></td>
+                        <td data-label="Email"><?php $this->_($profile['email']); ?></td>
+                        <td data-label="Username"><?php $this->_(empty($profile['username']) ? 'No login prepared' : $profile['username']); ?></td>
+                        <td data-label="Account">
                             <?php $this->_(isset($this->accountStates[$profile['account_state_key']]) ? $this->accountStates[$profile['account_state_key']] : $profile['account_state_key']); ?><br />
                             <span class="nesp-muted"><?php $this->_($profile['role_key']); ?></span>
                             <?php if (trim($profile['email_warning']) !== ''): ?>
                                 <br /><strong><?php $this->_($profile['email_warning']); ?></strong>
                             <?php endif; ?>
                         </td>
-                        <td><?php $this->_($profile['approved_joborder_ids']); ?></td>
-                        <td><?php echo(((int) $profile['is_active'] === 1) ? 'Active' : 'Inactive'); ?></td>
-                        <td><?php $this->_($profile['active_grants']); ?></td>
-                        <td><?php $this->_((int) $profile['max_interviews_per_day'] . '/day, ' . (int) $profile['max_interviews_per_week'] . '/week'); ?></td>
-                        <td><?php $this->_($profile['default_zoom_join_url'] === '' ? 'None' : NESPWorkflow::maskZoomURLForAudit($profile['default_zoom_join_url'])); ?></td>
-                        <td><?php $this->_($profile['date_modified']); ?></td>
-                        <td><a class="nesp-secondary-action" href="#interviewer-<?php echo((int) $profile['interviewer_profile_id']); ?>">Edit</a></td>
+                        <td data-label="Approved Jobs"><?php $this->_($profile['approved_joborder_ids']); ?></td>
+                        <td data-label="Status"><span class="nesp-status-pill"><?php $this->_($profile['state_badge']); ?></span></td>
+                        <td data-label="Active Grants"><?php $this->_($profile['active_grants']); ?></td>
+                        <td data-label="Capacity"><?php $this->_((int) $profile['max_interviews_per_day'] . '/day, ' . (int) $profile['max_interviews_per_week'] . '/week'); ?></td>
+                        <td data-label="Zoom Link"><?php $this->_($profile['default_zoom_join_url'] === '' ? 'None' : NESPWorkflow::maskZoomURLForAudit($profile['default_zoom_join_url'])); ?></td>
+                        <td data-label="Last Login"><?php $this->_(empty($profile['last_login_display']) ? 'Never' : $profile['last_login_display']); ?></td>
+                        <td data-label="Last Change"><?php $this->_($profile['date_modified']); ?></td>
+                        <td data-label="Action"><a class="nesp-secondary-action" href="#interviewer-<?php echo((int) $profile['interviewer_profile_id']); ?>">Edit</a></td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (!count($this->interviewerProfiles)): ?>
                     <tr>
-                        <td colspan="10">No interviewer profiles have been created.</td>
+                        <td colspan="12">No interviewer profiles have been created.</td>
                     </tr>
                     <?php endif; ?>
                 </table>
@@ -350,27 +379,11 @@
                             Email address
                             <input type="text" name="email" value="<?php echo(htmlspecialchars($profile['email'], ENT_QUOTES, 'UTF-8')); ?>" />
                         </label>
-                        <label>
-                            New temporary password
-                            <input type="password" name="temporaryPassword" autocomplete="new-password" />
-                            <span class="nesp-help-text">Leave blank to keep the current password. Enter a new value to reset it and show one copy-only login message.</span>
-                        </label>
-                        <label>
-                            Linked OpenCATS user ID
-                            <input type="text" name="linkedUserID" value="<?php echo((int) $profile['user_id']); ?>" />
-                        </label>
-                        <label>
-                            Account state
-                            <select name="accountStateKey">
-                                <?php foreach ($this->accountStates as $stateKey => $stateLabel): ?>
-                                    <option value="<?php $this->_($stateKey); ?>"<?php if ($profile['account_state_key'] === $stateKey): ?> selected="selected"<?php endif; ?>><?php $this->_($stateLabel); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
-                        <label class="nesp-checkbox-row">
-                            <input type="checkbox" name="isActive"<?php if ((int) $profile['is_active'] === 1): ?> checked="checked"<?php endif; ?> />
-                            Active account access. Uncheck to revoke interviewer login access.
-                        </label>
+                        <div class="nesp-confirm-box">
+                            Account state: <?php $this->_($profile['state_badge']); ?>.
+                            Linked username: <?php $this->_(empty($profile['username']) ? 'none' : $profile['username']); ?>.
+                            Login access changes use the audited buttons below.
+                        </div>
                         <fieldset class="nesp-fieldset">
                             <legend>Approved job roles</legend>
                             <?php foreach ($this->jobRoleOptions as $roleOption): ?>
@@ -451,6 +464,53 @@
                         <div class="nesp-confirm-box">Review these changes before saving. Saving is immediate, audited, and never sends email automatically.</div>
                         <button type="submit" class="nesp-primary-button">Save Interviewer Settings</button>
                     </form>
+
+                    <div class="nesp-action-row">
+                        <?php if (!empty($profile['can_prepare_login'])): ?>
+                            <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=prepareInterviewerLogin">
+                                <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $profile['interviewer_profile_id']); ?>" />
+                                <input type="password" name="temporaryPassword" autocomplete="new-password" placeholder="Optional temp password" />
+                                <button type="submit" class="nesp-secondary-button">Prepare Login</button>
+                            </form>
+                        <?php endif; ?>
+                        <?php if (!empty($profile['can_activate_login'])): ?>
+                            <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=activateInterviewerLogin">
+                                <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $profile['interviewer_profile_id']); ?>" />
+                                <button type="submit" class="nesp-primary-button">Activate Login</button>
+                            </form>
+                        <?php endif; ?>
+                        <?php if (!empty($profile['can_suspend_login'])): ?>
+                            <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=suspendInterviewerLogin">
+                                <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $profile['interviewer_profile_id']); ?>" />
+                                <button type="submit" class="nesp-secondary-button">Suspend</button>
+                            </form>
+                        <?php endif; ?>
+                        <?php if (!empty($profile['can_reactivate_login'])): ?>
+                            <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=reactivateInterviewerLogin">
+                                <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $profile['interviewer_profile_id']); ?>" />
+                                <button type="submit" class="nesp-primary-button">Reactivate</button>
+                            </form>
+                        <?php endif; ?>
+                        <?php if (!empty($profile['can_reset_temp_password'])): ?>
+                            <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=resetInterviewerTempPassword">
+                                <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $profile['interviewer_profile_id']); ?>" />
+                                <input type="password" name="temporaryPassword" autocomplete="new-password" placeholder="Optional temp password" />
+                                <button type="submit" class="nesp-secondary-button">Reset Temp Password</button>
+                            </form>
+                        <?php endif; ?>
+                        <?php if (!empty($profile['can_disable_login'])): ?>
+                            <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=disableInterviewerLogin">
+                                <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $profile['interviewer_profile_id']); ?>" />
+                                <button type="submit" class="nesp-secondary-button">Permanently Disable</button>
+                            </form>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php endforeach; ?>
 
@@ -531,6 +591,37 @@
                         </label>
                         <button type="submit" class="nesp-secondary-button">Grant Assignment</button>
                     </form>
+
+                    <h4>Active Candidate Grants</h4>
+                    <table class="nesp-table">
+                        <tr>
+                            <th>Interviewer</th>
+                            <th>Candidate</th>
+                            <th>Role</th>
+                            <th>Granted</th>
+                            <th>Action</th>
+                        </tr>
+                        <?php foreach ($this->candidateGrants as $grant): ?>
+                        <tr>
+                            <td data-label="Interviewer"><?php $this->_($grant['interviewer_name']); ?><br /><span class="nesp-muted"><?php $this->_($grant['interviewer_email']); ?></span></td>
+                            <td data-label="Candidate"><?php $this->_($grant['candidate_name']); ?><br /><span class="nesp-muted"><?php $this->_($grant['candidate_email']); ?></span></td>
+                            <td data-label="Role"><?php $this->_($grant['role_title']); ?></td>
+                            <td data-label="Granted"><?php $this->_($grant['date_granted']); ?></td>
+                            <td data-label="Action">
+                                <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=revokeCandidateGrant">
+                                    <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                    <input type="hidden" name="grantID" value="<?php echo((int) $grant['grant_id']); ?>" />
+                                    <button type="submit" class="nesp-secondary-button">Revoke Candidate Access</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if (empty($this->candidateGrants)): ?>
+                        <tr>
+                            <td data-label="Grants" colspan="5">No active candidate grants.</td>
+                        </tr>
+                        <?php endif; ?>
+                    </table>
                 </div>
             </div>
 
