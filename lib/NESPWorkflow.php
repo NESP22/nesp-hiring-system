@@ -441,20 +441,51 @@ class NESPWorkflow
     public static function getQuestionnaireQuestionSets()
     {
         return array(
-            'weekend_sports_photographer' => array(
-                'label' => 'Weekend Sports Photographer',
-                'match' => array('weekend sports photographer', 'staff photographer', 'freelance photographer', 'sports photographer', 'photographer'),
+            'photography_assistant_poser' => array(
+                'label' => 'Field Staff Pre-Interview',
+                'match' => array('table greeter', 'field assistant', 'field staff', 'assistant', 'poser'),
+                'intro' => 'Spring 2026 Pre-Zoom Meeting Info and Survey. Please complete prior to the Zoom meeting. Try to answer all questions to the best of your ability and knowledge. Remember to hit Submit at the end, otherwise it will not record your information. Events take place in the New England area of the United States: Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.',
                 'questions' => array(
-                    array('key' => 'weekend_availability', 'label' => 'Are you available on Saturdays and Sundays?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'travel_areas', 'label' => 'What towns or areas can you reliably travel to?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'transportation', 'label' => 'Do you have reliable transportation?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'camera_ownership', 'label' => 'Do you own a DSLR or mirrorless camera?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'photography_experience', 'label' => 'Describe your photography experience.', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'youth_sports_comfort', 'label' => 'Are you comfortable photographing children and youth sports?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'lifting_ability', 'label' => 'Can you lift and carry approximately 25-40 pounds of equipment?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
-                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true),
-                    array('key' => 'interest', 'label' => 'Why are you interested in working with NESP?', 'type' => 'textarea', 'required' => true)
+                    array('key' => 'confirmed_email', 'label' => 'Email address.', 'type' => 'text', 'required' => true),
+                    array('key' => 'confirmed_name', 'label' => 'Your name.', 'type' => 'text', 'required' => true),
+                    array('key' => 'new_england_spring_availability', 'label' => 'Are you or will you be in the New England area during April, May, and early June? Events are in Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'position_for_zoom', 'label' => 'Which position are you scheduling a Zoom meeting for? Photographer or Table Greeter / Field Assistant?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'current_date_time', 'label' => 'Current date and time.', 'type' => 'text', 'required' => true),
+                    array('key' => 'primary_work', 'label' => 'Primary work, if any.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'talking_with_families', 'label' => 'Are you comfortable talking to and answering questions from kids and adults?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'organization_and_instructions', 'label' => 'Are you comfortable staying organized, checking in paperwork, and giving players, coaches, and parents the instructions they need at events?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'youth_age_comfort', 'label' => 'Do you have experience working with, or are you comfortable working with, kids from kindergarten through high school age?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'posing_and_gear_direction', 'label' => 'Are you comfortable talking to, giving directions to, and helping players from kindergarten through high school get into the correct picture positions while making sure gear, equipment, and uniforms look good?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'driver_license_vehicle', 'label' => 'This role requires driving to youth sports league locations. Do you have a valid driver\'s license and reliable access to a personal vehicle for these assignments?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'travel_distance', 'label' => 'Events are around New England. Most events average 45-60 minutes of travel time depending on location, but some available events could be further away. Select or describe all options you are willing to travel: at least 60 minutes, around 90 minutes, or further than 90 minutes.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'field_staff_interest', 'label' => 'Briefly write what interested you in looking into work at picture day events with NESP.', 'type' => 'textarea', 'required' => true)
+                )
+            ),
+            'weekend_sports_photographer' => array(
+                'label' => 'Photographer Pre-Interview',
+                'match' => array('weekend sports photographer', 'staff photographer', 'freelance photographer', 'sports photographer', 'photographer'),
+                'intro' => 'Spring 2026 Pre-Zoom Meeting Info and Survey. Please complete prior to the Zoom meeting. Try to answer all questions to the best of your ability and knowledge. Remember to hit Submit at the end, otherwise it will not record your information. Events take place in the New England area of the United States: Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.',
+                'questions' => array(
+                    array('key' => 'confirmed_email', 'label' => 'Email address.', 'type' => 'text', 'required' => true),
+                    array('key' => 'confirmed_name', 'label' => 'Your name.', 'type' => 'text', 'required' => true),
+                    array('key' => 'new_england_spring_availability', 'label' => 'Are you or will you be in the New England area during April, May, and early June? Events are in Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'position_for_zoom', 'label' => 'Which position are you scheduling a Zoom meeting for? Photographer or Table Greeter / Field Assistant?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'current_date_time', 'label' => 'Current date and time.', 'type' => 'text', 'required' => true),
+                    array('key' => 'primary_work', 'label' => 'Primary work, if any.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'last_five_photography_events', 'label' => 'Last 5 photography events. If fewer than 5, list what you have been on.', 'type' => 'textarea', 'required' => false),
+                    array('key' => 'portfolio_link', 'label' => 'Your online portfolio or website link, if applicable.', 'type' => 'text', 'required' => false),
+                    array('key' => 'linkedin_link', 'label' => 'Your LinkedIn link, if applicable.', 'type' => 'text', 'required' => false),
+                    array('key' => 'years_freelancing', 'label' => 'How many years have you been freelancing?', 'type' => 'text', 'required' => true),
+                    array('key' => 'camera_bodies', 'label' => 'List your camera body or bodies make and model. Example: Canon 5D Mark IV.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'lenses', 'label' => 'List your lens or lenses make, focal length, and aperture range. Example: Tamron 28-75 f2.8.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'owns_flash', 'label' => 'Do you own a flash? Yes or No.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'indoor_lighting_experience', 'label' => 'Do you have experience with indoor photography lighting using 2 or more monolights? Yes or No.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'driver_license_vehicle', 'label' => 'This role requires driving to youth sports league locations. Do you have a valid driver\'s license and reliable access to a personal vehicle for these assignments?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'travel_distance', 'label' => 'Most events involve 45-75 minutes of travel time depending on location, though some available events may be farther away. Select or describe all travel ranges you would be comfortable with: at least 60 minutes, around 90 minutes, or further than 90 minutes.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'early_weekend_mornings', 'label' => 'Picture days start early on weekends, including travel time. Are you willing and able to get up early on weekend mornings to go to NESP events?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'youth_age_comfort', 'label' => 'Do you have experience working with, or are you comfortable working with, kids from kindergarten through high school age?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'early_arrival_plan', 'label' => 'If your first scheduled group begins at 7:30 AM, what time would you plan to arrive at the event location and why?', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'photographer_interest', 'label' => 'So, what about being a youth sports team and portrait photographer interested you?', 'type' => 'textarea', 'required' => true)
                 )
             ),
             'school_photographer' => array(
@@ -467,20 +498,6 @@ class NESPWorkflow
                     array('key' => 'children_experience', 'label' => 'Describe your experience working with children.', 'type' => 'textarea', 'required' => true),
                     array('key' => 'high_volume_comfort', 'label' => 'Are you comfortable with repetitive posing and high-volume photography?', 'type' => 'textarea', 'required' => true),
                     array('key' => 'travel_range', 'label' => 'What travel range can you reliably cover?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
-                    array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true)
-                )
-            ),
-            'photography_assistant_poser' => array(
-                'label' => 'Photography Assistant / Poser',
-                'match' => array('assistant', 'poser', 'field assistant'),
-                'questions' => array(
-                    array('key' => 'availability', 'label' => 'What weekend and weekday availability do you have?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'children_comfort', 'label' => 'Are you comfortable working with children?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'standing', 'label' => 'Are you able to stand for long periods?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'carry_equipment', 'label' => 'Are you able to carry equipment as needed?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'transportation', 'label' => 'Do you have reliable transportation?', 'type' => 'textarea', 'required' => true),
-                    array('key' => 'customer_service', 'label' => 'Describe any customer-service experience.', 'type' => 'textarea', 'required' => true),
                     array('key' => 'start_date', 'label' => 'What is your earliest available start date?', 'type' => 'text', 'required' => true),
                     array('key' => 'pay_expectations', 'label' => 'What hourly pay range are you seeking?', 'type' => 'text', 'required' => true)
                 )
@@ -575,6 +592,17 @@ class NESPWorkflow
             'required' => false
         );
         return $questions;
+    }
+
+    public static function getQuestionnaireIntroForSet($questionSetKey)
+    {
+        $sets = self::getQuestionnaireQuestionSets();
+        if (!isset($sets[$questionSetKey]))
+        {
+            $questionSetKey = 'weekend_sports_photographer';
+        }
+
+        return isset($sets[$questionSetKey]['intro']) ? $sets[$questionSetKey]['intro'] : '';
     }
 
     public static function validateQuestionnaireAnswers($questions, $answers)
@@ -5171,6 +5199,7 @@ class NESPWorkflow
         $set = self::getQuestionnaireSetForRole($row['title']);
         $row['question_set_key'] = $set['key'];
         $row['question_set_label'] = $set['label'];
+        $row['question_set_intro'] = self::getQuestionnaireIntroForSet($set['key']);
         $row['questions'] = self::getQuestionnaireQuestionsForSet($set['key']);
         $row['estimated_minutes'] = '5-10 minutes';
         return $row;
@@ -5337,6 +5366,7 @@ class NESPWorkflow
 
         $detail = $this->decorateQuestionnaireRow($detail);
         $detail['questions'] = self::getQuestionnaireQuestionsForSet($detail['question_set_key']);
+        $detail['question_set_intro'] = self::getQuestionnaireIntroForSet($detail['question_set_key']);
         $answers = $this->_db->getAllAssoc(
             sprintf(
                 'SELECT question_key, question_label, answer_text, sort_order
@@ -5484,6 +5514,7 @@ class NESPWorkflow
         $this->logQuestionnaireActivity($row['screening_questionnaire_id'], $tokenHash, 'page_viewed', array());
         $row = $this->decorateQuestionnaireRow($row);
         $row['questions'] = self::getQuestionnaireQuestionsForSet($row['question_set_key']);
+        $row['question_set_intro'] = self::getQuestionnaireIntroForSet($row['question_set_key']);
         return array('ok' => true, 'state' => 'valid', 'questionnaire' => $row);
     }
 

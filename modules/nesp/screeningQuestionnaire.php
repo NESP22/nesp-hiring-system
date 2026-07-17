@@ -141,6 +141,12 @@ foreach ($questionnaire['questions'] as $question)
     }
 }
 
+$introHTML = '';
+if (!empty($questionnaire['question_set_intro']))
+{
+    $introHTML = '<p class="muted">' . nesp_questionnaire_escape($questionnaire['question_set_intro']) . '</p>';
+}
+
 $body = '<div class="notice">Your answers will be reviewed by a person. No automated hiring decision will be made.</div>'
     . '<div class="steps" aria-label="Questionnaire progress"><div class="step"><span>1</span>Review the role</div><div class="step"><span>2</span>Answer questions</div><div class="step"><span>3</span>NESP follows up</div></div>'
     . '<div class="panel"><h2>Screening Questionnaire</h2>'
@@ -149,6 +155,7 @@ $body = '<div class="notice">Your answers will be reviewed by a person. No autom
     . '<dt>Estimated time</dt><dd>Approximately 5-10 minutes</dd>'
     . '<dt>Account required</dt><dd>No account is required</dd>'
     . '</dl>'
+    . $introHTML
     . '<p class="muted">Please answer only job-related questions about your availability, experience, and fit for the role. Do not include protected personal information such as age, race, religion, medical history, disability, marital or family status.</p></div>'
     . $errorHTML
     . '<div class="panel"><form method="post">'

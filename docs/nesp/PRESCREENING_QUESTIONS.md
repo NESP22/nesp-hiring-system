@@ -29,6 +29,68 @@ Applicants see this statement above the questions:
 
 Job `41004` remains inactive/nonpublic and has no NESP prescreen questions.
 
+## Photographer Pre-Interview Questionnaire
+
+The Staff Photographer and Freelance Photographer roles both use the
+Photographer Pre-Interview questionnaire. The applicant-facing title is:
+
+`Spring 2026 Pre-Zoom Meeting Info and Survey`
+
+The Photographer questionnaire asks job-related questions about:
+
+- email address
+- applicant name
+- being in the New England area during April, May, and early June
+- whether the applicant is scheduling for Photographer or Table Greeter / Field
+  Assistant
+- current date and time
+- primary work, if any
+- last 5 photography events, or fewer if the applicant has fewer than 5
+- online portfolio or website link, if applicable
+- LinkedIn link, if applicable
+- years freelancing
+- camera body make and model
+- lens make, focal length, and aperture range
+- flash ownership
+- indoor photography lighting experience using 2 or more monolights
+- valid driver's license and reliable personal vehicle access
+- willingness to travel 60 minutes, around 90 minutes, or farther
+- willingness and ability to get up early on weekend mornings
+- comfort with kindergarten through high school age players
+- arrival plan for a 7:30 AM first scheduled group
+- what interested the applicant in youth sports team and portrait photography
+  work
+
+The questionnaire applies to both staff and freelance photographer candidates.
+
+## Field Staff Pre-Interview Questionnaire
+
+The screening-questionnaire flow presents the Field Staff / Table Greeter path
+first. The applicant-facing title is:
+
+`Spring 2026 Pre-Zoom Meeting Info and Survey`
+
+The Field Staff questionnaire asks job-related questions about:
+
+- email address
+- applicant name
+- being in the New England area during April, May, and early June
+- whether the applicant is scheduling for Photographer or Table Greeter / Field
+  Assistant
+- current date and time
+- primary work, if any
+- comfort talking with kids and adults
+- staying organized, checking paperwork, and giving event instructions
+- comfort with kindergarten through high school age players
+- helping players get into correct picture positions and checking uniforms,
+  gear, and equipment
+- valid driver's license and reliable personal vehicle access
+- willingness to travel 60 minutes, around 90 minutes, or farther
+- what interested the applicant in picture day event work at NESP
+
+The questionnaire remains human-reviewed. It does not automatically reject,
+rank, hire, assign, email, call, text, or change applicant status.
+
 ## External Posting Rule
 
 Do not duplicate these prescreening questions inside Indeed, Craigslist,
