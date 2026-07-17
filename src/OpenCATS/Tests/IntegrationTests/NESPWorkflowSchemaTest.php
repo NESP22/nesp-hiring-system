@@ -257,6 +257,54 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'invitation_copy_text'));
     }
 
+    public function testCareerPortalApplicationRoutesToNeedsCraigWorkflowOnce()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Public', 'Applicant');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $this->assertFalse($workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, 1, true));
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+
+        $this->mySQLQueryLocal(
+            "UPDATE nesp_feature_flag
+             SET is_enabled = 1
+             WHERE flag_key = 'NESP_WORKFLOW_ENABLED'"
+        );
+
+        $this->assertTrue($workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, 1, true));
+
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf(
+                "candidate_id = %d AND joborder_id = %d AND waiting_on_key = 'Craig' AND next_action_label = 'Review application' AND workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'new' LIMIT 1)",
+                $candidateID,
+                $jobOrderID
+            )
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_audit_event',
+            "event_type = 'candidate_workflow_stage_changed'"
+        ));
+
+        $this->assertTrue($workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, 1, true));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+    }
+
     public function testQuestionnaireRollbackRemovesAdditiveTables()
     {
         $this->dropQuestionnaireTables();
