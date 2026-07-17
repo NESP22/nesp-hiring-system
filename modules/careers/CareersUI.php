@@ -705,7 +705,7 @@ class CareersUI extends UserInterface
             $template['Content'] = str_replace('<input-keySkills>', '<input name="keySkills" id="keySkills" class="inputBoxNormal" value="' . $keySkillsEscaped . '" />', $template['Content']);
             $template['Content'] = str_replace('<input-source>', '<input name="source" id="source" class="inputBoxNormal" value="' . $sourceEscaped . '" />', $template['Content']);
             $template['Content'] = str_replace('<input-employer>', '<input name="employer" id="employer" class="inputBoxNormal" value="' . $employerEscaped . '" />', $template['Content']);
-            $template['Content'] = str_replace(array('<input-captcha>', '<input-captcha req>'), '<img src="' . CATSUtility::getIndexName() . '?m=careers&amp;p=captcha&amp;t=' . time() . '" alt="Captcha" /><br />' . '<input type="text" name="captcha" id="captcha" class="inputBoxNormal" />', $template['Content']);
+            $template['Content'] = $this->renderCareerPortalCaptchaPlaceholder($template['Content']);
             $template['Content'] = str_replace('<input-resumeUpload>', '<input type="file" id="resume" name="file" class="inputBoxFile" />', $template['Content']);
             $template['Content'] = str_replace('<input-resumeUploadPreview>',
                 '<input type="hidden" id="applyToJobSubAction" name="applyToJobSubAction" value="" /> '
@@ -831,7 +831,8 @@ class CareersUI extends UserInterface
                 die();
             }
 
-            if ($this->careerPortalTemplateRequiresCaptcha($template['Content - Apply for Position']))
+            if ($this->isCareerPortalCaptchaEnabled()
+                && $this->careerPortalTemplateRequiresCaptcha($template['Content - Apply for Position']))
             {
                 $captchaValue = isset($_POST['captcha']) ? $_POST['captcha'] : '';
                 if (!$this->validateCareerPortalCaptcha($captchaValue))
@@ -1204,6 +1205,36 @@ class CareersUI extends UserInterface
     private function careerPortalTemplateRequiresCaptcha($templateContent)
     {
         return (strpos($templateContent, '<input-captcha req>') !== false);
+    }
+
+    private function renderCareerPortalCaptchaPlaceholder($templateContent)
+    {
+        if (!$this->isCareerPortalCaptchaEnabled())
+        {
+            $templateContent = preg_replace(
+                '/<tr>\s*<td[^>]*>\s*<label\s+id="captchaLabel"[^>]*>.*?<input-captcha(?:\s+req)?>.*?<\/tr>\s*/is',
+                '',
+                $templateContent
+            );
+
+            return str_replace(array('<input-captcha>', '<input-captcha req>'), '', $templateContent);
+        }
+
+        $captchaHTML = '<img src="' . CATSUtility::getIndexName() . '?m=careers&amp;p=captcha&amp;t=' . time() . '" alt="Captcha" /><br />'
+            . '<input type="text" name="captcha" id="captcha" class="inputBoxNormal" />';
+
+        return str_replace(array('<input-captcha>', '<input-captcha req>'), $captchaHTML, $templateContent);
+    }
+
+    private function isCareerPortalCaptchaEnabled()
+    {
+        $setting = getenv('NESP_CAREER_PORTAL_CAPTCHA_ENABLED');
+        if ($setting === false || trim((string) $setting) === '')
+        {
+            return false;
+        }
+
+        return in_array(strtolower(trim((string) $setting)), array('1', 'true', 'yes', 'on'), true);
     }
 
     private function validateCareerPortalCaptcha($captchaValue)
