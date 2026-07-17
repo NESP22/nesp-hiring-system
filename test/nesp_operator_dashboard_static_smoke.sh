@@ -29,6 +29,8 @@ require_file "$WORKFLOW"
 require_file "$FIXTURE"
 
 require_grep 'What needs my attention now' "$DASHBOARD" 'first screen question is missing'
+require_grep 'Start here checklist' "$DASHBOARD" 'start-here checklist is missing'
+require_grep 'Press the blue next-action button' "$DASHBOARD" 'plain-language next-action checklist is missing'
 require_grep 'Needs Me Now' "$DASHBOARD" 'Needs Me Now label is missing'
 require_grep 'Waiting on Applicant' "$DASHBOARD" 'Waiting on Applicant label is missing'
 require_grep 'Upcoming Interviews' "$DASHBOARD" 'Upcoming Interviews label is missing'

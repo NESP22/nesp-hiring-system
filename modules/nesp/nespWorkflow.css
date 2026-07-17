@@ -241,6 +241,22 @@
     margin: 0;
 }
 
+.nesp-workflow .nesp-start-list {
+    border-left: 3px solid var(--nesp-dashboard-red);
+    color: var(--nesp-dashboard-text);
+    display: grid;
+    gap: 5px;
+    font-size: 13px;
+    line-height: 1.35;
+    margin: 12px 0 0;
+    padding: 0 0 0 24px;
+}
+
+.nesp-workflow .nesp-start-list li {
+    color: var(--nesp-dashboard-text);
+    padding-left: 2px;
+}
+
 .nesp-workflow .nesp-attention-grid {
     display: grid;
     gap: 10px;
