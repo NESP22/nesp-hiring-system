@@ -5,122 +5,83 @@
         <?php TemplateUtility::printQuickSearch(); ?>
         <div id="contents">
             <div class="nesp-page-title">
-                <h2>NESP Hiring Dashboard</h2>
-                <p>Task-first hiring view for Craig, applicants, interviewers, and seasonal staffing. Production integrations stay disabled unless Craig turns them on later.</p>
+                <h2>Hiring Dashboard</h2>
+                <p>Start here. The first four sections show what needs attention now, what is waiting, what is scheduled, and what was just finished.</p>
             </div>
 
             <div class="nesp-safety-banner">
                 Human-reviewed only: no automatic rejection, ranking, applicant email, phone calls, Zoom meetings, AI review, or external posting happens from this dashboard.
             </div>
 
-            <div class="nesp-dashboard-nav">
-                <?php foreach ($this->dashboardNavigation as $navItem): ?>
-                    <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
-                        <?php continue; ?>
-                    <?php endif; ?>
-                    <?php
-                        $navURL = CATSUtility::getIndexName() . '?m=nesp';
-                        if ($navItem['action'] !== 'dashboard')
-                        {
-                            $navURL .= '&amp;a=' . $navItem['action'];
-                        }
-                        $isActive = $this->viewKey === $navItem['key'] || ($this->viewKey === 'dashboard' && $navItem['key'] === 'needsCraig');
-                    ?>
-                    <a class="<?php echo($isActive ? 'active' : ''); ?>" href="<?php echo($navURL); ?>"><?php $this->_($navItem['label']); ?></a>
-                <?php endforeach; ?>
-            </div>
+            <?php
+                $attentionCards = array(
+                    array('key' => 'needsCraig', 'label' => 'Needs Me Now', 'count' => $this->queueCounts['needsCraig'], 'hint' => 'Review these first', 'action' => 'dashboard'),
+                    array('key' => 'waitingApplicant', 'label' => 'Waiting on Applicant', 'count' => $this->queueCounts['waitingApplicant'], 'hint' => 'No action unless overdue', 'action' => 'waiting'),
+                    array('key' => 'upcomingInterviews', 'label' => 'Upcoming Interviews', 'count' => count($this->upcomingInterviews), 'hint' => 'Track, reschedule, or cancel', 'action' => 'interviews'),
+                    array('key' => 'recentlyCompleted', 'label' => 'Recently Completed', 'count' => $this->queueCounts['recentlyCompleted'], 'hint' => 'Confirm finished items', 'action' => 'completed')
+                );
+            ?>
+            <section class="nesp-operator-focus" aria-label="What needs attention now">
+                <div class="nesp-focus-copy">
+                    <span class="nesp-kicker">Operator view</span>
+                    <h3>What needs my attention now?</h3>
+                    <p>Work left to right. Each candidate card has one main next step; extra links are tucked under Details.</p>
+                </div>
+                <div class="nesp-attention-grid">
+                    <?php foreach ($attentionCards as $attentionCard): ?>
+                        <?php
+                            $attentionURL = CATSUtility::getIndexName() . '?m=nesp';
+                            if ($attentionCard['action'] !== 'dashboard')
+                            {
+                                $attentionURL .= '&amp;a=' . $attentionCard['action'];
+                            }
+                            $attentionActive = $this->viewKey === $attentionCard['action'] || ($this->viewKey === 'dashboard' && $attentionCard['key'] === 'needsCraig');
+                        ?>
+                        <a class="nesp-attention-card <?php echo($attentionActive ? 'active' : ''); ?>" href="<?php echo($attentionURL); ?>">
+                            <span><?php $this->_($attentionCard['label']); ?></span>
+                            <strong><?php $this->_($attentionCard['count']); ?></strong>
+                            <em><?php $this->_($attentionCard['hint']); ?></em>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </section>
 
-            <div class="nesp-card-grid nesp-card-grid-compact">
-                <div class="nesp-card">
-                    <span class="nesp-card-label">Needs Craig</span>
-                    <strong><?php $this->_($this->queueCounts['needsCraig']); ?></strong>
-                </div>
-                <div class="nesp-card">
-                    <span class="nesp-card-label">Waiting on Applicant</span>
-                    <strong><?php $this->_($this->queueCounts['waitingApplicant']); ?></strong>
-                </div>
-                <div class="nesp-card">
-                    <span class="nesp-card-label">Waiting on Interviewer</span>
-                    <strong><?php $this->_($this->queueCounts['waitingInterviewer']); ?></strong>
-                </div>
-                <div class="nesp-card">
-                    <span class="nesp-card-label">Interviews This Week</span>
-                    <strong><?php $this->_($this->summary['interviewsThisWeek']); ?></strong>
-                </div>
-                <div class="nesp-card">
-                    <span class="nesp-card-label">Overdue</span>
-                    <strong><?php $this->_($this->summary['overdueItems']); ?></strong>
-                </div>
-                <div class="nesp-card">
-                    <span class="nesp-card-label">Routing Rules</span>
-                    <strong><?php $this->_($this->summary['assignmentRules']); ?></strong>
-                </div>
-                <div class="nesp-card">
-                    <span class="nesp-card-label">Availability Blocks</span>
-                    <strong><?php $this->_($this->summary['availabilityBlocks']); ?></strong>
-                </div>
-            </div>
-
-            <?php if ($this->viewKey === 'dashboard' || $this->viewKey === 'interviews'): ?>
-            <div class="nesp-two-column">
-                <div class="nesp-panel">
-                    <h3>Suggested Interviewer Routing</h3>
-                    <?php if (count($this->assignmentSuggestions)): ?>
-                        <table class="nesp-table">
-                            <tr>
-                                <th>Candidate</th>
-                                <th>Role</th>
-                                <th>Suggested Owner</th>
-                                <th>Rule</th>
-                                <th>Action</th>
-                            </tr>
-                            <?php foreach ($this->assignmentSuggestions as $suggestion): ?>
-                            <tr>
-                                <td><?php $this->_($suggestion['candidate_name']); ?></td>
-                                <td><?php $this->_($suggestion['role_title']); ?></td>
-                                <td><?php $this->_($suggestion['suggested_interviewer']); ?></td>
-                                <td><?php $this->_($suggestion['assignment_rule']); ?></td>
-                                <td><a class="nesp-secondary-action" href="<?php echo($suggestion['candidate_url']); ?>">Review</a></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </table>
-                    <?php else: ?>
-                        <div class="nesp-empty">No candidates are ready for interviewer routing yet.</div>
-                    <?php endif; ?>
-                </div>
-
-                <div class="nesp-panel">
-                    <h3>Interviewer Follow-Through</h3>
-                    <?php if (count($this->interviewerAccountability)): ?>
-                        <table class="nesp-table">
-                            <tr>
-                                <th>Interviewer</th>
-                                <th>Assigned</th>
-                                <th>Open</th>
-                                <th>Scorecards</th>
-                                <th>Overdue</th>
-                                <th>Availability</th>
-                            </tr>
-                            <?php foreach ($this->interviewerAccountability as $row): ?>
-                            <tr>
-                                <td><?php $this->_($row['display_name']); ?></td>
-                                <td><?php $this->_($row['active_grants']); ?></td>
-                                <td><?php $this->_($row['open_interviews']); ?></td>
-                                <td><?php $this->_($row['scorecards_due']); ?></td>
-                                <td><strong><?php $this->_($row['overdue_items']); ?></strong></td>
-                                <td><?php $this->_($row['availability_blocks']); ?></td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </table>
-                    <?php else: ?>
-                        <div class="nesp-empty">No interviewer profiles exist yet.</div>
-                    <?php endif; ?>
+            <div class="nesp-secondary-tools">
+                <span>Other hiring tools</span>
+                <div class="nesp-dashboard-nav">
+                    <?php foreach ($this->dashboardNavigation as $navItem): ?>
+                        <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
+                            <?php continue; ?>
+                        <?php endif; ?>
+                        <?php
+                            $navURL = CATSUtility::getIndexName() . '?m=nesp';
+                            if ($navItem['action'] !== 'dashboard')
+                            {
+                                $navURL .= '&amp;a=' . $navItem['action'];
+                            }
+                            $isActive = $this->viewKey === $navItem['key'] || ($this->viewKey === 'dashboard' && $navItem['key'] === 'needsCraig');
+                        ?>
+                        <a class="<?php echo($isActive ? 'active' : ''); ?>" href="<?php echo($navURL); ?>"><?php $this->_($navItem['label']); ?></a>
+                    <?php endforeach; ?>
                 </div>
             </div>
-            <?php endif; ?>
 
             <?php
                 $sections = array();
+                $sectionLabels = array(
+                    'needsCraig' => 'Needs Me Now',
+                    'waitingApplicant' => 'Waiting on Applicant',
+                    'waitingInterviewer' => 'Waiting on Interviewer',
+                    'upcomingInterviews' => 'Upcoming Interviews',
+                    'recentlyCompleted' => 'Recently Completed'
+                );
+                $emptyActions = array(
+                    'needsCraig' => array('label' => 'Check Waiting Items', 'url' => CATSUtility::getIndexName() . '?m=nesp&amp;a=waiting'),
+                    'waitingApplicant' => array('label' => 'Review Questionnaire Queue', 'url' => CATSUtility::getIndexName() . '?m=nesp&amp;a=questionnaires'),
+                    'waitingInterviewer' => array('label' => 'Open Interviewer Settings', 'url' => CATSUtility::getIndexName() . '?m=nesp&amp;a=settings'),
+                    'upcomingInterviews' => array('label' => 'Open Interviews', 'url' => CATSUtility::getIndexName() . '?m=nesp&amp;a=interviews'),
+                    'recentlyCompleted' => array('label' => 'Review Completed Items', 'url' => CATSUtility::getIndexName() . '?m=nesp&amp;a=completed')
+                );
                 if ($this->viewKey === 'waiting')
                 {
                     $sections = array('waitingApplicant', 'waitingInterviewer');
@@ -135,16 +96,16 @@
                 }
                 else
                 {
-                    $sections = array('needsCraig', 'waitingApplicant', 'waitingInterviewer', 'upcomingInterviews', 'recentlyCompleted');
+                    $sections = array('needsCraig', 'waitingApplicant', 'upcomingInterviews', 'recentlyCompleted');
                 }
             ?>
 
             <?php foreach ($sections as $sectionKey): ?>
                 <div class="nesp-queue-section">
-                    <h3><?php $this->_($this->queueDefinitions[$sectionKey]['title']); ?></h3>
+                    <h3><?php $this->_($sectionLabels[$sectionKey]); ?></h3>
                     <?php if ($sectionKey === 'upcomingInterviews'): ?>
                         <?php if (count($this->upcomingInterviews)): ?>
-                            <table class="nesp-table nesp-interview-table">
+                            <table class="nesp-table nesp-data-table nesp-interview-table">
                                 <tr>
                                     <th>Candidate</th>
                                     <th>Role</th>
@@ -166,16 +127,22 @@
                                     <td data-label="Status"><?php $this->_($interview['status_label']); ?></td>
                                     <td data-label="Actions">
                                         <div class="nesp-button-row">
-                                            <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=recordInterviewOutcome&amp;interviewID=<?php echo((int) $interview['interview_id']); ?>">Track</a>
-                                            <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=scheduleInterview&amp;interviewID=<?php echo((int) $interview['interview_id']); ?>">Reschedule</a>
-                                            <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=cancelInterview&amp;interviewID=<?php echo((int) $interview['interview_id']); ?>">Cancel</a>
+                                            <a class="nesp-primary-action nesp-primary-action-small" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=recordInterviewOutcome&amp;interviewID=<?php echo((int) $interview['interview_id']); ?>">Track Interview</a>
+                                            <details class="nesp-secondary-actions nesp-inline-details">
+                                                <summary>Details</summary>
+                                                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=scheduleInterview&amp;interviewID=<?php echo((int) $interview['interview_id']); ?>">Reschedule</a>
+                                                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=cancelInterview&amp;interviewID=<?php echo((int) $interview['interview_id']); ?>">Cancel</a>
+                                            </details>
                                         </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
                             </table>
                         <?php else: ?>
-                            <div class="nesp-empty"><?php $this->_($this->queueDefinitions[$sectionKey]['empty']); ?></div>
+                            <div class="nesp-empty nesp-empty-action">
+                                <strong><?php $this->_($this->queueDefinitions[$sectionKey]['empty']); ?></strong>
+                                <a class="nesp-secondary-button" href="<?php echo($emptyActions[$sectionKey]['url']); ?>"><?php $this->_($emptyActions[$sectionKey]['label']); ?></a>
+                            </div>
                         <?php endif; ?>
                     <?php else: ?>
                         <?php if (count($this->queues[$sectionKey])): ?>
@@ -188,11 +155,18 @@
                                         </div>
                                         <div class="nesp-task-role"><?php $this->_($card['role_title']); ?></div>
                                         <p><?php $this->_($card['summary']); ?></p>
-                                        <dl>
-                                            <dt>Waiting on</dt>
-                                            <dd><?php $this->_($card['waiting_on']); ?></dd>
-                                            <dt>Last activity</dt>
-                                            <dd><?php $this->_($card['last_activity']); ?></dd>
+                                        <dl class="nesp-card-meta">
+                                            <dt>Owner</dt>
+                                            <dd><?php $this->_(ucwords(str_replace('_', ' ', $card['waiting_on']))); ?></dd>
+                                            <?php if (!empty($card['due_at'])): ?>
+                                                <?php $dueTimestamp = strtotime($card['due_at']); ?>
+                                                <dt><?php echo($dueTimestamp !== false && $dueTimestamp < time() ? 'Overdue since' : 'Due'); ?></dt>
+                                                <dd><?php $this->_($dueTimestamp === false ? $card['due_at'] : date('M j, g:i A', $dueTimestamp)); ?></dd>
+                                            <?php else: ?>
+                                                <?php $activityTimestamp = strtotime($card['last_activity']); ?>
+                                                <dt>Waiting since</dt>
+                                                <dd><?php $this->_($activityTimestamp === false ? $card['last_activity'] : date('M j, g:i A', $activityTimestamp)); ?></dd>
+                                            <?php endif; ?>
                                         </dl>
                                         <?php if (!empty($card['scheduled_start'])): ?>
                                             <div class="nesp-task-next">
@@ -216,16 +190,80 @@
                                 <?php endforeach; ?>
                             </div>
                         <?php else: ?>
-                            <div class="nesp-empty"><?php $this->_($this->queueDefinitions[$sectionKey]['empty']); ?></div>
+                            <div class="nesp-empty nesp-empty-action">
+                                <strong><?php $this->_($this->queueDefinitions[$sectionKey]['empty']); ?></strong>
+                                <a class="nesp-secondary-button" href="<?php echo($emptyActions[$sectionKey]['url']); ?>"><?php $this->_($emptyActions[$sectionKey]['label']); ?></a>
+                            </div>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
 
+            <?php if ($this->viewKey === 'dashboard' || $this->viewKey === 'interviews'): ?>
+            <div class="nesp-secondary-workspace">
+                <h3>Secondary Review</h3>
+                <div class="nesp-two-column">
+                    <div class="nesp-panel">
+                        <h4>Suggested Interviewer Routing</h4>
+                        <?php if (count($this->assignmentSuggestions)): ?>
+                            <table class="nesp-table nesp-data-table">
+                                <tr>
+                                    <th>Candidate</th>
+                                    <th>Role</th>
+                                    <th>Suggested Owner</th>
+                                    <th>Rule</th>
+                                    <th>Action</th>
+                                </tr>
+                                <?php foreach ($this->assignmentSuggestions as $suggestion): ?>
+                                <tr>
+                                    <td data-label="Candidate"><?php $this->_($suggestion['candidate_name']); ?></td>
+                                    <td data-label="Role"><?php $this->_($suggestion['role_title']); ?></td>
+                                    <td data-label="Suggested Owner"><?php $this->_($suggestion['suggested_interviewer']); ?></td>
+                                    <td data-label="Rule"><?php $this->_($suggestion['assignment_rule']); ?></td>
+                                    <td data-label="Action"><a class="nesp-secondary-action" href="<?php echo($suggestion['candidate_url']); ?>">Review</a></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </table>
+                        <?php else: ?>
+                            <div class="nesp-empty">No candidates are ready for interviewer routing yet.</div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="nesp-panel">
+                        <h4>Interviewer Follow-Through</h4>
+                        <?php if (count($this->interviewerAccountability)): ?>
+                            <table class="nesp-table nesp-data-table">
+                                <tr>
+                                    <th>Interviewer</th>
+                                    <th>Assigned</th>
+                                    <th>Open</th>
+                                    <th>Scorecards</th>
+                                    <th>Overdue</th>
+                                    <th>Availability</th>
+                                </tr>
+                                <?php foreach ($this->interviewerAccountability as $row): ?>
+                                <tr>
+                                    <td data-label="Interviewer"><?php $this->_($row['display_name']); ?></td>
+                                    <td data-label="Assigned"><?php $this->_($row['active_grants']); ?></td>
+                                    <td data-label="Open"><?php $this->_($row['open_interviews']); ?></td>
+                                    <td data-label="Scorecards"><?php $this->_($row['scorecards_due']); ?></td>
+                                    <td data-label="Overdue"><strong><?php $this->_($row['overdue_items']); ?></strong></td>
+                                    <td data-label="Availability"><?php $this->_($row['availability_blocks']); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </table>
+                        <?php else: ?>
+                            <div class="nesp-empty">No interviewer profiles exist yet.</div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <div class="nesp-two-column">
                 <div class="nesp-panel">
                     <h3>Feature Flag Safety</h3>
-                    <table class="nesp-table">
+                    <table class="nesp-table nesp-data-table">
                         <tr>
                             <th>Integration</th>
                             <th>Status</th>
@@ -233,9 +271,9 @@
                         </tr>
                         <?php foreach ($this->integrationStatuses as $status): ?>
                         <tr>
-                            <td><?php $this->_($status['display_name']); ?></td>
-                            <td><span class="nesp-status nesp-status-off"><?php $this->_($status['status_key']); ?></span></td>
-                            <td><?php $this->_($status['message']); ?></td>
+                            <td data-label="Integration"><?php $this->_($status['display_name']); ?></td>
+                            <td data-label="Status"><span class="nesp-status nesp-status-off"><?php $this->_($status['status_key']); ?></span></td>
+                            <td data-label="Message"><?php $this->_($status['message']); ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </table>

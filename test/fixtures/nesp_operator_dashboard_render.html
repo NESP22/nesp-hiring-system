@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NESP Operator Dashboard Render Fixture</title>
+    <link rel="stylesheet" href="../../main.css" />
+    <link rel="stylesheet" href="../../modules/nesp/nespWorkflow.css" />
+</head>
+<body>
+    <div id="header">
+        <ul id="primary">
+            <li><a class="inactive" href="#">Home</a></li>
+            <li><a class="inactive" href="#">Candidates</a></li>
+            <li><a class="active" href="#">NESP Hiring</a></li>
+            <li><a class="inactive" href="#">Reports</a></li>
+            <li><a class="inactive" href="#">Settings</a></li>
+            <li><a class="inactive" href="#">Calendar</a></li>
+            <li><a class="inactive" href="#">Job Orders</a></li>
+            <li><a class="inactive" href="#">Companies</a></li>
+            <li><a class="inactive" href="#">Activities</a></li>
+            <li><a class="inactive" href="#">Lists</a></li>
+            <li><a class="inactive" href="#">Import</a></li>
+            <li><a class="inactive" href="#">Help</a></li>
+        </ul>
+    </div>
+    <div id="main" class="nesp-workflow">
+        <div id="contents">
+            <div class="nesp-page-title">
+                <h2>Hiring Dashboard</h2>
+                <p>Start here. The first four sections show what needs attention now, what is waiting, what is scheduled, and what was just finished.</p>
+            </div>
+            <div class="nesp-safety-banner">Human-reviewed only: no automatic rejection, ranking, applicant email, phone calls, Zoom meetings, AI review, or external posting happens from this dashboard.</div>
+            <section class="nesp-operator-focus" aria-label="What needs attention now">
+                <div class="nesp-focus-copy">
+                    <span class="nesp-kicker">Operator view</span>
+                    <h3>What needs my attention now?</h3>
+                    <p>Work left to right. Each candidate card has one main next step; extra links are tucked under Details.</p>
+                </div>
+                <div class="nesp-attention-grid">
+                    <a class="nesp-attention-card active" href="#"><span>Needs Me Now</span><strong>3</strong><em>Review these first</em></a>
+                    <a class="nesp-attention-card" href="#"><span>Waiting on Applicant</span><strong>5</strong><em>No action unless overdue</em></a>
+                    <a class="nesp-attention-card" href="#"><span>Upcoming Interviews</span><strong>2</strong><em>Track, reschedule, or cancel</em></a>
+                    <a class="nesp-attention-card" href="#"><span>Recently Completed</span><strong>4</strong><em>Confirm finished items</em></a>
+                </div>
+            </section>
+            <div class="nesp-secondary-tools">
+                <span>Other hiring tools</span>
+                <div class="nesp-dashboard-nav">
+                    <a class="active" href="#">Needs Craig</a>
+                    <a href="#">Waiting</a>
+                    <a href="#">Interviews</a>
+                    <a href="#">Questionnaires</a>
+                    <a href="#">Manage Question Sets</a>
+                    <a href="#">Phone Screens</a>
+                    <a href="#">Job Ads</a>
+                    <a href="#">Completed</a>
+                    <a href="#">Staffing Forecast</a>
+                    <a href="#">Interviewer Settings</a>
+                </div>
+            </div>
+            <div class="nesp-queue-section">
+                <h3>Needs Me Now</h3>
+                <div class="nesp-task-grid">
+                    <div class="nesp-task-card">
+                        <div class="nesp-task-topline"><strong>Test Candidate One</strong><span>Needs Review</span></div>
+                        <div class="nesp-task-role">Weekend Sports Photographer</div>
+                        <p>Review application details and choose the next human step.</p>
+                        <dl class="nesp-card-meta">
+                            <dt>Owner</dt><dd>Craig</dd>
+                            <dt>Due</dt><dd>Jul 17, 9:00 AM</dd>
+                        </dl>
+                        <a class="nesp-primary-action" href="#">Review Application</a>
+                        <details class="nesp-secondary-actions"><summary>Details</summary><a href="#">Candidate</a><a href="#">Role</a><a href="#">Questionnaire</a></details>
+                    </div>
+                </div>
+            </div>
+            <div class="nesp-queue-section">
+                <h3>Waiting on Applicant</h3>
+                <div class="nesp-empty nesp-empty-action"><strong>No applicant replies are waiting right now.</strong><a class="nesp-secondary-button" href="#">Review Questionnaire Queue</a></div>
+            </div>
+            <div class="nesp-queue-section">
+                <h3>Upcoming Interviews</h3>
+                <table class="nesp-table nesp-data-table nesp-interview-table">
+                    <tr><th>Candidate</th><th>Role</th><th>Date</th><th>Actions</th></tr>
+                    <tr><td data-label="Candidate">Test Candidate Two</td><td data-label="Role">Photo Assistant</td><td data-label="Date">Jul 18, 10:00 AM</td><td data-label="Actions"><a class="nesp-primary-action nesp-primary-action-small" href="#">Track Interview</a></td></tr>
+                </table>
+            </div>
+            <div class="nesp-queue-section">
+                <h3>Recently Completed</h3>
+                <div class="nesp-empty nesp-empty-action"><strong>No recently completed items need review.</strong><a class="nesp-secondary-button" href="#">Review Completed Items</a></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
