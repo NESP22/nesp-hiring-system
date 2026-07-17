@@ -42,6 +42,7 @@ include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 include_once(LEGACY_ROOT . '/lib/Questionnaire.php');
 include_once(LEGACY_ROOT . '/lib/NESPApplicationQuestions.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
+include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/DocumentToText.php');
 include_once(LEGACY_ROOT . '/lib/FileUtility.php');
 include_once(LEGACY_ROOT . '/lib/ParseUtility.php');
@@ -2034,6 +2035,8 @@ class CareersUI extends UserInterface
             $jobOrderID
         );
 
+        $this->routeNESPApplicantToWorkflow($candidateID, $jobOrderID, $automatedUser['userID'], $newApplication);
+
         /* Send an E-Mail describing what happened. */
         $emailTemplates = new EmailTemplates();
         $candidatesEmailTemplateRS = $emailTemplates->getByTag(
@@ -2165,6 +2168,26 @@ class CareersUI extends UserInterface
                 );
             }
         }
+    }
+
+    private function routeNESPApplicantToWorkflow($candidateID, $jobOrderID, $actorUserID, $newApplication)
+    {
+        try
+        {
+            $workflow = new NESPWorkflow();
+            $workflow->routeCareerPortalApplicationToNeedsCraig(
+                $candidateID,
+                $jobOrderID,
+                $actorUserID,
+                $newApplication
+            );
+        }
+        catch (Exception $e)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     public function capturePostData($ignore = array())

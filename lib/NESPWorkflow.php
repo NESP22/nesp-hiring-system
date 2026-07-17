@@ -2983,6 +2983,85 @@ class NESPWorkflow
         return $row;
     }
 
+    public function routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, $actorUserID = null, $isNewApplication = true)
+    {
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        if ($candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return false;
+        }
+
+        if (!$this->isSchemaInstalled() || !$this->isFeatureFlagEnabled('NESP_WORKFLOW_ENABLED'))
+        {
+            return false;
+        }
+
+        $row = $this->_db->getAssoc(
+            sprintf(
+                'SELECT
+                    c.candidate_id,
+                    c.first_name,
+                    c.last_name,
+                    jo.joborder_id,
+                    jo.title AS role_title,
+                    cw.candidate_workflow_id,
+                    ws.stage_key
+                 FROM candidate c
+                 INNER JOIN candidate_joborder cjo
+                    ON cjo.candidate_id = c.candidate_id
+                    AND cjo.joborder_id = %s
+                 INNER JOIN joborder jo
+                    ON jo.joborder_id = cjo.joborder_id
+                 LEFT JOIN nesp_candidate_workflow cw
+                    ON cw.candidate_id = c.candidate_id
+                    AND cw.joborder_id = jo.joborder_id
+                 LEFT JOIN nesp_workflow_stage ws
+                    ON ws.workflow_stage_id = cw.workflow_stage_id
+                 WHERE c.candidate_id = %s
+                   AND c.is_active = 1
+                   AND jo.public = 1
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($jobOrderID),
+                $this->_db->makeQueryInteger($candidateID)
+            )
+        );
+        if (empty($row))
+        {
+            return false;
+        }
+
+        if (!empty($row['candidate_workflow_id']) && !in_array($row['stage_key'], array('new', 'needs_review')))
+        {
+            $this->logAuditEvent($actorUserID, 'career_portal_workflow_route_skipped', 'candidate_workflow', $row['candidate_workflow_id'], array(
+                'candidate_id' => $candidateID,
+                'joborder_id' => $jobOrderID,
+                'existing_stage_key' => $row['stage_key']
+            ));
+            return false;
+        }
+
+        $roleTitle = isset($row['role_title']) ? trim($row['role_title']) : 'the selected role';
+        if ($roleTitle === '')
+        {
+            $roleTitle = 'the selected role';
+        }
+
+        $stageKey = $isNewApplication ? 'new' : 'needs_review';
+        $summary = ($isNewApplication ? 'New public application submitted' : 'Applicant reapplied')
+            . ' through the careers portal for ' . $roleTitle . '.';
+
+        return $this->setCandidateWorkflowStage(
+            $candidateID,
+            $jobOrderID,
+            $stageKey,
+            'Craig',
+            $summary,
+            'Review application',
+            $actorUserID
+        );
+    }
+
     public function getInterviewDetail($interviewID)
     {
         $interviewID = (int) $interviewID;
@@ -6589,20 +6668,40 @@ class NESPWorkflow
 
         if (empty($existing))
         {
-            $this->_db->query(
-                sprintf(
-                    'INSERT INTO nesp_candidate_workflow
-                        (candidate_id, joborder_id, workflow_stage_id, priority, waiting_on_key, summary, next_action_label, date_created, date_modified)
-                     VALUES
-                        (%s, %s, %s, 1, %s, %s, %s, NOW(), NOW())',
-                    $this->_db->makeQueryInteger($candidateID),
-                    $this->_db->makeQueryInteger($jobOrderID),
-                    $this->_db->makeQueryInteger($stage['workflow_stage_id']),
-                    $this->_db->makeQueryString($waitingOn),
-                    $this->_db->makeQueryString($summary),
-                    $this->_db->makeQueryString($nextActionLabel)
-                )
-            );
+            if ($this->isColumnInstalled('nesp_candidate_workflow', 'priority'))
+            {
+                $this->_db->query(
+                    sprintf(
+                        'INSERT INTO nesp_candidate_workflow
+                            (candidate_id, joborder_id, workflow_stage_id, priority, waiting_on_key, summary, next_action_label, date_created, date_modified)
+                         VALUES
+                            (%s, %s, %s, 1, %s, %s, %s, NOW(), NOW())',
+                        $this->_db->makeQueryInteger($candidateID),
+                        $this->_db->makeQueryInteger($jobOrderID),
+                        $this->_db->makeQueryInteger($stage['workflow_stage_id']),
+                        $this->_db->makeQueryString($waitingOn),
+                        $this->_db->makeQueryString($summary),
+                        $this->_db->makeQueryString($nextActionLabel)
+                    )
+                );
+            }
+            else
+            {
+                $this->_db->query(
+                    sprintf(
+                        'INSERT INTO nesp_candidate_workflow
+                            (candidate_id, joborder_id, workflow_stage_id, waiting_on_key, summary, next_action_label, date_created, date_modified)
+                         VALUES
+                            (%s, %s, %s, %s, %s, %s, NOW(), NOW())',
+                        $this->_db->makeQueryInteger($candidateID),
+                        $this->_db->makeQueryInteger($jobOrderID),
+                        $this->_db->makeQueryInteger($stage['workflow_stage_id']),
+                        $this->_db->makeQueryString($waitingOn),
+                        $this->_db->makeQueryString($summary),
+                        $this->_db->makeQueryString($nextActionLabel)
+                    )
+                );
+            }
             $workflowID = (int) $this->_db->getLastInsertID();
         }
         else
