@@ -5633,12 +5633,15 @@ class NESPWorkflow
             return (int) $existingDraft['question_set_version_id'];
         }
 
-        $nextVersion = (int) $this->_db->getColumn(sprintf(
+        $nextVersionRow = $this->_db->getColumn(sprintf(
             'SELECT COALESCE(MAX(version_number), 0) + 1
              FROM nesp_question_set_version
              WHERE question_set_id = %s',
             $this->_db->makeQueryInteger((int) $sourceDetail['question_set_id'])
         ), 0, 0);
+        $nextVersion = is_array($nextVersionRow) && isset($nextVersionRow[0])
+            ? (int) $nextVersionRow[0]
+            : 1;
         $questions = self::normalizeQuestionnaireSnapshotQuestions($sourceDetail['questions']);
         $roleMatches = $this->normalizeQuestionSetRoleMatches($sourceDetail['role_matches']);
         $this->_db->query(sprintf(
