@@ -809,15 +809,17 @@ class NESPWorkflowTest extends TestCase
     public function testStaffingForecastMetricsAreExplainable()
     {
         $rows = array(
-            array('event_date' => '2024-04-20', 'event_name' => 'A', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'photographer', 'staff_name' => 'Alex', 'staff_count' => 2, 'staff_hours' => 8, 'issue_count' => 0),
-            array('event_date' => '2024-04-21', 'event_name' => 'B', 'state' => 'NH', 'sport' => 'Baseball', 'role_key' => 'assistant', 'staff_name' => 'Sam', 'staff_count' => 1, 'staff_hours' => 4, 'issue_count' => 0),
-            array('event_date' => '2025-05-10', 'event_name' => 'C', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'table_staff', 'staff_name' => 'Taylor', 'staff_count' => 3, 'staff_hours' => 9, 'issue_count' => 1)
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '12:00:00', 'event_name' => 'A', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'photographer', 'staff_name' => 'Alex', 'staff_count' => 2, 'staff_hours' => 8, 'issue_count' => 0),
+            array('event_date' => '2024-04-21', 'event_start_time' => '09:00:00', 'event_end_time' => '13:00:00', 'event_name' => 'B', 'state' => 'NH', 'sport' => 'Baseball', 'role_key' => 'assistant', 'staff_name' => 'Sam', 'staff_count' => 1, 'staff_hours' => 4, 'issue_count' => 0),
+            array('event_date' => '2025-05-10', 'event_start_time' => '10:00:00', 'event_end_time' => '13:00:00', 'event_name' => 'C', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'table_staff', 'staff_name' => 'Taylor', 'staff_count' => 3, 'staff_hours' => 9, 'issue_count' => 1)
         );
 
         $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows, array('active_staff' => 1, 'expected_returning_staff' => 1, 'confirmed_available_staff' => 1));
 
         $this->assertSame(3, $metrics['total_events']);
         $this->assertSame(3, $metrics['peak_day_staffing']);
+        $this->assertSame(3, $metrics['peak_concurrent_staff']);
+        $this->assertSame(3, $metrics['recommendation_peak_staffing']);
         $this->assertSame('Medium', $metrics['confidence']);
         $this->assertArrayHasKey('recommended_pool', $metrics['formulas']);
         $this->assertGreaterThanOrEqual(0, $metrics['hiring_gap']);
@@ -826,9 +828,9 @@ class NESPWorkflowTest extends TestCase
     public function testStaffingForecastMetricsCountMultiRoleEventsOnce()
     {
         $rows = array(
-            array('event_date' => '2024-04-20', 'event_name' => 'Fixture Opener', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'photographer', 'staff_name' => 'Alex Fixture; Sam Fixture', 'staff_count' => 2, 'staff_hours' => 8, 'issue_count' => 0),
-            array('event_date' => '2024-04-20', 'event_name' => 'Fixture Opener', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'assistant', 'staff_name' => 'Taylor Fixture', 'staff_count' => 1, 'staff_hours' => 4, 'issue_count' => 0),
-            array('event_date' => '2024-04-20', 'event_name' => 'Fixture Opener', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'table_staff', 'staff_name' => 'Jordan Fixture', 'staff_count' => 1, 'staff_hours' => 4, 'issue_count' => 0)
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '12:00:00', 'event_name' => 'Fixture Opener', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'photographer', 'staff_name' => 'Alex Fixture; Sam Fixture', 'staff_count' => 2, 'staff_hours' => 8, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '12:00:00', 'event_name' => 'Fixture Opener', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'assistant', 'staff_name' => 'Taylor Fixture', 'staff_count' => 1, 'staff_hours' => 4, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '12:00:00', 'event_name' => 'Fixture Opener', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'table_staff', 'staff_name' => 'Jordan Fixture', 'staff_count' => 1, 'staff_hours' => 4, 'issue_count' => 0)
         );
 
         $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows);
@@ -838,6 +840,61 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame(1, $metrics['events_by_state']['MA']);
         $this->assertSame(4, $metrics['unique_staff_by_season']['2024']);
         $this->assertSame(4, $metrics['peak_day_staffing']);
+        $this->assertSame(4, $metrics['peak_concurrent_staff']);
+    }
+
+    public function testStaffingForecastRecommendationsUseOverlapAwarePeakForNonOverlappingEvents()
+    {
+        $rows = array(
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '10:00:00', 'event_name' => 'Morning Fixture', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'photographer', 'staff_name' => 'Alex Fixture; Sam Fixture', 'staff_count' => 2, 'staff_hours' => 4, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => '10:00:00', 'event_end_time' => '12:00:00', 'event_name' => 'Late Fixture', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'photographer', 'staff_name' => 'Taylor Fixture; Jordan Fixture; Casey Fixture; Riley Fixture', 'staff_count' => 4, 'staff_hours' => 8, 'issue_count' => 0)
+        );
+
+        $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows);
+
+        $this->assertSame(6, $metrics['peak_day_staffing']);
+        $this->assertSame(4, $metrics['peak_concurrent_staff']);
+        $this->assertSame(4, $metrics['recommendation_peak_staffing']);
+        $this->assertSame(5, $metrics['recommended_pool']);
+        $this->assertSame(2, $metrics['recommended_backup']);
+        $this->assertSame(7, $metrics['hiring_gap']);
+        $this->assertSame('Overlap-aware event start/end times.', $metrics['peak_concurrent_staff_basis']);
+        $this->assertSame(0, $metrics['rows_missing_start_or_end']);
+        $this->assertStringContainsString('recommendation_peak_staffing', $metrics['formulas']['recommended_pool']);
+    }
+
+    public function testStaffingForecastPeakConcurrentAddsOverlappingEvents()
+    {
+        $rows = array(
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '11:00:00', 'event_name' => 'Early Fixture', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'photographer', 'staff_name' => 'Alex Fixture; Sam Fixture', 'staff_count' => 2, 'staff_hours' => 6, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => '10:00:00', 'event_end_time' => '12:00:00', 'event_name' => 'Overlap Fixture', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'assistant', 'staff_name' => 'Taylor Fixture; Jordan Fixture; Casey Fixture', 'staff_count' => 3, 'staff_hours' => 6, 'issue_count' => 0)
+        );
+
+        $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows);
+
+        $this->assertSame(5, $metrics['peak_day_staffing']);
+        $this->assertSame(5, $metrics['peak_concurrent_staff']);
+        $this->assertSame(5, $metrics['recommendation_peak_staffing']);
+    }
+
+    public function testStaffingForecastMissingTimesUseConservativeLowConfidenceFallback()
+    {
+        $rows = array(
+            array('event_date' => '2024-04-20', 'event_start_time' => null, 'event_end_time' => null, 'event_name' => 'Untimed Fixture', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'photographer', 'staff_name' => 'Alex Fixture; Sam Fixture', 'staff_count' => 2, 'staff_hours' => 0, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => '10:00:00', 'event_end_time' => '12:00:00', 'event_name' => 'Timed Fixture', 'state' => 'MA', 'sport' => 'Soccer', 'role_key' => 'assistant', 'staff_name' => 'Taylor Fixture; Jordan Fixture; Casey Fixture; Riley Fixture', 'staff_count' => 4, 'staff_hours' => 8, 'issue_count' => 0),
+            array('event_date' => '2025-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '10:00:00', 'event_name' => 'Complete Fixture', 'state' => 'NH', 'sport' => 'Baseball', 'role_key' => 'photographer', 'staff_name' => 'Morgan Fixture', 'staff_count' => 1, 'staff_hours' => 2, 'issue_count' => 0)
+        );
+
+        $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows);
+
+        $this->assertSame(6, $metrics['peak_day_staffing']);
+        $this->assertSame(6, $metrics['peak_concurrent_staff']);
+        $this->assertSame(6, $metrics['recommendation_peak_staffing']);
+        $this->assertSame(8, $metrics['recommended_pool']);
+        $this->assertSame('Low', $metrics['confidence']);
+        $this->assertSame(1, $metrics['rows_missing_start_or_end']);
+        $this->assertSame(1, $metrics['days_with_conservative_time_fallback']);
+        $this->assertSame('Conservative daily-total fallback for days with missing or unusable event times.', $metrics['peak_concurrent_staff_basis']);
     }
 
     public function testStaffingCSVParserFlagsDuplicateSourceRows()

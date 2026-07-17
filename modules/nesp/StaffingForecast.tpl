@@ -288,7 +288,9 @@
                     <h3>Fall 2026 Preliminary Forecast</h3>
                     <p class="nesp-help-text">The gap is advisory and never opens, closes, or edits jobs.</p>
                     <table class="nesp-table">
-                        <tr><th>Required headcount at peak</th><td><?php $this->_($this->forecast['metrics']['peak_day_staffing']); ?></td></tr>
+                        <tr><th>Required concurrent headcount at peak</th><td><?php $this->_($this->forecast['metrics']['recommendation_peak_staffing']); ?></td></tr>
+                        <tr><th>Peak daily total</th><td><?php $this->_($this->forecast['metrics']['peak_day_staffing']); ?></td></tr>
+                        <tr><th>Concurrency basis</th><td><?php $this->_($this->forecast['metrics']['peak_concurrent_staff_basis']); ?></td></tr>
                         <tr><th>Current confirmed staff</th><td>0</td></tr>
                         <tr><th>Recommended pool</th><td><?php $this->_($this->forecast['metrics']['recommended_pool']); ?></td></tr>
                         <tr><th>Recommended backup / on-call</th><td><?php $this->_($this->forecast['metrics']['recommended_backup']); ?></td></tr>
@@ -326,9 +328,11 @@
 
                 <div class="nesp-panel">
                     <h3>Peak Weekends</h3>
-                    <p class="nesp-help-text">Peak staffing currently uses the busiest normalized event date.</p>
+                    <p class="nesp-help-text">Peak concurrent staffing uses overlapping event times when available. Days with missing times fall back to the daily total and lower forecast confidence.</p>
                     <table class="nesp-table">
                         <tr><th>Peak concurrent staff</th><td><?php $this->_($this->forecast['metrics']['peak_concurrent_staff']); ?></td></tr>
+                        <tr><th>Rows missing start/end</th><td><?php $this->_($this->forecast['metrics']['rows_missing_start_or_end']); ?></td></tr>
+                        <tr><th>Conservative fallback days</th><td><?php $this->_($this->forecast['metrics']['days_with_conservative_time_fallback']); ?></td></tr>
                         <tr><th>Total staff-hours</th><td><?php $this->_($this->forecast['metrics']['staff_hours']); ?></td></tr>
                     </table>
                 </div>

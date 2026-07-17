@@ -1881,21 +1881,26 @@ class NESPWorkflow
             'total_staff_assignments' => 0,
             'peak_day_staffing' => 0,
             'peak_concurrent_staff' => 0,
+            'recommendation_peak_staffing' => 0,
+            'peak_concurrent_staff_basis' => 'No dated staffing rows.',
+            'rows_missing_start_or_end' => 0,
+            'days_with_conservative_time_fallback' => 0,
             'average_staff_per_event' => 0,
             'recommended_pool' => 0,
             'recommended_backup' => 0,
             'hiring_gap' => 0,
             'confidence' => 'Low',
             'formulas' => array(
-                'recommended_pool' => 'ceil(peak_day_staffing * (1 + buffer_percent / 100))',
+                'recommended_pool' => 'ceil(recommendation_peak_staffing * (1 + buffer_percent / 100))',
                 'recommended_backup' => 'ceil(recommended_pool * buffer_percent / 100)',
                 'hiring_gap' => 'max(0, recommended_pool + recommended_backup - active_staff - expected_returning_staff - confirmed_available_staff)',
-                'confidence' => 'High requires at least 3 usable seasons and no open import issues; Medium requires at least 2 usable seasons.'
+                'confidence' => 'High requires at least 3 usable seasons, no open import issues, and complete usable event times; Medium requires at least 2 usable seasons with complete usable event times.'
             )
         );
 
         $events = array();
         $dayStaff = array();
+        $datedRows = array();
         $staffBySeason = array();
         $openIssues = 0;
         foreach ($rows as $row)
@@ -1948,6 +1953,7 @@ class NESPWorkflow
                 $dayStaff[$row['event_date']] = 0;
             }
             $dayStaff[$row['event_date']] += max(1, (int) $row['staff_count']);
+            $datedRows[] = $row;
             $metrics['staff_hours'] += (float) $row['staff_hours'];
             $metrics['total_staff_assignments'] += max(1, (int) $row['staff_count']);
         }
@@ -1959,12 +1965,17 @@ class NESPWorkflow
 
         $metrics['total_events'] = count($events);
         $metrics['peak_day_staffing'] = empty($dayStaff) ? 0 : max($dayStaff);
-        $metrics['peak_concurrent_staff'] = $metrics['peak_day_staffing'];
+        $concurrency = self::calculatePeakConcurrentStaffing($datedRows, $dayStaff);
+        $metrics['peak_concurrent_staff'] = $concurrency['peak_concurrent_staff'];
+        $metrics['recommendation_peak_staffing'] = $concurrency['peak_concurrent_staff'];
+        $metrics['peak_concurrent_staff_basis'] = $concurrency['basis'];
+        $metrics['rows_missing_start_or_end'] = $concurrency['rows_missing_start_or_end'];
+        $metrics['days_with_conservative_time_fallback'] = $concurrency['days_with_conservative_time_fallback'];
         $metrics['average_staff_per_event'] = $metrics['total_events'] > 0
             ? round($metrics['total_staff_assignments'] / $metrics['total_events'], 2)
             : 0;
         $metrics['staff_hours'] = round($metrics['staff_hours'], 2);
-        $metrics['recommended_pool'] = (int) ceil($metrics['peak_day_staffing'] * (1 + ((float) $config['buffer_percent'] / 100)));
+        $metrics['recommended_pool'] = (int) ceil($metrics['recommendation_peak_staffing'] * (1 + ((float) $config['buffer_percent'] / 100)));
         $metrics['recommended_backup'] = (int) ceil($metrics['recommended_pool'] * ((float) $config['buffer_percent'] / 100));
         $available = (int) $config['active_staff'] + (int) $config['expected_returning_staff'] + (int) $config['confirmed_available_staff'];
         $metrics['hiring_gap'] = max(0, $metrics['recommended_pool'] + $metrics['recommended_backup'] - $available);
@@ -1977,6 +1988,10 @@ class NESPWorkflow
         else if ($usableSeasons >= 2)
         {
             $metrics['confidence'] = 'Medium';
+        }
+        if ($metrics['rows_missing_start_or_end'] > 0 || $metrics['days_with_conservative_time_fallback'] > 0)
+        {
+            $metrics['confidence'] = 'Low';
         }
 
         ksort($metrics['events_by_season']);
@@ -9636,6 +9651,107 @@ class NESPWorkflow
         }
 
         return round((($end - $start) / 3600) * max(1, (int) $staffCount), 2);
+    }
+
+    private static function calculatePeakConcurrentStaffing($rows, $dayStaff)
+    {
+        $byDay = array();
+        $missingRows = 0;
+        foreach ($rows as $row)
+        {
+            if (empty($row['event_date']))
+            {
+                continue;
+            }
+
+            $date = $row['event_date'];
+            if (!isset($byDay[$date]))
+            {
+                $byDay[$date] = array('points' => array(), 'has_missing_time' => false);
+            }
+
+            $start = isset($row['event_start_time']) ? trim((string) $row['event_start_time']) : '';
+            $end = isset($row['event_end_time']) ? trim((string) $row['event_end_time']) : '';
+            $startSeconds = self::staffingTimeToSeconds($start);
+            $endSeconds = self::staffingTimeToSeconds($end);
+            if ($startSeconds === null || $endSeconds === null || $endSeconds <= $startSeconds)
+            {
+                $byDay[$date]['has_missing_time'] = true;
+                $missingRows++;
+                continue;
+            }
+
+            $staffCount = max(1, (int) $row['staff_count']);
+            $byDay[$date]['points'][] = array('time' => $startSeconds, 'delta' => $staffCount);
+            $byDay[$date]['points'][] = array('time' => $endSeconds, 'delta' => -$staffCount);
+        }
+
+        $peak = 0;
+        $fallbackDays = 0;
+        foreach ($dayStaff as $date => $dailyStaff)
+        {
+            if (!isset($byDay[$date]) || empty($byDay[$date]['points']) || !empty($byDay[$date]['has_missing_time']))
+            {
+                $peak = max($peak, (int) $dailyStaff);
+                if ((int) $dailyStaff > 0)
+                {
+                    $fallbackDays++;
+                }
+                continue;
+            }
+
+            usort(
+                $byDay[$date]['points'],
+                function ($left, $right) {
+                    if ($left['time'] === $right['time'])
+                    {
+                        return $left['delta'] - $right['delta'];
+                    }
+                    return $left['time'] - $right['time'];
+                }
+            );
+
+            $current = 0;
+            foreach ($byDay[$date]['points'] as $point)
+            {
+                $current += (int) $point['delta'];
+                $peak = max($peak, $current);
+            }
+        }
+
+        $basis = 'Overlap-aware event start/end times.';
+        if (empty($dayStaff))
+        {
+            $basis = 'No dated staffing rows.';
+        }
+        else if ($missingRows > 0 || $fallbackDays > 0)
+        {
+            $basis = 'Conservative daily-total fallback for days with missing or unusable event times.';
+        }
+
+        return array(
+            'peak_concurrent_staff' => $peak,
+            'basis' => $basis,
+            'rows_missing_start_or_end' => $missingRows,
+            'days_with_conservative_time_fallback' => $fallbackDays
+        );
+    }
+
+    private static function staffingTimeToSeconds($time)
+    {
+        $time = trim((string) $time);
+        if ($time === '')
+        {
+            return null;
+        }
+
+        $timestamp = strtotime('2000-01-01 ' . $time);
+        if ($timestamp === false)
+        {
+            return null;
+        }
+
+        return ((int) date('G', $timestamp) * 3600) + ((int) date('i', $timestamp) * 60) + (int) date('s', $timestamp);
     }
 
     private static function incrementMetric(&$bucket, $key, $amount)
