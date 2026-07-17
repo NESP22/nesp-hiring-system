@@ -1881,20 +1881,26 @@ class NESPWorkflow
             'total_staff_assignments' => 0,
             'peak_day_staffing' => 0,
             'peak_concurrent_staff' => 0,
+            'peak_concurrent_staff_confidence' => 'Exact',
+            'peak_concurrent_staff_uncertainty' => '',
+            'recommendation_staffing' => 0,
+            'recommendation_staffing_basis' => 'peak_concurrent_staff',
             'average_staff_per_event' => 0,
             'recommended_pool' => 0,
             'recommended_backup' => 0,
             'hiring_gap' => 0,
             'confidence' => 'Low',
             'formulas' => array(
-                'recommended_pool' => 'ceil(peak_day_staffing * (1 + buffer_percent / 100))',
+                'recommended_pool' => 'ceil(recommendation_staffing * (1 + buffer_percent / 100))',
                 'recommended_backup' => 'ceil(recommended_pool * buffer_percent / 100)',
                 'hiring_gap' => 'max(0, recommended_pool + recommended_backup - active_staff - expected_returning_staff - confirmed_available_staff)',
+                'peak_concurrent_staff' => 'maximum staffing across overlapping valid event intervals; unknown when a dated event has missing, conflicting, or invalid start/end times',
                 'confidence' => 'High requires at least 3 usable seasons and no open import issues; Medium requires at least 2 usable seasons.'
             )
         );
 
         $events = array();
+        $eventIntervals = array();
         $dayStaff = array();
         $staffBySeason = array();
         $openIssues = 0;
@@ -1916,6 +1922,27 @@ class NESPWorkflow
             $eventKey = $row['event_date'] . '|' . $row['event_name'] . '|' . $row['state'];
             $isNewEvent = !isset($events[$eventKey]);
             $events[$eventKey] = true;
+
+            $rowStartTime = isset($row['event_start_time']) && $row['event_start_time'] !== null && trim((string) $row['event_start_time']) !== ''
+                ? trim((string) $row['event_start_time'])
+                : null;
+            $rowEndTime = isset($row['event_end_time']) && $row['event_end_time'] !== null && trim((string) $row['event_end_time']) !== ''
+                ? trim((string) $row['event_end_time'])
+                : null;
+            if (!isset($eventIntervals[$eventKey]))
+            {
+                $eventIntervals[$eventKey] = array(
+                    'event_date' => $row['event_date'],
+                    'event_start_time' => $rowStartTime,
+                    'event_end_time' => $rowEndTime,
+                    'staffing' => 0,
+                    'has_consistent_times' => true
+                );
+            }
+            else if ($eventIntervals[$eventKey]['event_start_time'] !== $rowStartTime || $eventIntervals[$eventKey]['event_end_time'] !== $rowEndTime)
+            {
+                $eventIntervals[$eventKey]['has_consistent_times'] = false;
+            }
 
             if ($isNewEvent)
             {
@@ -1948,6 +1975,7 @@ class NESPWorkflow
                 $dayStaff[$row['event_date']] = 0;
             }
             $dayStaff[$row['event_date']] += max(1, (int) $row['staff_count']);
+            $eventIntervals[$eventKey]['staffing'] += max(1, (int) $row['staff_count']);
             $metrics['staff_hours'] += (float) $row['staff_hours'];
             $metrics['total_staff_assignments'] += max(1, (int) $row['staff_count']);
         }
@@ -1959,12 +1987,67 @@ class NESPWorkflow
 
         $metrics['total_events'] = count($events);
         $metrics['peak_day_staffing'] = empty($dayStaff) ? 0 : max($dayStaff);
-        $metrics['peak_concurrent_staff'] = $metrics['peak_day_staffing'];
+        $concurrencyPointsByDate = array();
+        $hasIncompleteEventIntervals = false;
+        foreach ($eventIntervals as $eventInterval)
+        {
+            $start = $eventInterval['event_start_time'] === null
+                ? false
+                : strtotime('2000-01-01 ' . $eventInterval['event_start_time']);
+            $end = $eventInterval['event_end_time'] === null
+                ? false
+                : strtotime('2000-01-01 ' . $eventInterval['event_end_time']);
+            if (!$eventInterval['has_consistent_times'] || $start === false || $end === false || $end <= $start)
+            {
+                $hasIncompleteEventIntervals = true;
+                continue;
+            }
+
+            if (!isset($concurrencyPointsByDate[$eventInterval['event_date']]))
+            {
+                $concurrencyPointsByDate[$eventInterval['event_date']] = array();
+            }
+            if (!isset($concurrencyPointsByDate[$eventInterval['event_date']][$start]))
+            {
+                $concurrencyPointsByDate[$eventInterval['event_date']][$start] = 0;
+            }
+            if (!isset($concurrencyPointsByDate[$eventInterval['event_date']][$end]))
+            {
+                $concurrencyPointsByDate[$eventInterval['event_date']][$end] = 0;
+            }
+            $concurrencyPointsByDate[$eventInterval['event_date']][$start] += $eventInterval['staffing'];
+            $concurrencyPointsByDate[$eventInterval['event_date']][$end] -= $eventInterval['staffing'];
+        }
+
+        $peakConcurrentStaff = 0;
+        foreach ($concurrencyPointsByDate as $points)
+        {
+            ksort($points, SORT_NUMERIC);
+            $currentStaff = 0;
+            foreach ($points as $change)
+            {
+                $currentStaff += $change;
+                $peakConcurrentStaff = max($peakConcurrentStaff, $currentStaff);
+            }
+        }
+        if ($hasIncompleteEventIntervals)
+        {
+            $metrics['peak_concurrent_staff'] = null;
+            $metrics['peak_concurrent_staff_confidence'] = 'Unknown';
+            $metrics['peak_concurrent_staff_uncertainty'] = 'One or more dated events have missing, conflicting, or invalid start/end times.';
+            $metrics['recommendation_staffing'] = $metrics['peak_day_staffing'];
+            $metrics['recommendation_staffing_basis'] = 'peak_day_staffing_fallback';
+        }
+        else
+        {
+            $metrics['peak_concurrent_staff'] = $peakConcurrentStaff;
+            $metrics['recommendation_staffing'] = $metrics['peak_concurrent_staff'];
+        }
         $metrics['average_staff_per_event'] = $metrics['total_events'] > 0
             ? round($metrics['total_staff_assignments'] / $metrics['total_events'], 2)
             : 0;
         $metrics['staff_hours'] = round($metrics['staff_hours'], 2);
-        $metrics['recommended_pool'] = (int) ceil($metrics['peak_day_staffing'] * (1 + ((float) $config['buffer_percent'] / 100)));
+        $metrics['recommended_pool'] = (int) ceil($metrics['recommendation_staffing'] * (1 + ((float) $config['buffer_percent'] / 100)));
         $metrics['recommended_backup'] = (int) ceil($metrics['recommended_pool'] * ((float) $config['buffer_percent'] / 100));
         $available = (int) $config['active_staff'] + (int) $config['expected_returning_staff'] + (int) $config['confirmed_available_staff'];
         $metrics['hiring_gap'] = max(0, $metrics['recommended_pool'] + $metrics['recommended_backup'] - $available);
