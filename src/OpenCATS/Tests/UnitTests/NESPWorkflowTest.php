@@ -86,10 +86,14 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_STAFFING_FORECAST_ENABLED', NESPWorkflow::getFeatureFlagForAction('dryRunStaffingImport'));
         $this->assertSame('NESP_STAFFING_FORECAST_ENABLED', NESPWorkflow::getFeatureFlagForAction('importApprovedStaffingRows'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreens'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('questionSets'));
+        $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('publishQuestionSetDraft'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('phoneScreenAvailability'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('markPhoneScreenInvitationCopied'));
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('allowPhoneScreenReschedule'));
         $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('updateInterviewerZoomLink'));
+        $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('activateInterviewerLogin'));
+        $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('revokeCandidateGrant'));
         $this->assertSame('NESP_INTERVIEWER_AVAILABILITY_ENABLED', NESPWorkflow::getFeatureFlagForAction('myAvailability'));
         $this->assertSame('NESP_INTERVIEWER_AVAILABILITY_ENABLED', NESPWorkflow::getFeatureFlagForAction('createInterviewerBlackout'));
         $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('googleCalendarConnect'));
@@ -223,9 +227,23 @@ class NESPWorkflowTest extends TestCase
         );
 
         $this->assertSame(
-            array('Needs Craig', 'Waiting', 'Interviews', 'Questionnaires', 'Phone Screens', 'Job Ads', 'Completed', 'Staffing Forecast', 'Interviewer Settings'),
+            array('Needs Craig', 'Waiting', 'Interviews', 'Questionnaires', 'Manage Question Sets', 'Phone Screens', 'Job Ads', 'Completed', 'Staffing Forecast', 'Interviewer Settings'),
             $labels
         );
+    }
+
+    public function testQuestionnaireSnapshotNormalizationKeepsImmutableQuestionShape()
+    {
+        $questions = NESPWorkflow::normalizeQuestionnaireSnapshotQuestions(array(
+            array('key' => 'Availability!', 'label' => 'Availability?', 'type' => 'text', 'required' => true, 'choices' => array('A')),
+            array('key' => 'Availability!', 'label' => 'Duplicate ignored', 'type' => 'textarea', 'required' => true),
+            array('key' => '', 'label' => 'Missing key')
+        ));
+
+        $this->assertSame(1, count($questions));
+        $this->assertSame('availability_', $questions[0]['key']);
+        $this->assertSame('Availability?', $questions[0]['label']);
+        $this->assertTrue($questions[0]['required']);
     }
 
     public function testNespInterviewerAclMapDeniesLegacyGlobalModules()
@@ -359,12 +377,62 @@ class NESPWorkflowTest extends TestCase
         $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('weekend_sports_photographer');
         $labels = strtolower(json_encode($questions));
 
-        $this->assertStringContainsString('saturdays and sundays', $labels);
+        $this->assertStringContainsString('early on weekends', $labels);
         $this->assertStringContainsString('anything else', $labels);
         foreach (array('race', 'religion', 'marital', 'medical history', 'disability') as $forbidden)
         {
             $this->assertStringNotContainsString($forbidden, $labels);
         }
+    }
+
+    public function testPhotographerQuestionnaireCoversFreelanceAndStaffPreInterviewWording()
+    {
+        $staff = NESPWorkflow::getQuestionnaireSetForRole('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $freelance = NESPWorkflow::getQuestionnaireSetForRole('Freelance/Contract Youth Sports Photographer');
+
+        $this->assertSame('weekend_sports_photographer', $staff['key']);
+        $this->assertSame('weekend_sports_photographer', $freelance['key']);
+        $this->assertSame('Photographer Pre-Interview', $staff['label']);
+
+        $intro = NESPWorkflow::getQuestionnaireIntroForSet('weekend_sports_photographer');
+        $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('weekend_sports_photographer');
+        $labels = strtolower(json_encode($questions));
+
+        $this->assertStringContainsString('spring 2026 pre-zoom meeting info and survey', strtolower($intro));
+        $this->assertStringContainsString('massachusetts, new hampshire, rhode island, connecticut, and vermont', strtolower($intro));
+        $this->assertStringContainsString('last 5 photography events', $labels);
+        $this->assertStringContainsString('online portfolio', $labels);
+        $this->assertStringContainsString('linkedin', $labels);
+        $this->assertStringContainsString('how many years have you been freelancing', $labels);
+        $this->assertStringContainsString('camera body', $labels);
+        $this->assertStringContainsString('monolights', $labels);
+        $this->assertStringContainsString('45-75 minutes', $labels);
+        $this->assertStringContainsString('7:30 am', $labels);
+        $this->assertStringContainsString('youth sports team and portrait photographer', $labels);
+    }
+
+    public function testFieldStaffQuestionnaireIsFirstAndUsesCraigPreInterviewWording()
+    {
+        $sets = NESPWorkflow::getQuestionnaireQuestionSets();
+        $this->assertSame('photography_assistant_poser', key($sets));
+        $this->assertSame('Field Staff Pre-Interview', $sets['photography_assistant_poser']['label']);
+
+        $matched = NESPWorkflow::getQuestionnaireSetForRole('Weekend Table Greeter / Field Assistant');
+        $this->assertSame('photography_assistant_poser', $matched['key']);
+
+        $intro = NESPWorkflow::getQuestionnaireIntroForSet('photography_assistant_poser');
+        $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('photography_assistant_poser');
+        $labels = strtolower(json_encode($questions));
+
+        $this->assertStringContainsString('spring 2026 pre-zoom meeting info and survey', strtolower($intro));
+        $this->assertStringContainsString('massachusetts, new hampshire, rhode island, connecticut, and vermont', strtolower($intro));
+        $this->assertStringContainsString('email address', $labels);
+        $this->assertStringContainsString('your name', $labels);
+        $this->assertStringContainsString('valid driver', $labels);
+        $this->assertStringContainsString('personal vehicle', $labels);
+        $this->assertStringContainsString('45-60 minutes', $labels);
+        $this->assertStringContainsString('kindergarten through high school', $labels);
+        $this->assertStringContainsString('picture day events', $labels);
     }
 
     public function testQuestionnaireAnswerValidationRequiresCurrentServerQuestions()

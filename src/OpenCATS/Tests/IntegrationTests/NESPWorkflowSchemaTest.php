@@ -29,6 +29,10 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_vapi_blackout_date',
             'nesp_vapi_scheduling_activity',
             'nesp_vapi_webhook_event',
+            'nesp_question_set',
+            'nesp_question_set_version',
+            'nesp_question_set_question',
+            'nesp_question_set_role_match',
             'nesp_screening_questionnaire',
             'nesp_screening_questionnaire_answer',
             'nesp_screening_questionnaire_activity',
@@ -67,6 +71,8 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countRows('nesp_interview_slot'));
         $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
         $this->assertSame(0, $this->countRows('nesp_recruiting_campaign_control'));
+        $this->assertSame(0, $this->countRows('nesp_question_set'));
+        $this->assertSame(0, $this->countRows('nesp_question_set_version'));
         $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
         $this->assertSame(11, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_feature_flag', "flag_key = 'NESP_INTERVIEWER_AVAILABILITY_ENABLED' AND is_enabled = 0"));
@@ -145,6 +151,8 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countUniqueIndexes('nesp_vapi_webhook_event', 'IDX_provider_event_id'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'token_hash'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_set_key'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_set_version_id'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_snapshot_json'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'reviewer_profile_id'));
         $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'link_url'));
         $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'invitation_copy_text'));
@@ -174,6 +182,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertNotContains('link_url', $catsSchemaColumns);
         $this->assertNotContains('invitation_copy_text', $catsSchemaColumns);
         $this->assertContains('token_hash', $catsSchemaColumns);
+        $this->assertContains('question_snapshot_json', $catsSchemaColumns);
     }
 
     public function testQuestionnaireWorkflowRunsOnAdditiveMigrationSchema()
@@ -257,6 +266,111 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'invitation_copy_text'));
     }
 
+    public function testQuestionnaireIssuedLinksUseStoredSnapshot()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $workflow->ensureDefaultQuestionSetsSeeded(1);
+
+        $candidateID = $this->insertFakeCandidate('Snapshot', 'Applicant');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+
+        $result = $workflow->requestQuestionnaire($candidateID, $jobOrderID, 1);
+        $token = $this->extractQuestionnaireToken($result['one_time_invitation_copy']);
+        $page = $workflow->getQuestionnairePageByToken($token);
+        $this->assertTrue($page['ok']);
+        $originalLabel = $page['questionnaire']['questions'][0]['label'];
+        $versionID = (int) $page['questionnaire']['question_set_version_id'];
+
+        $draftID = $workflow->createQuestionSetDraftFromVersion(0, $versionID, 1);
+        $draft = $workflow->getQuestionSetVersionDetail($draftID);
+        $draft['questions'][0]['label'] = 'Changed future-only fixture question';
+        $input = array(
+            'displayName' => $draft['display_name'],
+            'description' => $draft['description'],
+            'roleMatches' => $draft['role_matches'],
+            'questionKey' => array(),
+            'questionLabel' => array(),
+            'questionHelp' => array(),
+            'questionType' => array(),
+            'questionRequired' => array(),
+            'questionChoices' => array(),
+            'questionSortOrder' => array()
+        );
+        foreach ($draft['questions'] as $question)
+        {
+            $input['questionKey'][] = $question['key'];
+            $input['questionLabel'][] = $question['label'];
+            $input['questionHelp'][] = $question['help'];
+            $input['questionType'][] = $question['type'];
+            $input['questionRequired'][] = !empty($question['required']) ? '1' : '0';
+            $input['questionChoices'][] = implode("\n", $question['choices']);
+            $input['questionSortOrder'][] = (string) $question['sort_order'];
+        }
+        $this->assertTrue($workflow->saveQuestionSetDraft($draftID, $input, 1)['ok']);
+        $this->assertTrue($workflow->publishQuestionSetDraft($draftID, 1));
+
+        $sameIssuedLink = $workflow->getQuestionnairePageByToken($token);
+        $this->assertTrue($sameIssuedLink['ok']);
+        $this->assertSame($originalLabel, $sameIssuedLink['questionnaire']['questions'][0]['label']);
+        $this->assertNotSame('Changed future-only fixture question', $sameIssuedLink['questionnaire']['questions'][0]['label']);
+    }
+
+    public function testInterviewerDirectAccessRequiresActiveExactNonRevokedGrant()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Scoped', 'Candidate');
+        $jobOrderID = $this->insertFakeJobOrder('Customer Service');
+        $wrongJobOrderID = $this->insertFakeJobOrder('Field Assistant');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->insertFakeCandidateJobOrder($candidateID, $wrongJobOrderID);
+
+        $this->mySQLQueryLocal(
+            "INSERT INTO user (user_name, password, access_level, can_change_password, is_test_user, email, first_name, last_name, categories, can_see_eeo_info)
+             VALUES ('nesp.scoped.fixture', 'hash', 100, 1, 0, 'scoped@example.test', 'Scoped', 'Fixture', 'nesp_interviewer', 0)"
+        );
+        $userID = $this->lastInsertID();
+        $this->mySQLQueryLocal(sprintf(
+            "INSERT INTO nesp_interviewer_profile (user_id, display_name, email, role_key, is_active, account_state_key, date_created, date_modified)
+             VALUES (%d, 'Scoped Fixture', 'scoped@example.test', 'interviewer', 1, 'active', NOW(), NOW())",
+            $userID
+        ));
+        $profileID = $this->lastInsertID();
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $this->assertFalse($workflow->userCanAccessCandidate($userID, $candidateID, $jobOrderID));
+
+        $this->mySQLQueryLocal(sprintf(
+            "INSERT INTO nesp_interviewer_candidate_grant (interviewer_profile_id, candidate_id, joborder_id, granted_by_user_id, access_level_key, can_view_resume, can_add_notes, can_submit_scorecard, date_granted)
+             VALUES (%d, %d, %d, 1, 'interview', 1, 1, 1, NOW())",
+            $profileID,
+            $candidateID,
+            $jobOrderID
+        ));
+        $grantID = $this->lastInsertID();
+
+        $this->assertTrue($workflow->userCanAccessCandidate($userID, $candidateID, $jobOrderID));
+        $this->assertFalse($workflow->userCanAccessCandidate($userID, $candidateID, $wrongJobOrderID));
+
+        $this->assertTrue($workflow->revokeCandidateGrant($grantID, 1));
+        $this->assertFalse($workflow->userCanAccessCandidate($userID, $candidateID, $jobOrderID));
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_interviewer_candidate_grant SET date_revoked = NULL WHERE grant_id = %d",
+            $grantID
+        ));
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_interviewer_profile SET is_active = 0, account_state_key = 'suspended' WHERE interviewer_profile_id = %d",
+            $profileID
+        ));
+        $this->assertFalse($workflow->userCanAccessCandidate($userID, $candidateID, $jobOrderID));
+    }
+
     public function testCareerPortalApplicationRoutesToNeedsCraigWorkflowOnce()
     {
         include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
@@ -314,6 +428,21 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countMatchingTables('nesp_screening_questionnaire'));
         $this->assertSame(0, $this->countMatchingTables('nesp_screening_questionnaire_answer'));
         $this->assertSame(0, $this->countMatchingTables('nesp_screening_questionnaire_activity'));
+    }
+
+    public function testQuestionSetAdminRollbackRemovesAdditiveTablesAndColumns()
+    {
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_question_set_admin_additive.sql'), ";\n");
+        $this->assertSame(1, $this->countMatchingTables('nesp_question_set'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_snapshot_json'));
+
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_question_set_admin_rollback.sql'), ";\n");
+        $this->assertSame(0, $this->countMatchingTables('nesp_question_set'));
+        $this->assertSame(0, $this->countMatchingTables('nesp_question_set_version'));
+        $this->assertSame(0, $this->countMatchingTables('nesp_question_set_question'));
+        $this->assertSame(0, $this->countMatchingTables('nesp_question_set_role_match'));
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_snapshot_json'));
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_question_set_admin_additive.sql'), ";\n");
     }
 
     private function countMatchingTables($table)

@@ -128,17 +128,53 @@ foreach ($questionnaire['questions'] as $question)
 {
     $key = $question['key'];
     $value = isset($_POST['answers'][$key]) ? $_POST['answers'][$key] : '';
+    $values = is_array($value) ? $value : array($value);
     $requiredMark = !empty($question['required']) ? ' *' : '';
     $requiredAttribute = !empty($question['required']) ? ' aria-required="true"' : '';
     $fields .= '<label for="answer_' . nesp_questionnaire_escape($key) . '">' . nesp_questionnaire_escape($question['label'] . $requiredMark) . '</label>';
-    if ($question['type'] === 'text')
+    if (!empty($question['help']))
     {
-        $fields .= '<input type="text" id="answer_' . nesp_questionnaire_escape($key) . '" name="answers[' . nesp_questionnaire_escape($key) . ']" value="' . nesp_questionnaire_escape($value) . '"' . $requiredAttribute . ' />';
+        $fields .= '<p class="muted">' . nesp_questionnaire_escape($question['help']) . '</p>';
+    }
+    if ($question['type'] === 'text' || $question['type'] === 'number')
+    {
+        $inputType = $question['type'] === 'number' ? 'number' : 'text';
+        $fields .= '<input type="' . $inputType . '" id="answer_' . nesp_questionnaire_escape($key) . '" name="answers[' . nesp_questionnaire_escape($key) . ']" value="' . nesp_questionnaire_escape(is_array($value) ? '' : $value) . '"' . $requiredAttribute . ' />';
+    }
+    else if ($question['type'] === 'yes_no')
+    {
+        foreach (array('Yes', 'No') as $choice)
+        {
+            $checked = in_array($choice, $values, true) ? ' checked="checked"' : '';
+            $fields .= '<label class="choice"><input type="radio" name="answers[' . nesp_questionnaire_escape($key) . ']" value="' . nesp_questionnaire_escape($choice) . '"' . $checked . ' /> ' . nesp_questionnaire_escape($choice) . '</label>';
+        }
+    }
+    else if ($question['type'] === 'single_choice')
+    {
+        foreach ((array) $question['choices'] as $choice)
+        {
+            $checked = in_array($choice, $values, true) ? ' checked="checked"' : '';
+            $fields .= '<label class="choice"><input type="radio" name="answers[' . nesp_questionnaire_escape($key) . ']" value="' . nesp_questionnaire_escape($choice) . '"' . $checked . ' /> ' . nesp_questionnaire_escape($choice) . '</label>';
+        }
+    }
+    else if ($question['type'] === 'multiple_choice')
+    {
+        foreach ((array) $question['choices'] as $choice)
+        {
+            $checked = in_array($choice, $values, true) ? ' checked="checked"' : '';
+            $fields .= '<label class="choice"><input type="checkbox" name="answers[' . nesp_questionnaire_escape($key) . '][]" value="' . nesp_questionnaire_escape($choice) . '"' . $checked . ' /> ' . nesp_questionnaire_escape($choice) . '</label>';
+        }
     }
     else
     {
-        $fields .= '<textarea id="answer_' . nesp_questionnaire_escape($key) . '" name="answers[' . nesp_questionnaire_escape($key) . ']"' . $requiredAttribute . '>' . nesp_questionnaire_escape($value) . '</textarea>';
+        $fields .= '<textarea id="answer_' . nesp_questionnaire_escape($key) . '" name="answers[' . nesp_questionnaire_escape($key) . ']"' . $requiredAttribute . '>' . nesp_questionnaire_escape(is_array($value) ? implode(', ', $value) : $value) . '</textarea>';
     }
+}
+
+$introHTML = '';
+if (!empty($questionnaire['question_set_intro']))
+{
+    $introHTML = '<p class="muted">' . nesp_questionnaire_escape($questionnaire['question_set_intro']) . '</p>';
 }
 
 $body = '<div class="notice">Your answers will be reviewed by a person. No automated hiring decision will be made.</div>'
@@ -149,6 +185,7 @@ $body = '<div class="notice">Your answers will be reviewed by a person. No autom
     . '<dt>Estimated time</dt><dd>Approximately 5-10 minutes</dd>'
     . '<dt>Account required</dt><dd>No account is required</dd>'
     . '</dl>'
+    . $introHTML
     . '<p class="muted">Please answer only job-related questions about your availability, experience, and fit for the role. Do not include protected personal information such as age, race, religion, medical history, disability, marital or family status.</p></div>'
     . $errorHTML
     . '<div class="panel"><form method="post">'

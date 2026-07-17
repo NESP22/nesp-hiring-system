@@ -335,6 +335,14 @@ class LoginUI extends UserInterface
 
         if (!eval(Hooks::get('ON_FORGOT_PASSWORD'))) return;
 
+        if ($this->forgotPasswordBlockedForScopedInterviewer($username))
+        {
+            $this->_template->assign('message', 'Password recovery for interviewer accounts is handled manually by an administrator. No password has been sent.');
+            $this->_template->assign('complete', false);
+            $this->_template->display('./modules/login/ForgotPassword.tpl');
+            return;
+        }
+
         $user = new Users();
         if ($password = $user->getPassword($username))
         {
@@ -364,6 +372,28 @@ class LoginUI extends UserInterface
         }
 
         $this->_template->display('./modules/login/ForgotPassword.tpl');
+    }
+
+    private function forgotPasswordBlockedForScopedInterviewer($username)
+    {
+        $username = trim((string) $username);
+        if ($username === '')
+        {
+            return false;
+        }
+
+        $db = DatabaseConnection::getInstance();
+        $row = $db->getAssoc(sprintf(
+            'SELECT categories
+             FROM user
+             WHERE user_name = %s
+                OR email = %s
+             LIMIT 1',
+            $db->makeQueryString($username),
+            $db->makeQueryString($username)
+        ));
+
+        return !empty($row) && trim((string) $row['categories']) === 'nesp_interviewer';
     }
 
 

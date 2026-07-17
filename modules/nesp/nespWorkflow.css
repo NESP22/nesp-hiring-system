@@ -358,6 +358,51 @@
     gap: 8px;
 }
 
+.nesp-workflow .nesp-action-row {
+    align-items: flex-end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.nesp-workflow .nesp-action-row form {
+    align-items: flex-end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+}
+
+.nesp-workflow .nesp-status-pill {
+    display: inline-block;
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    background: var(--nesp-dashboard-panel-soft);
+    color: var(--nesp-dashboard-text);
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 7px;
+}
+
+.nesp-workflow .nesp-inline-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 140px;
+    gap: 10px;
+}
+
+.nesp-workflow .nesp-question-editor-row {
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    display: grid;
+    grid-template-columns: 80px minmax(140px, 1fr) 130px 110px;
+    gap: 10px;
+    margin: 0 0 12px;
+    padding: 12px;
+}
+
+.nesp-workflow .nesp-question-editor-row label:nth-last-child(-n+3) {
+    grid-column: 1 / -1;
+}
+
 .nesp-workflow .nesp-form-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -765,6 +810,8 @@
     .nesp-workflow .nesp-card-grid-tight,
     .nesp-workflow .nesp-two-column,
     .nesp-workflow .nesp-form-wide,
+    .nesp-workflow .nesp-inline-fields,
+    .nesp-workflow .nesp-question-editor-row,
     .nesp-workflow .nesp-task-grid,
     .nesp-workflow .nesp-step-row {
         grid-template-columns: 1fr;
@@ -785,10 +832,17 @@
 
     .nesp-workflow .nesp-action-form .nesp-primary-action,
     .nesp-workflow .nesp-action-form .nesp-secondary-action,
+    .nesp-workflow .nesp-action-row form,
+    .nesp-workflow .nesp-action-row input,
+    .nesp-workflow .nesp-action-row button,
     .nesp-workflow .nesp-upload-form .nesp-secondary-button,
     .nesp-workflow .nesp-file-input {
         box-sizing: border-box;
         width: 100%;
+    }
+
+    .nesp-workflow .nesp-question-editor-row label:nth-last-child(-n+3) {
+        grid-column: auto;
     }
 
     .nesp-workflow .nesp-table,

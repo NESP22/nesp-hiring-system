@@ -41,6 +41,9 @@
 
             <div class="nesp-panel">
                 <h3>Questions</h3>
+                <?php if (!empty($this->preview['question_set_intro'])): ?>
+                <p><?php $this->_($this->preview['question_set_intro']); ?></p>
+                <?php endif; ?>
                 <ol class="nesp-list">
                     <?php foreach ($this->preview['questions'] as $question): ?>
                     <li><?php $this->_($question['label']); ?><?php echo(!empty($question['required']) ? ' *' : ''); ?></li>
