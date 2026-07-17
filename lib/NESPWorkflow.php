@@ -5457,12 +5457,22 @@ class NESPWorkflow
             {
                 $questions = self::normalizeQuestionnaireSnapshotQuestions(self::getQuestionnaireQuestionsForSet($setKey));
                 $snapshotJSON = json_encode($questions);
+                $roleMatches = array();
+                $priority = 10;
+                foreach ((array) $set['match'] as $matchText)
+                {
+                    $roleMatches[] = array('match_text' => $matchText, 'joborder_id' => null, 'priority' => $priority, 'is_active' => 1);
+                    $priority += 10;
+                }
                 $this->_db->query(sprintf(
                     'INSERT INTO nesp_question_set_version
-                        (question_set_id, version_number, status_key, snapshot_json, created_by_user_id, published_by_user_id, published_at, date_created, date_modified)
+                        (question_set_id, version_number, status_key, display_name, description, role_match_snapshot_json, snapshot_json, created_by_user_id, published_by_user_id, published_at, date_created, date_modified)
                      VALUES
-                        (%s, 1, "published", %s, %s, %s, UTC_TIMESTAMP(), NOW(), NOW())',
+                        (%s, 1, "published", %s, %s, %s, %s, %s, %s, UTC_TIMESTAMP(), NOW(), NOW())',
                     $this->_db->makeQueryInteger($questionSetID),
+                    $this->_db->makeQueryString($set['label']),
+                    $this->_db->makeQueryString(isset($set['intro']) ? $set['intro'] : ''),
+                    $this->_db->makeQueryString(json_encode($roleMatches)),
                     $this->_db->makeQueryString($snapshotJSON),
                     $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID),
                     $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
@@ -5569,7 +5579,11 @@ class NESPWorkflow
             return array();
         }
         $detail = $this->_db->getAssoc(sprintf(
-            'SELECT qsv.*, qs.set_key, qs.display_name, qs.description, qs.status_key AS set_status_key
+            'SELECT qsv.*,
+                    qs.set_key,
+                    COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
+                    COALESCE(qsv.description, qs.description) AS description,
+                    qs.status_key AS set_status_key
              FROM nesp_question_set_version qsv
              INNER JOIN nesp_question_set qs
                 ON qs.question_set_id = qsv.question_set_id
@@ -5582,7 +5596,8 @@ class NESPWorkflow
             return array();
         }
         $detail['questions'] = $this->getQuestionsForQuestionSetVersion($detail);
-        $detail['role_matches'] = $this->getQuestionSetRoleMatches((int) $detail['question_set_id']);
+        $draftMatches = !empty($detail['role_match_snapshot_json']) ? json_decode((string) $detail['role_match_snapshot_json'], true) : null;
+        $detail['role_matches'] = is_array($draftMatches) ? $this->normalizeQuestionSetRoleMatches($draftMatches) : $this->getQuestionSetRoleMatches((int) $detail['question_set_id']);
         return $detail;
     }
 
@@ -5625,13 +5640,17 @@ class NESPWorkflow
             $this->_db->makeQueryInteger((int) $sourceDetail['question_set_id'])
         ), 0, 0);
         $questions = self::normalizeQuestionnaireSnapshotQuestions($sourceDetail['questions']);
+        $roleMatches = $this->normalizeQuestionSetRoleMatches($sourceDetail['role_matches']);
         $this->_db->query(sprintf(
             'INSERT INTO nesp_question_set_version
-                (question_set_id, version_number, status_key, snapshot_json, draft_source_version_id, created_by_user_id, date_created, date_modified)
+                (question_set_id, version_number, status_key, display_name, description, role_match_snapshot_json, snapshot_json, draft_source_version_id, created_by_user_id, date_created, date_modified)
              VALUES
-                (%s, %s, "draft", %s, %s, %s, NOW(), NOW())',
+                (%s, %s, "draft", %s, %s, %s, %s, %s, %s, NOW(), NOW())',
             $this->_db->makeQueryInteger((int) $sourceDetail['question_set_id']),
             $this->_db->makeQueryInteger($nextVersion),
+            $this->_db->makeQueryString((string) $sourceDetail['display_name']),
+            $this->_db->makeQueryString((string) $sourceDetail['description']),
+            $this->_db->makeQueryString(json_encode($roleMatches)),
             $this->_db->makeQueryString(json_encode($questions)),
             $this->_db->makeQueryInteger($sourceVersionID),
             $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
@@ -5662,27 +5681,23 @@ class NESPWorkflow
             return array('ok' => false, 'error' => 'At least one question is required.');
         }
 
-        $this->_db->query(sprintf(
-            'UPDATE nesp_question_set
-             SET display_name = %s,
-                 description = %s,
-                 date_modified = NOW()
-             WHERE question_set_id = %s',
-            $this->_db->makeQueryString($displayName),
-            $this->_db->makeQueryString($description),
-            $this->_db->makeQueryInteger((int) $detail['question_set_id'])
-        ));
+        $roleMatches = $this->normalizeQuestionSetRoleMatches(isset($input['roleMatches']) ? $input['roleMatches'] : array());
         $this->_db->query(sprintf(
             'UPDATE nesp_question_set_version
-             SET snapshot_json = %s,
+             SET display_name = %s,
+                 description = %s,
+                 role_match_snapshot_json = %s,
+                 snapshot_json = %s,
                  date_modified = NOW()
              WHERE question_set_version_id = %s
                AND status_key = "draft"',
+            $this->_db->makeQueryString($displayName),
+            $this->_db->makeQueryString($description),
+            $this->_db->makeQueryString(json_encode($roleMatches)),
             $this->_db->makeQueryString(json_encode($questions)),
             $this->_db->makeQueryInteger((int) $versionID)
         ));
         $this->replaceQuestionSetVersionQuestions((int) $versionID, $questions);
-        $this->replaceQuestionSetRoleMatches((int) $detail['question_set_id'], isset($input['roleMatches']) ? $input['roleMatches'] : array());
         $this->logAuditEvent($actorUserID, 'question_set_draft_saved', 'question_set_version', (int) $versionID, array('question_count' => count($questions)));
         return array('ok' => true, 'version_id' => (int) $versionID);
     }
@@ -5718,13 +5733,18 @@ class NESPWorkflow
         }
         $this->_db->query(sprintf(
             'UPDATE nesp_question_set
-             SET current_version_id = %s,
+             SET display_name = %s,
+                 description = %s,
+                 current_version_id = %s,
                  status_key = "active",
                  date_modified = NOW()
              WHERE question_set_id = %s',
+            $this->_db->makeQueryString((string) $detail['display_name']),
+            $this->_db->makeQueryString((string) $detail['description']),
             $this->_db->makeQueryInteger((int) $versionID),
             $this->_db->makeQueryInteger((int) $detail['question_set_id'])
         ));
+        $this->replaceQuestionSetRoleMatches((int) $detail['question_set_id'], $detail['role_matches']);
         $this->logAuditEvent($actorUserID, 'question_set_version_published', 'question_set_version', (int) $versionID, array('version_number' => (int) $detail['version_number']));
         return true;
     }
@@ -5753,7 +5773,10 @@ class NESPWorkflow
         if ($this->isTableInstalled('nesp_question_set_version'))
         {
             $matchSQL = sprintf(
-                'SELECT qsv.*, qs.set_key, qs.display_name, qs.description
+                'SELECT qsv.*,
+                        qs.set_key,
+                        COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
+                        COALESCE(qsv.description, qs.description) AS description
                  FROM nesp_question_set_role_match rm
                  INNER JOIN nesp_question_set qs
                     ON qs.question_set_id = rm.question_set_id
@@ -5773,7 +5796,10 @@ class NESPWorkflow
             if (empty($row))
             {
                 $row = $this->_db->getAssoc(
-                    'SELECT qsv.*, qs.set_key, qs.display_name, qs.description
+                    'SELECT qsv.*,
+                            qs.set_key,
+                            COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
+                            COALESCE(qsv.description, qs.description) AS description
                      FROM nesp_question_set qs
                      INNER JOIN nesp_question_set_version qsv
                         ON qsv.question_set_version_id = qs.current_version_id
@@ -5931,6 +5957,29 @@ class NESPWorkflow
              ORDER BY is_active DESC, priority ASC, question_set_role_match_id ASC',
             $this->_db->makeQueryInteger((int) $questionSetID)
         ));
+    }
+
+    private function normalizeQuestionSetRoleMatches($matches)
+    {
+        $clean = array();
+        $priority = 10;
+        foreach ((array) $matches as $match)
+        {
+            $matchText = isset($match['match_text']) ? trim((string) $match['match_text']) : '';
+            $jobOrderID = isset($match['joborder_id']) ? (int) $match['joborder_id'] : 0;
+            if ($matchText === '' && $jobOrderID <= 0)
+            {
+                continue;
+            }
+            $clean[] = array(
+                'match_text' => substr($matchText, 0, 160),
+                'joborder_id' => $jobOrderID > 0 ? $jobOrderID : null,
+                'priority' => isset($match['priority']) ? (int) $match['priority'] : $priority,
+                'is_active' => isset($match['is_active']) ? (int) $match['is_active'] : 1
+            );
+            $priority += 10;
+        }
+        return $clean;
     }
 
     private function replaceQuestionSetRoleMatches($questionSetID, $matches)
@@ -7588,7 +7637,9 @@ class NESPWorkflow
         if (!empty($row['question_set_version_id']) && $this->isTableInstalled('nesp_question_set_version'))
         {
             $versionLabel = $this->_db->getAssoc(sprintf(
-                'SELECT qs.display_name, qs.description, qsv.version_number
+                'SELECT COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
+                        COALESCE(qsv.description, qs.description) AS description,
+                        qsv.version_number
                  FROM nesp_question_set_version qsv
                  INNER JOIN nesp_question_set qs
                     ON qs.question_set_id = qsv.question_set_id

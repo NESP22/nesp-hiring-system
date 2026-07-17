@@ -283,15 +283,17 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $page = $workflow->getQuestionnairePageByToken($token);
         $this->assertTrue($page['ok']);
         $originalLabel = $page['questionnaire']['questions'][0]['label'];
+        $originalSetLabel = $page['questionnaire']['question_set_label'];
+        $originalIntro = $page['questionnaire']['question_set_intro'];
         $versionID = (int) $page['questionnaire']['question_set_version_id'];
 
         $draftID = $workflow->createQuestionSetDraftFromVersion(0, $versionID, 1);
         $draft = $workflow->getQuestionSetVersionDetail($draftID);
         $draft['questions'][0]['label'] = 'Changed future-only fixture question';
         $input = array(
-            'displayName' => $draft['display_name'],
-            'description' => $draft['description'],
-            'roleMatches' => $draft['role_matches'],
+            'displayName' => 'Draft-only fixture label',
+            'description' => 'Draft-only fixture intro',
+            'roleMatches' => array(array('match_text' => 'draft-only unmatched role', 'joborder_id' => 0)),
             'questionKey' => array(),
             'questionLabel' => array(),
             'questionHelp' => array(),
@@ -311,10 +313,19 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             $input['questionSortOrder'][] = (string) $question['sort_order'];
         }
         $this->assertTrue($workflow->saveQuestionSetDraft($draftID, $input, 1)['ok']);
+
+        $newCandidateID = $this->insertFakeCandidate('Future', 'Applicant');
+        $this->insertFakeCandidateJobOrder($newCandidateID, $jobOrderID);
+        $activePreview = $workflow->getCandidateQuestionnairePreview($newCandidateID, $jobOrderID);
+        $this->assertSame($originalSetLabel, $activePreview['question_set_label']);
+        $this->assertSame($originalIntro, $activePreview['question_set_intro']);
+        $this->assertSame($originalLabel, $activePreview['questions'][0]['label']);
+
         $this->assertTrue($workflow->publishQuestionSetDraft($draftID, 1));
 
         $sameIssuedLink = $workflow->getQuestionnairePageByToken($token);
         $this->assertTrue($sameIssuedLink['ok']);
+        $this->assertSame($originalIntro, $sameIssuedLink['questionnaire']['question_set_intro']);
         $this->assertSame($originalLabel, $sameIssuedLink['questionnaire']['questions'][0]['label']);
         $this->assertNotSame('Changed future-only fixture question', $sameIssuedLink['questionnaire']['questions'][0]['label']);
     }

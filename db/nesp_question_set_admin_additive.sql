@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS `nesp_question_set_version` (
   `question_set_id` INT(11) NOT NULL,
   `version_number` INT(11) NOT NULL DEFAULT 1,
   `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
+  `display_name` VARCHAR(160) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `description` TEXT COLLATE utf8mb4_unicode_ci,
+  `role_match_snapshot_json` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
   `snapshot_json` MEDIUMTEXT COLLATE utf8mb4_unicode_ci,
   `draft_source_version_id` INT(11),
   `created_by_user_id` INT(11),
@@ -77,3 +80,8 @@ ALTER TABLE `nesp_screening_questionnaire`
   ADD COLUMN IF NOT EXISTS `question_set_version_id` INT(11) AFTER `question_set_version`,
   ADD COLUMN IF NOT EXISTS `question_snapshot_json` MEDIUMTEXT COLLATE utf8mb4_unicode_ci AFTER `question_set_version_id`,
   ADD KEY IF NOT EXISTS `IDX_questionnaire_set_version` (`question_set_version_id`);
+
+ALTER TABLE `nesp_question_set_version`
+  ADD COLUMN IF NOT EXISTS `display_name` VARCHAR(160) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' AFTER `status_key`,
+  ADD COLUMN IF NOT EXISTS `description` TEXT COLLATE utf8mb4_unicode_ci AFTER `display_name`,
+  ADD COLUMN IF NOT EXISTS `role_match_snapshot_json` MEDIUMTEXT COLLATE utf8mb4_unicode_ci AFTER `description`;
