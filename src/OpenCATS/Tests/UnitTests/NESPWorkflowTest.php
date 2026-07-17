@@ -840,6 +840,38 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame(4, $metrics['peak_day_staffing']);
     }
 
+    public function testStaffingForecastPeakConcurrentStaffUsesIntervalOverlap()
+    {
+        $rows = array(
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '10:00:00', 'event_name' => 'Early Event', 'state' => 'MA', 'role_key' => 'photographer', 'staff_count' => 2, 'staff_hours' => 4, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '10:00:00', 'event_name' => 'Early Event', 'state' => 'MA', 'role_key' => 'assistant', 'staff_count' => 1, 'staff_hours' => 2, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => '09:00:00', 'event_end_time' => '11:00:00', 'event_name' => 'Overlap Event', 'state' => 'MA', 'role_key' => 'assistant', 'staff_count' => 1, 'staff_hours' => 2, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => '10:00:00', 'event_end_time' => '12:00:00', 'event_name' => 'Late Event', 'state' => 'MA', 'role_key' => 'table_staff', 'staff_count' => 3, 'staff_hours' => 6, 'issue_count' => 0)
+        );
+
+        $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows);
+
+        $this->assertSame(7, $metrics['peak_day_staffing']);
+        $this->assertSame(4, $metrics['peak_concurrent_staff']);
+        $this->assertSame('Exact', $metrics['peak_concurrent_staff_confidence']);
+        $this->assertSame('', $metrics['peak_concurrent_staff_uncertainty']);
+    }
+
+    public function testStaffingForecastPeakConcurrentStaffIsUnknownWhenEventTimesAreMissing()
+    {
+        $rows = array(
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '10:00:00', 'event_name' => 'Timed Event', 'state' => 'MA', 'role_key' => 'photographer', 'staff_count' => 2, 'staff_hours' => 4, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => null, 'event_end_time' => null, 'event_name' => 'Untimed Event', 'state' => 'MA', 'role_key' => 'assistant', 'staff_count' => 3, 'staff_hours' => 0, 'issue_count' => 1)
+        );
+
+        $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows);
+
+        $this->assertSame(5, $metrics['peak_day_staffing']);
+        $this->assertNull($metrics['peak_concurrent_staff']);
+        $this->assertSame('Unknown', $metrics['peak_concurrent_staff_confidence']);
+        $this->assertSame('One or more dated events are missing a valid start or end time.', $metrics['peak_concurrent_staff_uncertainty']);
+    }
+
     public function testStaffingCSVParserFlagsDuplicateSourceRows()
     {
         $csv = "Date,Start,End,State,Sport,Event,Role,Staff\n"
