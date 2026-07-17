@@ -853,8 +853,27 @@ class NESPWorkflowTest extends TestCase
 
         $this->assertSame(7, $metrics['peak_day_staffing']);
         $this->assertSame(4, $metrics['peak_concurrent_staff']);
+        $this->assertSame(4, $metrics['recommendation_staffing']);
+        $this->assertSame('peak_concurrent_staff', $metrics['recommendation_staffing_basis']);
+        $this->assertSame(5, $metrics['recommended_pool']);
+        $this->assertSame(7, $metrics['hiring_gap']);
         $this->assertSame('Exact', $metrics['peak_concurrent_staff_confidence']);
         $this->assertSame('', $metrics['peak_concurrent_staff_uncertainty']);
+    }
+
+    public function testStaffingForecastRecommendationsUseNonOverlappingPeak()
+    {
+        $rows = array(
+            array('event_date' => '2024-04-20', 'event_start_time' => '08:00:00', 'event_end_time' => '10:00:00', 'event_name' => 'Early Event', 'state' => 'MA', 'role_key' => 'photographer', 'staff_count' => 2, 'staff_hours' => 4, 'issue_count' => 0),
+            array('event_date' => '2024-04-20', 'event_start_time' => '10:00:00', 'event_end_time' => '12:00:00', 'event_name' => 'Late Event', 'state' => 'MA', 'role_key' => 'table_staff', 'staff_count' => 3, 'staff_hours' => 6, 'issue_count' => 0)
+        );
+
+        $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows, array('buffer_percent' => 0));
+
+        $this->assertSame(5, $metrics['peak_day_staffing']);
+        $this->assertSame(3, $metrics['peak_concurrent_staff']);
+        $this->assertSame(3, $metrics['recommended_pool']);
+        $this->assertSame(3, $metrics['hiring_gap']);
     }
 
     public function testStaffingForecastPeakConcurrentStaffIsUnknownWhenEventTimesAreMissing()
@@ -869,7 +888,11 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame(5, $metrics['peak_day_staffing']);
         $this->assertNull($metrics['peak_concurrent_staff']);
         $this->assertSame('Unknown', $metrics['peak_concurrent_staff_confidence']);
-        $this->assertSame('One or more dated events are missing a valid start or end time.', $metrics['peak_concurrent_staff_uncertainty']);
+        $this->assertSame('One or more dated events have missing, conflicting, or invalid start/end times.', $metrics['peak_concurrent_staff_uncertainty']);
+        $this->assertSame(5, $metrics['recommendation_staffing']);
+        $this->assertSame('peak_day_staffing_fallback', $metrics['recommendation_staffing_basis']);
+        $this->assertSame(5, $metrics['recommended_pool']);
+        $this->assertSame(5, $metrics['hiring_gap']);
     }
 
     public function testStaffingCSVParserFlagsDuplicateSourceRows()
