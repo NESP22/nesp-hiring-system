@@ -7652,7 +7652,8 @@ class NESPWorkflow
             ));
             if (!empty($versionLabel))
             {
-                $row['question_set_label'] = $versionLabel['display_name'] . ' v' . (int) $versionLabel['version_number'];
+                $row['question_set_label'] = $versionLabel['display_name'];
+                $row['question_set_version'] = (int) $versionLabel['version_number'];
                 $row['question_set_intro'] = isset($versionLabel['description']) ? (string) $versionLabel['description'] : '';
             }
         }
