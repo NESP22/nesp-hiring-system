@@ -883,7 +883,7 @@ class NESPWorkflowTest extends TestCase
             array('event_date' => '2024-04-20', 'event_start_time' => null, 'event_end_time' => null, 'event_name' => 'Untimed Event', 'state' => 'MA', 'role_key' => 'assistant', 'staff_count' => 3, 'staff_hours' => 0, 'issue_count' => 1)
         );
 
-        $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows);
+        $metrics = NESPWorkflow::calculateStaffingForecastMetrics($rows, array('buffer_percent' => 0));
 
         $this->assertSame(5, $metrics['peak_day_staffing']);
         $this->assertNull($metrics['peak_concurrent_staff']);
