@@ -12,7 +12,7 @@ class NESPJobDescriptionFormatter
             return nl2br(self::escape($description));
         }
 
-        $tokens = self::tokenize($description);
+        $tokens = self::polishOpening($jobOrderID, self::tokenize($description));
         if (empty($tokens))
         {
             return '';
@@ -84,7 +84,7 @@ class NESPJobDescriptionFormatter
 
     public static function formatIndeed($description, $jobOrderID)
     {
-        $tokens = self::tokenize($description);
+        $tokens = self::polishOpening($jobOrderID, self::tokenize($description));
         $html = '';
         if (self::isNESPJobOrderID($jobOrderID))
         {
@@ -194,6 +194,71 @@ class NESPJobDescriptionFormatter
         }
 
         return $tokens;
+    }
+
+    private static function polishOpening($jobOrderID, $tokens)
+    {
+        $opening = self::getOpeningParagraphs($jobOrderID);
+        if (empty($opening))
+        {
+            return $tokens;
+        }
+
+        $leadingParagraphCount = 0;
+        foreach ($tokens as $token)
+        {
+            if ($token['type'] !== 'paragraph')
+            {
+                break;
+            }
+            $leadingParagraphCount++;
+        }
+
+        if ($leadingParagraphCount === 0)
+        {
+            return $tokens;
+        }
+
+        $polished = array();
+        foreach ($opening as $paragraph)
+        {
+            $polished[] = array('type' => 'paragraph', 'text' => $paragraph);
+        }
+
+        return array_merge($polished, array_slice($tokens, $leadingParagraphCount));
+    }
+
+    private static function getOpeningParagraphs($jobOrderID)
+    {
+        switch ((int) $jobOrderID)
+        {
+            case 41001:
+                return array(
+                    'New England Sports Photo is hiring a part-time Customer Service Representative for our Methuen office. You will become a trusted point of contact for parents, families, league coordinators, and school partners, turning order, delivery, account, reprint, and support questions into clear next steps.',
+                    'This is a steady, year-round opportunity for someone who enjoys practical problem-solving, clear communication, and helping people feel taken care of.'
+                );
+
+            case 41002:
+                return array(
+                    'We are hiring dependable weekend photographers to create polished individual portraits and team photographs at youth-sports Picture Day events. NESP provides the equipment, training, and workflow, so photography experience is helpful but not required.',
+                    'If you enjoy active community events and want seasonal work with a repeatable process and opportunities to return, this role is designed to help you succeed.'
+                );
+
+            case 41003:
+                return array(
+                    'New England Sports Photo is seeking experienced freelance photographers for recurring youth-sports Picture Day assignments. This role is a strong fit for photographers who own approved professional equipment, understand camera and flash settings, and want well-organized seasonal work with clear expectations.',
+                    'You will bring your craft and equipment; NESP provides the assignment details, event process, and support needed to work efficiently and professionally with families and leagues.'
+                );
+
+            case 41005:
+                return array(
+                    'We are hiring friendly, organized field assistants to help youth-sports Picture Day events run smoothly. This active weekend role is a great fit for someone who enjoys welcoming families, keeping details straight, and supporting a photographer and event team in the field.',
+                    'You will often be one of the first NESP team members families meet. Your calm, welcoming presence and attention to names, teams, forms, and player numbers will help the entire event stay organized and on schedule.'
+                );
+
+            default:
+                return array();
+        }
     }
 
     private static function isNESPJobOrderID($jobOrderID)
