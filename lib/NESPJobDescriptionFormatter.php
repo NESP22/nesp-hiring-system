@@ -12,7 +12,10 @@ class NESPJobDescriptionFormatter
             return nl2br(self::escape($description));
         }
 
-        $tokens = self::polishOpening($jobOrderID, self::tokenize($description));
+        $tokens = self::polishTokens(
+            $jobOrderID,
+            self::polishOpening($jobOrderID, self::tokenize($description))
+        );
         if (empty($tokens))
         {
             return '';
@@ -84,7 +87,10 @@ class NESPJobDescriptionFormatter
 
     public static function formatIndeed($description, $jobOrderID)
     {
-        $tokens = self::polishOpening($jobOrderID, self::tokenize($description));
+        $tokens = self::polishTokens(
+            $jobOrderID,
+            self::polishOpening($jobOrderID, self::tokenize($description))
+        );
         $html = '';
         if (self::isNESPJobOrderID($jobOrderID))
         {
@@ -226,6 +232,34 @@ class NESPJobDescriptionFormatter
         }
 
         return array_merge($polished, array_slice($tokens, $leadingParagraphCount));
+    }
+
+    private static function polishTokens($jobOrderID, $tokens)
+    {
+        if ((int) $jobOrderID !== 41001)
+        {
+            return $tokens;
+        }
+
+        foreach ($tokens as &$token)
+        {
+            if ($token['type'] === 'bullet' && stripos($token['text'], 'spring and fall seasons') !== false)
+            {
+                $token['text'] = 'Year-round weekday schedule with approximately 20-30 hours per week';
+            }
+
+            if ($token['type'] === 'paragraph' && stripos($token['text'], 'daytime weekday work during peak seasons') !== false)
+            {
+                $token['text'] = str_ireplace(
+                    'daytime weekday work during peak seasons',
+                    'daytime weekday work throughout the year',
+                    $token['text']
+                );
+            }
+        }
+        unset($token);
+
+        return $tokens;
     }
 
     private static function getOpeningParagraphs($jobOrderID)
