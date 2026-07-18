@@ -41,8 +41,6 @@ include_once(LEGACY_ROOT . '/lib/DatabaseSearch.php');
 include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 include_once(LEGACY_ROOT . '/lib/Questionnaire.php');
 include_once(LEGACY_ROOT . '/lib/NESPApplicationQuestions.php');
-include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
-include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/DocumentToText.php');
 include_once(LEGACY_ROOT . '/lib/FileUtility.php');
 include_once(LEGACY_ROOT . '/lib/ParseUtility.php');
@@ -665,14 +663,7 @@ class CareersUI extends UserInterface
             $email2Escaped = htmlspecialchars((string) $email2, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $emailconfirmEscaped = htmlspecialchars((string) $emailconfirm, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $keySkillsEscaped = htmlspecialchars((string) $keySkills, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
-            $trackedSource = NESPRecruitingAds::sourceFromRequest($_REQUEST);
-            if ($source === '' && $trackedSource !== '')
-            {
-                $source = $trackedSource;
-            }
-            $trackingSourceKey = NESPRecruitingAds::normalizeSourceKey(isset($_REQUEST['nesp_source']) ? $_REQUEST['nesp_source'] : '');
             $sourceEscaped = htmlspecialchars((string) $source, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
-            $trackingSourceKeyEscaped = htmlspecialchars((string) $trackingSourceKey, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $employerEscaped = htmlspecialchars((string) $employer, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $resumeFileLocationEscaped = htmlspecialchars((string) $resumeFileLocation, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $resumeContentsEscaped = htmlspecialchars((string) $resumeContents, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
@@ -705,7 +696,7 @@ class CareersUI extends UserInterface
             $template['Content'] = str_replace('<input-keySkills>', '<input name="keySkills" id="keySkills" class="inputBoxNormal" value="' . $keySkillsEscaped . '" />', $template['Content']);
             $template['Content'] = str_replace('<input-source>', '<input name="source" id="source" class="inputBoxNormal" value="' . $sourceEscaped . '" />', $template['Content']);
             $template['Content'] = str_replace('<input-employer>', '<input name="employer" id="employer" class="inputBoxNormal" value="' . $employerEscaped . '" />', $template['Content']);
-            $template['Content'] = $this->renderCareerPortalCaptchaPlaceholder($template['Content']);
+            $template['Content'] = str_replace(array('<input-captcha>', '<input-captcha req>'), '<img src="' . CATSUtility::getIndexName() . '?m=careers&amp;p=captcha&amp;t=' . time() . '" alt="Captcha" /><br />' . '<input type="text" name="captcha" id="captcha" class="inputBoxNormal" />', $template['Content']);
             $template['Content'] = str_replace('<input-resumeUpload>', '<input type="file" id="resume" name="file" class="inputBoxFile" />', $template['Content']);
             $template['Content'] = str_replace('<input-resumeUploadPreview>',
                 '<input type="hidden" id="applyToJobSubAction" name="applyToJobSubAction" value="" /> '
@@ -805,7 +796,6 @@ class CareersUI extends UserInterface
                     . 'enctype="multipart/form-data" method="post" onsubmit="return applyValidate();">'
                     . '<input type="hidden" name="ID" value="' . $jobID . '">'
                     . '<input type="hidden" name="candidateID" value="' . $candidateID . '">'
-                    . '<input type="hidden" name="nesp_source" value="' . $trackingSourceKeyEscaped . '">'
                     . $template['Content'] . '</form>' . "\n" . $endTD;
             }
             else
@@ -816,8 +806,7 @@ class CareersUI extends UserInterface
                         . '?m=careers&amp;p=onApplyToJobOrder" '
                         . 'enctype="multipart/form-data" method="post" onsubmit="return applyValidate();">'
                         . '<input type="hidden" name="ID" value="' . $jobID . '">'
-                        . '<input type="hidden" name="candidateID" value="' . $candidateID . '">'
-                        . '<input type="hidden" name="nesp_source" value="' . $trackingSourceKeyEscaped . '">',
+                        . '<input type="hidden" name="candidateID" value="' . $candidateID . '">',
                         $template['Content'])
                     . "\n" . $endTD;
             }
@@ -831,8 +820,7 @@ class CareersUI extends UserInterface
                 die();
             }
 
-            if ($this->isCareerPortalCaptchaEnabled()
-                && $this->careerPortalTemplateRequiresCaptcha($template['Content - Apply for Position']))
+            if ($this->careerPortalTemplateRequiresCaptcha($template['Content - Apply for Position']))
             {
                 $captchaValue = isset($_POST['captcha']) ? $_POST['captcha'] : '';
                 if (!$this->validateCareerPortalCaptcha($captchaValue))
@@ -960,7 +948,10 @@ class CareersUI extends UserInterface
             $jobContactNameEscaped = htmlspecialchars((string) $jobOrderData['contactFullName'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $jobContactPhoneEscaped = htmlspecialchars((string) $jobOrderData['contactWorkPhone'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
             $jobContactEmailEscaped = htmlspecialchars((string) $jobOrderData['contactEmail'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
-            $jobDescriptionEscaped = htmlspecialchars((string) $jobOrderData['description'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+            $jobDescriptionHTML = $this->formatJobDescription(
+                (string) $jobOrderData['description'],
+                isset($jobOrderData['jobOrderID']) ? (int) $jobOrderData['jobOrderID'] : (int) $jobID
+            );
             $jobRateEscaped = nl2br(htmlspecialchars((string) $jobOrderData['maxRate'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING));
             $jobSalaryEscaped = nl2br(htmlspecialchars((string) $jobOrderData['salary'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING));
             $jobDaysOldEscaped = nl2br(htmlspecialchars((string) $jobOrderData['daysOld'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING));
@@ -984,7 +975,7 @@ class CareersUI extends UserInterface
             $template['Content'] = str_replace('<contactName>',  $jobContactNameEscaped, $template['Content']);
             $template['Content'] = str_replace('<contactPhone>', $jobContactPhoneEscaped, $template['Content']);
             $template['Content'] = str_replace('<contactEmail>', $jobContactEmailEscaped, $template['Content']);
-            $template['Content'] = str_replace('<description>',  $jobDescriptionEscaped, $template['Content']);
+            $template['Content'] = str_replace('<description>',  $jobDescriptionHTML, $template['Content']);
             $template['Content'] = str_replace('<rate>',         $jobRateEscaped, $template['Content']);
             $template['Content'] = str_replace('<salary>',       $jobSalaryEscaped, $template['Content']);
             $template['Content'] = str_replace('<daysOld>',      $jobDaysOldEscaped, $template['Content']);
@@ -1205,36 +1196,6 @@ class CareersUI extends UserInterface
     private function careerPortalTemplateRequiresCaptcha($templateContent)
     {
         return (strpos($templateContent, '<input-captcha req>') !== false);
-    }
-
-    private function renderCareerPortalCaptchaPlaceholder($templateContent)
-    {
-        if (!$this->isCareerPortalCaptchaEnabled())
-        {
-            $templateContent = preg_replace(
-                '/<tr>\s*<td[^>]*>\s*<label\s+id="captchaLabel"[^>]*>.*?<input-captcha(?:\s+req)?>.*?<\/tr>\s*/is',
-                '',
-                $templateContent
-            );
-
-            return str_replace(array('<input-captcha>', '<input-captcha req>'), '', $templateContent);
-        }
-
-        $captchaHTML = '<img src="' . CATSUtility::getIndexName() . '?m=careers&amp;p=captcha&amp;t=' . time() . '" alt="Captcha" /><br />'
-            . '<input type="text" name="captcha" id="captcha" class="inputBoxNormal" />';
-
-        return str_replace(array('<input-captcha>', '<input-captcha req>'), $captchaHTML, $templateContent);
-    }
-
-    private function isCareerPortalCaptchaEnabled()
-    {
-        $setting = getenv('NESP_CAREER_PORTAL_CAPTCHA_ENABLED');
-        if ($setting === false || trim((string) $setting) === '')
-        {
-            return false;
-        }
-
-        return in_array(strtolower(trim((string) $setting)), array('1', 'true', 'yes', 'on'), true);
     }
 
     private function validateCareerPortalCaptcha($captchaValue)
@@ -1733,6 +1694,145 @@ class CareersUI extends UserInterface
         return $facts;
     }
 
+    private function formatJobDescription($description, $jobOrderID)
+    {
+        $description = trim(str_replace(array("\r\n", "\r"), "\n", (string) $description));
+        if (!$this->isNESPJobOrderID($jobOrderID))
+        {
+            return nl2br(htmlspecialchars($description, ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING));
+        }
+
+        $lines = preg_split('/\n/', $description);
+        $tokens = array();
+        $skippingFacts = false;
+
+        foreach ($lines as $line)
+        {
+            $line = trim($line);
+            if ($line === '')
+            {
+                continue;
+            }
+
+            if (strcasecmp($line, 'Quick Facts') === 0)
+            {
+                $skippingFacts = true;
+                continue;
+            }
+
+            if ($skippingFacts && preg_match('/^(Pay|Location|Territory|Work location|Employment type|Typical schedule|Season):/i', $line))
+            {
+                continue;
+            }
+
+            $skippingFacts = false;
+            if ($this->isNESPDescriptionHeading($line))
+            {
+                $tokens[] = array('type' => 'heading', 'text' => $line);
+                continue;
+            }
+
+            if (strpos($line, '- ') === 0)
+            {
+                $tokens[] = array('type' => 'bullet', 'text' => substr($line, 2));
+                continue;
+            }
+
+            $tokens[] = array('type' => 'paragraph', 'text' => $line);
+        }
+
+        if (empty($tokens))
+        {
+            return '';
+        }
+
+        $html = '<div class="nesp-description-content">';
+        $sectionOpen = false;
+        $listOpen = false;
+
+        foreach ($tokens as $token)
+        {
+            if ($token['type'] === 'heading')
+            {
+                if ($listOpen)
+                {
+                    $html .= '</ul>';
+                    $listOpen = false;
+                }
+                if ($sectionOpen)
+                {
+                    $html .= '</section>';
+                }
+
+                $sectionClass = strcasecmp($token['text'], 'Apply Now') === 0
+                    ? ' nesp-description-apply'
+                    : '';
+                $html .= '<section class="nesp-description-section' . $sectionClass . '">';
+                $html .= '<h3>' . htmlspecialchars($token['text'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING) . '</h3>';
+                $sectionOpen = true;
+                continue;
+            }
+
+            if (!$sectionOpen)
+            {
+                $html .= '<p class="nesp-description-intro">' . htmlspecialchars($token['text'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING) . '</p>';
+                continue;
+            }
+
+            if ($token['type'] === 'bullet')
+            {
+                if (!$listOpen)
+                {
+                    $html .= '<ul>';
+                    $listOpen = true;
+                }
+                $html .= '<li>' . htmlspecialchars($token['text'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING) . '</li>';
+                continue;
+            }
+
+            if ($listOpen)
+            {
+                $html .= '</ul>';
+                $listOpen = false;
+            }
+            $html .= '<p>' . htmlspecialchars($token['text'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING) . '</p>';
+        }
+
+        if ($listOpen)
+        {
+            $html .= '</ul>';
+        }
+        if ($sectionOpen)
+        {
+            $html .= '</section>';
+        }
+
+        return $html . '</div>';
+    }
+
+    private function isNESPJobOrderID($jobOrderID)
+    {
+        return in_array((int) $jobOrderID, array(41001, 41002, 41003, 41005), true);
+    }
+
+    private function isNESPDescriptionHeading($line)
+    {
+        return in_array(
+            $line,
+            array(
+                'Why This Role May Be a Good Fit',
+                'What You\'ll Do',
+                'What We\'re Looking For',
+                'Equipment You Provide',
+                'What NESP Provides',
+                'Schedule and Travel Expectations',
+                'Schedule and Work Expectations',
+                'Apply Now'
+            ),
+            true
+        );
+    }
+
     private function getLocationString($city, $state, $country)
     {
         $city = (string) $city;
@@ -1839,8 +1939,7 @@ class CareersUI extends UserInterface
 
         if (empty($source))
         {
-            $trackedSource = NESPRecruitingAds::sourceFromRequest($_POST);
-            $source = $trackedSource !== '' ? $trackedSource : 'Online Careers Website';
+            $source = 'Online Careers Website';
         }
 
         $users = new Users();
@@ -2066,8 +2165,6 @@ class CareersUI extends UserInterface
             $jobOrderID
         );
 
-        $this->routeNESPApplicantToWorkflow($candidateID, $jobOrderID, $automatedUser['userID'], $newApplication);
-
         /* Send an E-Mail describing what happened. */
         $emailTemplates = new EmailTemplates();
         $candidatesEmailTemplateRS = $emailTemplates->getByTag(
@@ -2199,26 +2296,6 @@ class CareersUI extends UserInterface
                 );
             }
         }
-    }
-
-    private function routeNESPApplicantToWorkflow($candidateID, $jobOrderID, $actorUserID, $newApplication)
-    {
-        try
-        {
-            $workflow = new NESPWorkflow();
-            $workflow->routeCareerPortalApplicationToNeedsCraig(
-                $candidateID,
-                $jobOrderID,
-                $actorUserID,
-                $newApplication
-            );
-        }
-        catch (Exception $e)
-        {
-            return false;
-        }
-
-        return true;
     }
 
     public function capturePostData($ignore = array())

@@ -6,12 +6,16 @@
         <div id="contents">
             <div class="nesp-page-title">
                 <h2>My Assigned Candidates</h2>
-                <p>Scoped interviewer view. Only explicitly granted candidate and role assignments appear here.</p>
+                <p>Your interview work in one place. Open an assignment to review the candidate, conduct the interview, and complete the scorecard.</p>
             </div>
 
             <div class="nesp-dashboard-nav">
                 <a class="active" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignedCandidates">My Next Actions</a>
                 <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=myAvailability">My Availability</a>
+            </div>
+
+            <div class="nesp-safety-banner nesp-interviewer-note">
+                You only see candidates Craig assigned to you. Save a draft while you interview, then submit the scorecard when you are finished.
             </div>
 
             <?php if (count($this->assignedCandidates)): ?>
@@ -26,11 +30,11 @@
                         <p><?php $this->_($candidate['summary']); ?></p>
                         <dl>
                             <dt>Interview</dt>
-                            <dd><?php $this->_($candidate['scheduled_start']); ?></dd>
+                            <dd><?php $this->_($candidate['scheduled_start'] ? date('M j, Y - g:i A', strtotime($candidate['scheduled_start'])) : 'Not scheduled'); ?></dd>
                             <dt>Scorecard</dt>
-                            <dd><?php $this->_($candidate['scorecard_status_key']); ?></dd>
+                            <dd><?php $this->_($candidate['scorecard_status_key'] ? $candidate['scorecard_status_key'] : 'Not started'); ?></dd>
                         </dl>
-                        <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignedCandidate&amp;candidateID=<?php echo((int) $candidate['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $candidate['joborder_id']); ?>">Open Assignment</a>
+                        <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignedCandidate&amp;candidateID=<?php echo((int) $candidate['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $candidate['joborder_id']); ?>">Open interview</a>
                     </div>
                     <?php endforeach; ?>
                 </div>
