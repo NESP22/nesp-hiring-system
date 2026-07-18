@@ -20,8 +20,8 @@ The NESP careers portal remains the single intended application destination.
 ## Indeed
 
 Current review tabs exist for all four roles, but they are not ready to publish.
-The employer dashboard currently shows five incomplete drafts, including a
-duplicate Customer Service draft.
+The employer dashboard currently shows four incomplete NESP drafts, including
+two Customer Service drafts.
 
 Blocking issue:
 
@@ -71,8 +71,8 @@ Indeed ATS account check completed July 18:
 
 July 18 verification:
 
-- The current Indeed dashboard still shows five incomplete drafts, including a
-  duplicate Customer Service draft.
+- The current Indeed dashboard shows four incomplete NESP drafts, including two
+  Customer Service drafts.
 - At least one draft still shows `Application method: Email`.
 - Opening the application-method editor triggers Indeed's account
   re-verification prompt and requests a confirmation code before the setting
@@ -84,9 +84,11 @@ Current access re-check, July 18, 2026:
 
 - The Indeed employer account is currently signed in as
   `craig@nesportsphoto.com`.
-- The Jobs dashboard currently shows five incomplete NESP drafts: two Customer
-  Service drafts, Staff Photographer, Freelance Photographer, and Table
-  Greeter / Field Assistant.
+- The Jobs dashboard currently shows four incomplete NESP drafts: two Customer
+  Service drafts, Freelance Photographer, and Table Greeter / Field Assistant.
+  The unnamed exploratory draft was deleted during this verification; the
+  older Staff Photographer and Freelance Photographer listings remain visible
+  as paused listings.
 - The Customer Service review page still shows `Application method: Email`.
   No Indeed post was published during this check.
 - Craigslist currently redirects to the account login page, so no Craigslist
