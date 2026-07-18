@@ -13,7 +13,7 @@
 <job>
 <title><![CDATA[$[jobTitle]]]></title>
 <date><![CDATA[$[jobPostDate]]]></date>
-<referencenumber><![CDATA[$[jobID]]]></referencenumber>
+<referencenumber><![CDATA[$[jobOrderID]]]></referencenumber>
 <requisitionid><![CDATA[$[requisitionId]]]></requisitionid>
 <url><![CDATA[$[jobURL]]]></url>
 <company><![CDATA[$[hiringCompany]]]></company>
@@ -22,7 +22,7 @@
 <state><![CDATA[$[jobState]]]></state>
 <country><![CDATA[$[jobCountry]]]></country>
 <postalcode><![CDATA[$[jobZipCode]]]></postalcode>
-<email><![CDATA[craig@nesportsphoto.com]]></email>
+<email><![CDATA[$[feedEmail]]]></email>
 <description><![CDATA[$[jobDescription]]]></description>
 <salary><![CDATA[$[salary]]]></salary>
 </job>

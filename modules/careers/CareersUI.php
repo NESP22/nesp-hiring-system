@@ -45,6 +45,7 @@ include_once(LEGACY_ROOT . '/lib/DocumentToText.php');
 include_once(LEGACY_ROOT . '/lib/FileUtility.php');
 include_once(LEGACY_ROOT . '/lib/ParseUtility.php');
 include_once(LEGACY_ROOT . '/lib/StringUtility.php');
+include_once(LEGACY_ROOT . '/lib/NESPJobDescriptionFormatter.php');
 
 class CareersUI extends UserInterface
 {
@@ -1695,6 +1696,11 @@ class CareersUI extends UserInterface
     }
 
     private function formatJobDescription($description, $jobOrderID)
+    {
+        return NESPJobDescriptionFormatter::formatHTML($description, $jobOrderID);
+    }
+
+    private function formatLegacyJobDescription($description, $jobOrderID)
     {
         $description = trim(str_replace(array("\r\n", "\r"), "\n", (string) $description));
         if (!$this->isNESPJobOrderID($jobOrderID))

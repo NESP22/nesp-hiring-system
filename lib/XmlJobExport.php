@@ -217,6 +217,17 @@ class XmlTemplate
             $template
         );
     }
+
+    public static function replaceTemplateTagsCDATA($tag, $replace, $template)
+    {
+        $replace = str_replace(']]>', ']]]]><![CDATA[>', (string) $replace);
+
+        return str_replace(
+            sprintf('$[%s]', $tag),
+            $replace,
+            $template
+        );
+    }
 }
 
 ?>

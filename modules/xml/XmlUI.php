@@ -39,6 +39,7 @@ include_once(LEGACY_ROOT . '/lib/JobOrders.php');
 include_once(LEGACY_ROOT . '/lib/XmlJobExport.php');
 include_once(LEGACY_ROOT . '/lib/HttpLogger.php');
 include_once(LEGACY_ROOT . '/lib/CareerPortal.php');
+include_once(LEGACY_ROOT . '/lib/NESPJobDescriptionFormatter.php');
 
 define('XTPL_HEADER_STRING',    'header');
 define('XTPL_FOOTER_STRING',    'footer');
@@ -186,7 +187,7 @@ class XmlUI extends UserInterface
                 $publishedAt = strtotime((string) $row['dateCreatedSort']);
                 if ($publishedAt === false)
                 {
-                    $publishedAt = time();
+                    continue;
                 }
 
                 foreach ($tags as $tag)
@@ -267,12 +268,22 @@ class XmlUI extends UserInterface
                             break;
 
                         case 'salary':
-                            $salary = !empty($row['salary'])
-                                ? $row['salary']
-                                : $row['maxRate'];
                             $txtJobPosting = XmlTemplate::replaceTemplateTags(
                                 $tag,
-                                $salary,
+                                $row['salary'],
+                                $txtJobPosting
+                            );
+                            break;
+
+                        case 'feedEmail':
+                            $feedEmail = getenv('NESP_INDEED_FEED_EMAIL');
+                            if ($feedEmail === false)
+                            {
+                                $feedEmail = '';
+                            }
+                            $txtJobPosting = XmlTemplate::replaceTemplateTags(
+                                $tag,
+                                $feedEmail,
                                 $txtJobPosting
                             );
                             break;
@@ -311,9 +322,12 @@ class XmlUI extends UserInterface
                             break;
 
                         case 'jobDescription':
-                            $txtJobPosting = XmlTemplate::replaceTemplateTags(
+                            $txtJobPosting = XmlTemplate::replaceTemplateTagsCDATA(
                                 $tag,
-                                $row['jobDescription'],
+                                NESPJobDescriptionFormatter::formatIndeed(
+                                    $row['jobDescription'],
+                                    $row['jobOrderID']
+                                ),
                                 $txtJobPosting
                             );
                             break;
