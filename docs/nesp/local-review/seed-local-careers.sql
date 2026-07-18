@@ -231,7 +231,7 @@ Pay: $22-$25 per hour, based on experience
 Territory: Primarily Massachusetts, with additional assignments in Connecticut, Rhode Island, Vermont, and New Hampshire
 Employment type: Part-time, temporary, seasonal W-2
 Typical schedule: Most assignments are on Saturdays, with some Sundays and early-morning weekend availability
-Season: Spring season generally runs from late April through early June; optional after-school weekday assignments and future seasonal opportunities may be available
+Season: September-November and April-June; optional after-school weekday assignments and future seasonal opportunities may be available
 
 New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 
@@ -289,7 +289,7 @@ Pay: $22-$27 per hour, based on experience
 Territory: Massachusetts, Rhode Island, New Hampshire, and Connecticut
 Employment type: Freelance/Independent Contractor
 Typical schedule: Seasonal youth-sports Picture Day assignments, primarily weekends
-Season: Assignments commonly run from morning through early or mid-afternoon; optional after-school weekday work may be available
+Season: Part-time seasonal contract assignments generally run September-November and April-June; optional after-school weekday work may be available
 
 New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 
@@ -352,7 +352,7 @@ Territory: Primarily Massachusetts, with additional events in Connecticut, Rhode
 Work location: Youth-sports fields and facilities
 Employment type: Part-time, temporary, seasonal W-2
 Typical schedule: Primarily Saturdays, with some Sundays and early-morning availability
-Season: Mid-April through early June; training and early assignments may begin in April
+Season: September-November and April-June; training and early assignments may begin in April
 
 New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 

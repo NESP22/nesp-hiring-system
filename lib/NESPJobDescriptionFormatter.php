@@ -86,6 +86,10 @@ class NESPJobDescriptionFormatter
     {
         $tokens = self::tokenize($description);
         $html = '';
+        if (self::isNESPJobOrderID($jobOrderID))
+        {
+            $html = '<p><strong>Availability:</strong> ' . self::escape(self::getAvailabilityLine($jobOrderID)) . '</p>';
+        }
         $listOpen = false;
 
         foreach ($tokens as $token)
@@ -126,6 +130,25 @@ class NESPJobDescriptionFormatter
         }
 
         return $html;
+    }
+
+    private static function getAvailabilityLine($jobOrderID)
+    {
+        switch ((int) $jobOrderID)
+        {
+            case 41001:
+                return 'Year-round, approximately 20-30 hours per week.';
+
+            case 41002:
+            case 41005:
+                return 'Part-time seasonal work is generally available September-November and April-June.';
+
+            case 41003:
+                return 'Part-time seasonal contract assignments are generally available September-November and April-June.';
+
+            default:
+                return 'See the schedule and season details below.';
+        }
     }
 
     private static function tokenize($description)
