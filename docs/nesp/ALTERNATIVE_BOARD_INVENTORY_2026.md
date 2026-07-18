@@ -89,9 +89,9 @@ for our Methuen office. This role helps parents, families, league coordinators,
 and school contacts with online ordering, delivery, account, reprint, and
 support questions.
 
-**Pay:** `$22-$25/hour, based on experience`  
-**Location:** `Methuen, MA - in office`  
-**Employment:** `Part-time seasonal W-2`  
+**Pay:** `$22-$25/hour, based on experience`
+**Location:** `Methuen, MA - in office`
+**Employment:** `Part-time seasonal W-2`
 **Application:** `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41001`
 
 ### 41002 - Staff Photographer
@@ -102,10 +102,10 @@ New England Sports Photo is hiring seasonal W-2 staff photographers for
 youth-sports Picture Day events. NESP provides the camera and lighting
 equipment, paid training, and a structured Picture Day workflow.
 
-**Pay:** `$22-$25/hour, based on experience`  
-**Territory:** `MA, CT, RI, VT, NH`  
-**Schedule:** `Most assignments are Saturday mornings, with some Sundays and optional weekday after-school assignments`  
-**Employment:** `Part-time temporary seasonal W-2`  
+**Pay:** `$22-$25/hour, based on experience`
+**Territory:** `MA, CT, RI, VT, NH`
+**Schedule:** `Most assignments are Saturday mornings, with some Sundays and optional weekday after-school assignments`
+**Employment:** `Part-time temporary seasonal W-2`
 **Application:** `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41002`
 
 ### 41003 - Freelance Photographer
@@ -117,10 +117,10 @@ youth-sports Picture Day assignments. This contractor role is for photographers
 who provide their own approved professional equipment and are comfortable
 following a structured volume-photography workflow.
 
-**Pay:** `$22-$27/hour, based on experience`  
-**Territory:** `MA, RI, NH, CT`  
-**Schedule:** `Primarily early-morning weekend assignments; optional after-school weekday work may be available`  
-**Employment:** `Freelance/Independent Contractor`  
+**Pay:** `$22-$27/hour, based on experience`
+**Territory:** `MA, RI, NH, CT`
+**Schedule:** `Primarily early-morning weekend assignments; optional after-school weekday work may be available`
+**Employment:** `Freelance/Independent Contractor`
 **Application:** `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41003`
 
 ### 41005 - Field Assistant
@@ -131,10 +131,10 @@ New England Sports Photo is hiring friendly weekend field assistants to help
 youth-sports Picture Day events run smoothly. This active role welcomes families,
 organizes teams, checks forms, and supports the photographer.
 
-**Pay:** `$18/hour`  
-**Territory:** `Primarily MA, with CT, RI, and NH assignments`  
-**Schedule:** `Primarily Saturday mornings, with some Sundays during the spring season`  
-**Employment:** `Part-time temporary seasonal W-2`  
+**Pay:** `$18/hour`
+**Territory:** `Primarily MA, with CT, RI, and NH assignments`
+**Schedule:** `Primarily Saturday mornings, with some Sundays during the spring season`
+**Employment:** `Part-time temporary seasonal W-2`
 **Application:** `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41005`
 
 ## Required Assets Before Any Posting
