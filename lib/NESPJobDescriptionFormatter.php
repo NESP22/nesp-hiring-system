@@ -172,7 +172,7 @@ class NESPJobDescriptionFormatter
                 continue;
             }
 
-            if ($skippingFacts && preg_match('/^(Pay|Location|Territory|Work location|Employment type|Typical schedule|Season):/i', $line))
+            if ($skippingFacts && preg_match('/^(Pay|Location|Territory|Work location|Employment type|Typical schedule|Season|Availability):/i', $line))
             {
                 continue;
             }
