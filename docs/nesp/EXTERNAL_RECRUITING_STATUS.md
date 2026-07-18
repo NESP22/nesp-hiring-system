@@ -80,10 +80,22 @@ July 18 verification:
 - Do not publish the drafts until the application method is changed to a
   compliant external NESP application path and verified on the review page.
 
+Current access re-check, July 18, 2026:
+
+- The Indeed employer account is currently signed in as
+  `craig@nesportsphoto.com`.
+- The Jobs dashboard currently shows five incomplete NESP drafts: two Customer
+  Service drafts, Staff Photographer, Freelance Photographer, and Table
+  Greeter / Field Assistant.
+- The Customer Service review page still shows `Application method: Email`.
+  No Indeed post was published during this check.
+- Craigslist currently redirects to the account login page, so no Craigslist
+  draft was submitted or paid for during this check.
+
 Public copy release verification:
 
 - Copy polish was merged and deployed to `careers.nesportsphoto.com` on July
-  18 in release `1ff4541`.
+  18 in release `a9507e0`.
 - The live customer-service page now opens with a clear year-round role
   summary and shows approximately 20-30 hours per week.
 - The live staff photographer, freelance photographer, and field assistant

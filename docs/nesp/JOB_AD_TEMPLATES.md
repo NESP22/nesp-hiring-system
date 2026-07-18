@@ -46,7 +46,7 @@ New England Sports Photo is an equal opportunity employer. Every application is 
 - Status: prepared draft from approved Job ID `41001`.
 - Compensation: `$22-$25 per hour, based on experience`.
 - Location: in person at the NESP office in Methuen, Massachusetts.
-- Schedule: Monday-Friday agreed set schedule, generally 9:00 a.m.-3:00 p.m. or 10:00 a.m.-4:00 p.m. during peak seasons.
+- Schedule: Monday-Friday on an agreed set daytime schedule, generally 9:00 a.m.-3:00 p.m. or 10:00 a.m.-4:00 p.m., year-round.
 - Tracking link: `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41001&nesp_source=SOURCE_KEY`
 
 ### Short Version

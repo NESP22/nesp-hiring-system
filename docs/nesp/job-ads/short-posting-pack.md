@@ -1,6 +1,6 @@
 # NESP Short Posting Pack
 
-Use these short versions for previews, internal routing, and approved posting drafts. Keep application links as `[APPLICATION LINK]` until Craig approves the final destination.
+Use these short versions for previews, internal routing, and approved posting drafts. Each application link goes to the matching NESP/OpenCATS application form.
 
 ## Current Lineup
 
@@ -15,7 +15,7 @@ New England Sports Photo is hiring a part-time customer service representative f
 
 The schedule is Monday-Friday on an agreed set schedule, generally 9:00 a.m.-3:00 p.m. or 10:00 a.m.-4:00 p.m., with approximately 20-30 hours per week year-round.
 
-Apply: `[APPLICATION LINK]`
+Apply: https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41001
 
 ## Weekend Staff Portrait & Team Photographer - Youth Sports
 
@@ -23,7 +23,7 @@ New England Sports Photo is hiring seasonal W-2 staff photographers for youth-sp
 
 Most assignments are Saturdays, with some Sundays and early-morning availability. Seasonal work is generally available September-November and April-June, with optional after-school weekday assignments.
 
-Apply: `[APPLICATION LINK]`
+Apply: https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41002
 
 ## Freelance/Contract Youth Sports Photographer
 
@@ -31,7 +31,7 @@ New England Sports Photo is looking for experienced freelance photographers for 
 
 Assignments are primarily weekends across Massachusetts, Rhode Island, New Hampshire, and Connecticut, generally from morning through early or mid-afternoon. Seasonal work is generally available September-November and April-June, with optional after-school weekday assignments when available.
 
-Apply: `[APPLICATION LINK]`
+Apply: https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41003
 
 ## Weekend Table Greeter / Field Assistant
 
@@ -39,7 +39,7 @@ New England Sports Photo is hiring weekend table greeters and field assistants f
 
 This active seasonal role welcomes families, organizes teams, checks order details, assigns player codes, supports photographers, and helps keep events moving. Work is generally available September-November and April-June, primarily on Saturdays.
 
-Apply: `[APPLICATION LINK]`
+Apply: https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41005
 
 ## Suggested Short Titles
 
