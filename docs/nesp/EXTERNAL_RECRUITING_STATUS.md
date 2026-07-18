@@ -91,6 +91,9 @@ Current access re-check, July 18, 2026:
   No Indeed post was published during this check.
 - Craigslist currently redirects to the account login page, so no Craigslist
   draft was submitted or paid for during this check.
+- A direct HTTPS check of the live Indeed XML feed returned exactly
+  requisitions `41001`, `41002`, `41003`, and `41005`, with corrected
+  year-round/seasonal copy and role-specific NESP application URLs.
 
 Public copy release verification:
 
