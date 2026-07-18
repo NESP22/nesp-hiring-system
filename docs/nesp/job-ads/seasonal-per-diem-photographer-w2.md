@@ -6,18 +6,20 @@
 **Territory:** Primarily Massachusetts, with additional assignments in Connecticut, Rhode Island, Vermont, and New Hampshire
 **Employment type:** Part-time, temporary, seasonal W-2
 **Typical schedule:** Most assignments are on Saturdays, with some Sundays and early-morning weekend availability
-**Season:** Spring season generally runs from late April through early June; optional after-school weekday assignments and future seasonal opportunities may be available
+**Season:** Part-time seasonal work is generally available September-November and April-June; optional after-school weekday assignments and future seasonal opportunities may be available
 
 New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 
-We are hiring weekend staff photographers to create individual portraits and team photographs at youth-sports Picture Day events. Photography experience is helpful, but the bigger requirements are reliability, a professional attitude, comfort working with children and families, and willingness to learn a structured Picture Day system.
+We are hiring dependable weekend photographers to create polished individual portraits and team photographs at youth-sports Picture Day events. NESP provides the equipment, training, and workflow, so photography experience is helpful but not required. The most important qualities are reliability, professionalism, and comfort working with children and families.
+
+If you enjoy active community events and want seasonal work with a repeatable process and opportunities to return, this role is designed to help you succeed.
 
 ## Why This Role May Be a Good Fit
 
 - No personal camera equipment required
 - Professional equipment supplied by NESP
 - Paid training provided
-- Learn a repeatable Picture Day workflow
+- Learn a repeatable Picture Day workflow that helps every event run smoothly
 - Work with youth athletes and community sports leagues
 - Seasonal schedule with opportunities to return
 
@@ -48,7 +50,7 @@ NESP provides the camera equipment and lighting used for staff photographer assi
 
 ## Schedule and Travel Expectations
 
-Most assignments are Saturday mornings, with some Sundays. Optional weekday after-school assignments may be available. Paid drive time is handled in accordance with NESP policy.
+Part-time seasonal work is generally available September-November and April-June. Most assignments are Saturday mornings, with some Sundays and optional weekday after-school assignments. Paid drive time is handled in accordance with NESP policy.
 
 ## Apply Now
 

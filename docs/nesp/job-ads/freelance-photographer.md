@@ -5,17 +5,19 @@
 **Pay:** $22-$27 per hour, based on experience
 **Territory:** Massachusetts, Rhode Island, New Hampshire, and Connecticut
 **Employment type:** Freelance/Independent Contractor
-**Typical schedule:** Seasonal youth-sports Picture Day assignments, primarily weekends
-**Season:** Assignments commonly run from morning through early or mid-afternoon; optional after-school weekday work may be available
+**Typical schedule:** Primarily weekends, usually from morning through early or mid-afternoon; optional after-school weekday assignments may be available
+**Season:** Part-time seasonal contract assignments are generally available September-November and April-June
 
 New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 
-We are looking for experienced freelance photographers who enjoy efficient portrait and team photography in active outdoor youth-sports settings. This role is best suited for photographers who already own approved professional equipment, understand camera and flash settings, and want recurring seasonal assignments with a structured workflow.
+We are seeking experienced freelance photographers for recurring youth-sports Picture Day assignments. This role is a strong fit for photographers who own approved professional equipment, understand camera and flash settings, and want well-organized seasonal work with clear expectations.
+
+You will bring your craft and equipment; NESP provides the assignment details, event process, and support needed to work efficiently and professionally with families and leagues.
 
 ## Why This Role May Be a Good Fit
 
 - Use your own approved professional equipment
-- Add recurring seasonal weekend assignments
+- Add recurring seasonal weekend assignments to your calendar
 - Work with established youth-sports organizations
 - Follow a clear Picture Day process instead of guessing on site
 - Build on portrait, school, event, sports, or volume-photography experience
@@ -52,7 +54,7 @@ NESP provides the Picture Day workflow, assignment details, on-site process expe
 
 ## Schedule and Travel Expectations
 
-Assignments are primarily weekends and are commonly about 60-90 minutes from home. Optional after-school weekday work may be available. Travel and paid-time terms are handled according to the approved contractor assignment terms for the work offered.
+Part-time seasonal contract assignments are generally available September-November and April-June. Work is primarily weekends and is commonly about 60-90 minutes from home. Optional after-school weekday work may be available. Travel and paid-time terms are handled according to the approved contractor assignment terms for the work offered.
 
 ## Apply Now
 

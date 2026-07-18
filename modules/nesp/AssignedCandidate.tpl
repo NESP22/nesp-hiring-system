@@ -33,37 +33,37 @@
             <div class="nesp-two-column">
                 <div class="nesp-panel">
                     <h3>Assignment Snapshot</h3>
-                    <table class="nesp-table">
-                        <tr><th>Stage</th><td><?php $this->_($this->candidate['stage_name']); ?></td></tr>
-                        <tr><th>Waiting on</th><td><?php $this->_($this->candidate['waiting_on_key']); ?></td></tr>
-                        <tr><th>Last activity</th><td><?php $this->_($this->candidate['last_activity']); ?></td></tr>
-                        <tr><th>Summary</th><td><?php $this->_($this->candidate['summary']); ?></td></tr>
-                        <?php if (!empty($this->candidate['email1'])): ?><tr><th>Email</th><td><?php $this->_($this->candidate['email1']); ?></td></tr><?php endif; ?>
-                        <?php if (!empty($this->candidate['phone_cell'])): ?><tr><th>Phone</th><td><?php $this->_($this->candidate['phone_cell']); ?></td></tr><?php endif; ?>
+                    <table class="nesp-table nesp-table-stacked">
+                        <tr><th>Stage</th><td data-label="Stage"><?php $this->_($this->candidate['stage_name']); ?></td></tr>
+                        <tr><th>Waiting on</th><td data-label="Waiting on"><?php $this->_($this->candidate['waiting_on_key']); ?></td></tr>
+                        <tr><th>Last activity</th><td data-label="Last activity"><?php $this->_($this->candidate['last_activity']); ?></td></tr>
+                        <tr><th>Summary</th><td data-label="Summary"><?php $this->_($this->candidate['summary']); ?></td></tr>
+                        <?php if (!empty($this->candidate['email1'])): ?><tr><th>Email</th><td data-label="Email"><?php $this->_($this->candidate['email1']); ?></td></tr><?php endif; ?>
+                        <?php if (!empty($this->candidate['phone_cell'])): ?><tr><th>Phone</th><td data-label="Phone"><?php $this->_($this->candidate['phone_cell']); ?></td></tr><?php endif; ?>
                         <?php if ((int) $this->candidate['can_view_resume'] === 1): ?>
-                        <tr><th>Skills</th><td><?php $this->_($this->candidate['key_skills']); ?></td></tr>
-                        <tr><th>Notes</th><td><?php $this->_($this->candidate['notes']); ?></td></tr>
+                        <tr><th>Skills</th><td data-label="Skills"><?php $this->_($this->candidate['key_skills']); ?></td></tr>
+                        <tr><th>Notes</th><td data-label="Notes"><?php $this->_($this->candidate['notes']); ?></td></tr>
                         <?php endif; ?>
                     </table>
                 </div>
 
                 <div class="nesp-panel">
                     <h3>Interviews</h3>
-                    <table class="nesp-table">
-                        <tr>
+                    <table class="nesp-table nesp-table-stacked">
+                        <tr class="nesp-table-header">
                             <th>Date</th>
                             <th>Time</th>
                             <th>Status</th>
                         </tr>
                         <?php foreach ($this->candidate['interviews'] as $interview): ?>
                         <tr>
-                            <td><?php $this->_($interview['scheduled_start'] ? date('M j, Y', strtotime($interview['scheduled_start'])) : ''); ?></td>
-                            <td><?php $this->_($interview['scheduled_start'] ? date('g:i A', strtotime($interview['scheduled_start'])) : ''); ?></td>
-                            <td><?php $this->_($interview['status_key']); ?></td>
+                            <td data-label="Date"><?php $this->_($interview['scheduled_start'] ? date('M j, Y', strtotime($interview['scheduled_start'])) : ''); ?></td>
+                            <td data-label="Time"><?php $this->_($interview['scheduled_start'] ? date('g:i A', strtotime($interview['scheduled_start'])) : ''); ?></td>
+                            <td data-label="Status"><?php $this->_($interview['status_key']); ?></td>
                         </tr>
                         <?php endforeach; ?>
                         <?php if (!count($this->candidate['interviews'])): ?>
-                        <tr><td colspan="3">No interview record is attached to this assignment.</td></tr>
+                        <tr><td colspan="3" data-label="">No interview record is attached to this assignment.</td></tr>
                         <?php endif; ?>
                     </table>
                 </div>

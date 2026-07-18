@@ -265,6 +265,87 @@
                 </table>
             </div>
 
+            <?php if ($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA): ?>
+            <div class="nesp-panel">
+                <h3>Controlled Import Review</h3>
+                <p class="nesp-help-text">Pasted rows are staged for review first. They do not affect forecast math until approved and finalized.</p>
+                <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=previewStaffingImport" class="nesp-stacked-form">
+                    <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                    <label>Source label
+                        <input type="text" name="sourceLabel" value="Manual staffing review <?php echo(date('Y-m-d')); ?>" />
+                    </label>
+                    <label>CSV rows
+                        <textarea name="staffingCSVText" rows="6" placeholder="Date,Start,End,State,Sport,Event,Role,Staff"></textarea>
+                    </label>
+                    <button type="submit" class="nesp-secondary-button">Create Review Batch</button>
+                </form>
+
+                <h4>Pending Review Batches</h4>
+                <table class="nesp-table">
+                    <tr><th>Batch</th><th>Source</th><th>Rows Waiting</th><th>Created</th><th>Open</th></tr>
+                    <?php foreach ($this->forecast['pendingImportBatches'] as $batch): ?>
+                    <tr>
+                        <td><?php echo((int) $batch['import_batch_id']); ?></td>
+                        <td><?php $this->_($batch['source_label']); ?></td>
+                        <td><?php echo((int) $batch['rows_requiring_review']); ?></td>
+                        <td><?php $this->_($batch['date_created']); ?></td>
+                        <td><a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=staffingForecast&amp;reviewBatchID=<?php echo((int) $batch['import_batch_id']); ?>">Review</a></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (!count($this->forecast['pendingImportBatches'])): ?>
+                    <tr><td colspan="5">No staffing rows are waiting for review.</td></tr>
+                    <?php endif; ?>
+                </table>
+            </div>
+
+            <?php if ((int) $this->reviewBatchID > 0): ?>
+            <div class="nesp-panel">
+                <h3>Review Batch #<?php echo((int) $this->reviewBatchID); ?></h3>
+                <p class="nesp-help-text">Approve verified rows and reject rows that should stay out of calculations. Finalizing is blocked until every row has a decision.</p>
+                <form method="post" class="nesp-stacked-form">
+                    <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                    <input type="hidden" name="importBatchID" value="<?php echo((int) $this->reviewBatchID); ?>" />
+                    <table class="nesp-table">
+                        <tr>
+                            <th>Select</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Event</th>
+                            <th>Role</th>
+                            <th>Staff</th>
+                            <th>Issues</th>
+                        </tr>
+                        <?php foreach ($this->reviewRows as $row): ?>
+                        <tr>
+                            <td><input type="checkbox" name="rowIDs[]" value="<?php echo((int) $row['import_row_id']); ?>" /></td>
+                            <td><?php $this->_($row['status_key']); ?></td>
+                            <td><?php $this->_($row['event_date']); ?></td>
+                            <td><?php $this->_($row['event_name']); ?></td>
+                            <td><?php $this->_($row['role_key']); ?></td>
+                            <td><?php $this->_($row['staff_name']); ?></td>
+                            <td><?php echo((int) $row['issue_count']); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if (!count($this->reviewRows)): ?>
+                        <tr><td colspan="7">No rows found for this review batch.</td></tr>
+                        <?php endif; ?>
+                    </table>
+                    <label>Review note
+                        <input type="text" name="reviewNote" value="" />
+                    </label>
+                    <button type="submit" formaction="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=approveStaffingImportRows" class="nesp-secondary-button">Approve Selected</button>
+                    <button type="submit" formaction="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=rejectStaffingImportRows" class="nesp-secondary-button">Reject Selected</button>
+                </form>
+                <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=finalizeStaffingImport" class="nesp-inline-form">
+                    <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                    <input type="hidden" name="importBatchID" value="<?php echo((int) $this->reviewBatchID); ?>" />
+                    <button type="submit" class="nesp-secondary-button">Finalize Approved Rows</button>
+                    <span class="nesp-help-text">No applicant, calendar, Zoom, or Google action is taken.</span>
+                </form>
+            </div>
+            <?php endif; ?>
+            <?php endif; ?>
+
             <div class="nesp-two-column">
                 <div class="nesp-panel">
                     <h3>Season Summary</h3>
@@ -307,6 +388,20 @@
                     </form>
                     <?php endif; ?>
                 </div>
+            </div>
+
+            <div class="nesp-panel">
+                <h3>Preliminary Fall 2026 Gap</h3>
+                <p class="nesp-help-text">Uses approved September-November historical rows only.</p>
+                <table class="nesp-table">
+                    <tr><th>Season</th><td><?php $this->_($this->forecast['fall2026Gap']['season_label']); ?></td></tr>
+                    <tr><th>Historical fall events</th><td><?php echo((int) $this->forecast['fall2026Gap']['historical_fall_events']); ?></td></tr>
+                    <tr><th>Historical peak-day staffing</th><td><?php echo((int) $this->forecast['fall2026Gap']['historical_peak_day_staffing']); ?></td></tr>
+                    <tr><th>Recommended pool</th><td><?php echo((int) $this->forecast['fall2026Gap']['recommended_pool']); ?></td></tr>
+                    <tr><th>Recommended backup</th><td><?php echo((int) $this->forecast['fall2026Gap']['recommended_backup']); ?></td></tr>
+                    <tr><th>Preliminary hiring gap</th><td><?php echo((int) $this->forecast['fall2026Gap']['preliminary_hiring_gap']); ?></td></tr>
+                    <tr><th>Confidence</th><td><?php $this->_($this->forecast['fall2026Gap']['confidence']); ?></td></tr>
+                </table>
             </div>
 
             <div class="nesp-two-column">

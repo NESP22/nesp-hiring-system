@@ -13,7 +13,7 @@ for this campaign and now includes role-specific prescreening questions.
 
 | Job ID | Role | Pay | Classification | Location / Territory | Application link |
 | --- | --- | --- | --- | --- | --- |
-| `41001` | Part-Time Customer Service Representative | `$22-$25/hour` | Part-time seasonal W-2 | Methuen, MA | `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41001` |
+| `41001` | Part-Time Customer Service Representative | `$22-$25/hour` | Part-time year-round W-2 | Methuen, MA | `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41001` |
 | `41002` | Weekend Staff Portrait & Team Photographer - Youth Sports | `$22-$25/hour` | Part-time temporary seasonal W-2 | MA, CT, RI, VT, NH | `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41002` |
 | `41003` | Freelance/Contract Youth Sports Photographer | `$22-$27/hour` | Freelance/Independent Contractor | MA, RI, NH, CT | `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41003` |
 | `41005` | Weekend Table Greeter / Field Assistant | `$18/hour` | Part-time temporary seasonal W-2 | Primarily MA, with CT, RI, NH assignments | `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41005` |
@@ -40,14 +40,26 @@ Important distinction:
 
 ## Indeed Posting Package
 
+### Approved Opening Counts And Timing
+
+- Customer Service (`41001`): 1 year-round opening, approximately 20-30
+  hours per week.
+- Staff Photographer (`41002`): 20 part-time seasonal openings for
+  September-November and April-June, approximately 20-30 hours per week.
+- Freelance Photographer (`41003`): separate contract draft currently set to
+  7 openings; part-time seasonal contract assignments generally available
+  September-November and April-June; confirm any change before publication.
+- Field Assistant (`41005`): 20 part-time seasonal openings for
+  September-November and April-June.
+
 ### 41001 - Customer Service
 
 - Platform-ready title: `Part-Time Customer Service Representative - Methuen, MA`
-- Opening: `New England Sports Photo is hiring a part-time Customer Service Representative for our Methuen office. This role helps parents, families, league coordinators, and school contacts with online ordering, delivery, account, reprint, and support questions.`
+- Opening: `New England Sports Photo is hiring a part-time Customer Service Representative for our Methuen office. You will become a trusted point of contact for parents, families, league coordinators, and school partners, turning order, delivery, account, reprint, and support questions into clear next steps.`
 - Pay: `$22-$25/hour, based on experience`
 - Location: `Methuen, MA`
-- Schedule: `Weekday daytime schedule by agreement, generally 9:00 AM-3:00 PM or 10:00 AM-4:00 PM during spring and fall peak seasons`
-- Employment type: `Part-time seasonal W-2`
+- Schedule: `Year-round weekday daytime schedule by agreement, generally 9:00 AM-3:00 PM or 10:00 AM-4:00 PM`
+- Employment type: `Part-time year-round W-2`
 - Responsibilities:
   - Respond to customer emails, support tickets, and calls
   - Help parents with online ordering and account questions
@@ -75,7 +87,7 @@ Important distinction:
 - Opening: `New England Sports Photo is hiring seasonal W-2 staff photographers for youth-sports Picture Day events. NESP provides the camera and lighting equipment, paid training, and a structured Picture Day workflow.`
 - Pay: `$22-$25/hour, based on experience`
 - Territory: `MA, CT, RI, VT, NH`
-- Schedule: `Most assignments are Saturday mornings, with some Sundays and optional weekday after-school assignments`
+- Schedule: `Part-time seasonal work is generally available September-November and April-June. Most assignments are Saturday mornings, with some Sundays and optional weekday after-school assignments.`
 - Employment type: `Part-time temporary seasonal W-2`
 - Responsibilities:
   - Photograph individual athletes and teams using NESP equipment
@@ -105,7 +117,7 @@ Important distinction:
 - Opening: `New England Sports Photo is seeking freelance/contract photographers for youth-sports Picture Day assignments. This contractor role is for photographers who provide their own approved professional equipment and are comfortable following a structured volume-photography workflow.`
 - Pay: `$22-$27/hour, based on experience`
 - Territory: `MA, RI, NH, CT`
-- Schedule: `Primarily early-morning weekend assignments; optional after-school weekday work may be available`
+- Schedule: `Part-time seasonal contract assignments are generally available September-November and April-June. Work is primarily early-morning weekends; optional after-school weekday assignments may be available.`
 - Employment type: `Freelance/Independent Contractor`
 - Responsibilities:
   - Photograph youth athletes and teams at assigned Picture Day events
@@ -136,7 +148,7 @@ Important distinction:
 - Opening: `New England Sports Photo is hiring friendly weekend field assistants to help youth-sports Picture Day events run smoothly. This active role welcomes families, organizes teams, checks forms, and supports the photographer.`
 - Pay: `$18/hour`
 - Territory: `Primarily MA, with CT, RI, and NH assignments`
-- Schedule: `Primarily Saturday mornings, with some Sundays during the spring season`
+- Schedule: `Part-time seasonal work is generally available September-November and April-June. Assignments are primarily Saturday mornings, with some Sundays.`
 - Employment type: `Part-time temporary seasonal W-2`
 - Responsibilities:
   - Welcome and check in families
@@ -207,8 +219,8 @@ New England Sports Photo is hiring a part-time Customer Service Representative f
 
 Pay: $22-$25 per hour, based on experience
 Location: Methuen, MA - in office
-Employment type: part-time seasonal W-2
-Schedule: weekday daytime hours during spring and fall peak seasons
+Employment type: part-time year-round W-2
+Schedule: approximately 20-30 hours per week, with a consistent weekday daytime schedule
 
 What you'll do:
 - Respond to customer emails, support tickets, and calls
@@ -246,7 +258,7 @@ New England Sports Photo is hiring seasonal W-2 staff photographers for youth-sp
 Pay: $22-$25 per hour, based on experience
 Territory: MA, CT, RI, VT, and NH
 Employment type: part-time temporary seasonal W-2
-Schedule: most Saturday mornings, some Sundays, optional weekday after-school assignments
+Schedule: part-time seasonal work is generally available September-November and April-June; most assignments are Saturday mornings, some Sundays, with optional weekday after-school assignments
 Equipment: NESP provides camera equipment, lighting, training, and workflow guidance
 
 What you'll do:
@@ -283,7 +295,7 @@ New England Sports Photo is seeking freelance/contract photographers for youth-s
 Pay: $22-$27 per hour, based on experience
 Classification: Freelance/Independent Contractor
 Territory: MA, RI, NH, and CT
-Schedule: primarily early-morning weekend Picture Day assignments
+Schedule: part-time seasonal contract assignments are generally available September-November and April-June; work is primarily early-morning weekend Picture Day assignments
 Equipment: freelance photographers provide their own approved professional camera body, external speedlight, suitable portrait zoom lens, and backup equipment
 
 What you'll do:
@@ -320,7 +332,7 @@ New England Sports Photo is hiring friendly weekend field assistants to help you
 Pay: $18 per hour
 Employment type: part-time temporary seasonal W-2
 Territory: primarily MA, with CT, RI, and NH assignments
-Schedule: primarily Saturday mornings, with some Sundays
+Schedule: part-time seasonal work is generally available September-November and April-June; assignments are primarily Saturday mornings, with some Sundays
 Equipment/training: NESP provides training, Picture Day workflow guidance, and posing guides
 
 What you'll do:

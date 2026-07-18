@@ -8,6 +8,8 @@ Revert the app to the approved pre-Phase-2 revision or backup branch. Do not mer
 
 Use `db/nesp_phase2_rollback.sql` only after a verified production database backup.
 
+Use `db/nesp_staffing_import_review_rollback.sql` when rolling back only the row-review metadata extension. Verify that no pending review batches need reviewer notes or timestamps before running it.
+
 Forecast rollback removes only Phase 2 forecast/import structures:
 
 - `nesp_staffing_recommendation`
