@@ -26,6 +26,9 @@
  * $Id: main.css 1054 2006-02-06 18:14:19Z austin $
  */
 
+/* NESP screens share this legacy global stylesheet on older admin routes. */
+@import url('modules/nesp/nespWorkflow.css');
+
 .dataGridResizeAreaInnerDiv
 {
     width:3px;

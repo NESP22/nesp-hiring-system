@@ -6,9 +6,9 @@ This document mirrors the public listing for the customer-service role and keeps
 
 **Pay:** $22-$25 per hour, based on experience
 **Location:** In person at the NESP office in Methuen, Massachusetts
-**Employment type:** Part-time, seasonal W-2
+**Employment type:** Part-time, year-round W-2
 **Typical schedule:** Monday-Friday, agreed set schedule, generally 9:00 a.m.-3:00 p.m. or 10:00 a.m.-4:00 p.m.
-**Season:** Approximately 20-30 hours per week during spring and fall peak seasons; reduced hours or scheduled time off may occur during slower summer and winter periods
+**Availability:** Year-round, approximately 20-30 hours per week
 
 New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 

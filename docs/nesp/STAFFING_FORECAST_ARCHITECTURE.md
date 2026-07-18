@@ -4,10 +4,12 @@
 
 - `NESP_STAFFING_FORECAST_ENABLED` defaults off.
 - `NESP_STAFFING_DRIVE_IMPORT_ENABLED` defaults off.
+- `NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED` defaults off and is separate from interviewer-pool access.
 - Forecast source status is stored in `nesp_staffing_import_batch`.
 - Normalized row lineage is stored in `nesp_staffing_import_row`.
 - Import issues are stored in `nesp_staffing_import_issue`.
 - Draft internal recommendations are stored in `nesp_staffing_recommendation`.
+- Manual CSV rows can be staged as `pending_review`, approved or rejected row by row, and finalized only after every row has a decision.
 - One-import undo marks an import batch as `undone` without deleting native OpenCATS data.
 
 ## Source Flow
@@ -16,9 +18,9 @@
 2. Alternatively upload CSV/XLSX in a controlled admin workflow.
 3. Preview sheets/tabs and columns.
 4. Map columns to normalized fields.
-5. Preview normalized rows and warnings.
-6. Confirm import.
-7. Review issues.
+5. Stage normalized rows and warnings in a review batch.
+6. Approve or reject every normalized row.
+7. Finalize the approved rows.
 8. Undo an import batch if needed.
 
 ## Required Future Drive Access
@@ -33,5 +35,5 @@ Expected scopes:
 ## Deferred
 
 - Live Google Drive discovery and file download are intentionally disabled.
-- Browser upload endpoints are not production-enabled by default.
+- Google Drive import remains production-disabled by default.
 - Real historical schedule import is not claimed by this PR.

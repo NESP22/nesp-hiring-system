@@ -9,9 +9,9 @@
 <job>
 <title>$[jobTitle]</title>
 <job-code>$[jobID]</job-code>
-<job-board-name>CATS Applicant Tracking System</job-board-name>
+<job-board-name>OpenCATS</job-board-name>
 
-<job-board-url>http://www.catsone.com</job-board-url>
+<job-board-url>https://careers.nesportsphoto.com/</job-board-url>
 <detail-url>$[jobURL]</detail-url>
 <apply-url>$[jobURL]</apply-url>
 

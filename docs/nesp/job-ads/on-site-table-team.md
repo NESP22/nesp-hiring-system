@@ -7,13 +7,13 @@
 **Work location:** Youth-sports fields and facilities
 **Employment type:** Part-time, temporary, seasonal W-2
 **Typical schedule:** Primarily Saturdays, with some Sundays and early-morning availability
-**Season:** Mid-April through early June; training and early assignments may begin in April
+**Season:** Part-time seasonal work is generally available September-November and April-June; training and early assignments may begin in April
 
 New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 
-We are hiring friendly, organized field assistants to help Picture Day run smoothly at youth-sports events. This is an active weekend role for someone who enjoys helping people, keeping details straight, and supporting a photographer and event team in the field.
+We are hiring friendly, organized field assistants to help youth-sports Picture Day events run smoothly. This active weekend role is a great fit for someone who enjoys welcoming families, keeping details straight, and supporting a photographer and event team in the field.
 
-You will often be one of the first NESP team members families meet when they arrive. A calm, welcoming attitude and careful attention to names, teams, forms, and player numbers help the whole event stay on track.
+You will often be one of the first NESP team members families meet. Your calm, welcoming presence and attention to names, teams, forms, and player numbers will help the entire event stay organized and on schedule.
 
 ## Why This Role May Be a Good Fit
 
@@ -54,7 +54,7 @@ NESP provides training, Picture Day workflow guidance, posing guides, and suppor
 
 ## Schedule and Travel Expectations
 
-Most assignments are early weekend events, especially Saturdays, during the busiest late-April through early-June period. Paid drive time is provided both directions.
+Part-time seasonal work is generally available September-November and April-June. Assignments are primarily Saturday mornings, with some Sundays and early-morning availability. Paid drive time is provided both directions.
 
 ## Apply Now
 

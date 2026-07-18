@@ -51,13 +51,13 @@ Job `41004` remains inactive/nonpublic and has no NESP prescreen questions.
 The Staff Photographer and Freelance Photographer roles both use the
 Photographer Pre-Interview questionnaire. The applicant-facing title is:
 
-`Spring 2026 Pre-Zoom Meeting Info and Survey`
+`Fall 2026 and Spring 2027 Pre-Interview Information and Survey`
 
 The Photographer questionnaire asks job-related questions about:
 
 - email address
 - applicant name
-- being in the New England area during April, May, and early June
+- availability for seasonal assignments during September-November and April-June
 - whether the applicant is scheduling for Photographer or Table Greeter / Field
   Assistant
 - current date and time
@@ -85,13 +85,13 @@ The questionnaire applies to both staff and freelance photographer candidates.
 The screening-questionnaire flow presents the Field Staff / Table Greeter path
 first. The applicant-facing title is:
 
-`Spring 2026 Pre-Zoom Meeting Info and Survey`
+`Fall 2026 and Spring 2027 Pre-Interview Information and Survey`
 
 The Field Staff questionnaire asks job-related questions about:
 
 - email address
 - applicant name
-- being in the New England area during April, May, and early June
+- availability for seasonal assignments during September-November and April-June
 - whether the applicant is scheduling for Photographer or Table Greeter / Field
   Assistant
 - current date and time

@@ -17,6 +17,8 @@ class DatabaseTestCase extends TestCase
         // but we will use explicit strings for the connection call below.
         if (!defined('DATABASE_NAME')) define('DATABASE_NAME', 'cats_integrationtest');
         if (!defined('DATABASE_HOST')) define('DATABASE_HOST', 'integrationtestdb');
+        if (!defined('DATABASE_USER')) define('DATABASE_USER', 'dev');
+        if (!defined('DATABASE_PASS')) define('DATABASE_PASS', 'dev');
 
         include_once('./config.php');
         include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');

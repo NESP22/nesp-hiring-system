@@ -199,7 +199,7 @@ class CareersUI extends UserInterface
             $candidate = $this->ProcessCandidateRegistration($template['Content - Candidate Registration'], $fields);
             if ($candidate === false)
             {
-                echo '<html><body>You have not registered yet.  Please wait while we direct you to the job list...<script>setTimeout("document.location.href=\'?m=careers&&p=showAll\';", 1500);</script></body></html>';
+                echo '<html><body>You have not registered yet. Please return to the open positions list to begin your application.<script>setTimeout("document.location.href=\'?m=careers&amp;p=showAll\';", 1500);</script></body></html>';
                 die();
             }
 
@@ -307,7 +307,7 @@ class CareersUI extends UserInterface
             $candidate = $this->ProcessCandidateRegistration($template['Content - Candidate Registration'], $fields, true);
             if ($candidate === false)
             {
-                echo '<html><body>You have not registered yet.  Please wait while we direct you to the job list...<script>setTimeout("document.location.href=\'?m=careers&&p=showAll\';", 1500);</script></body></html>';
+                echo '<html><body>You have not registered yet. Please return to the open positions list to begin your application.<script>setTimeout("document.location.href=\'?m=careers&amp;p=showAll\';", 1500);</script></body></html>';
                 die();
             }
 
@@ -626,7 +626,7 @@ class CareersUI extends UserInterface
             if (!isset($jobOrderData['public']) || $jobOrderData['public'] == 0)
             {
                 // FIXME: Generate valid XHTML error pages. Create an error/fatal method!
-                echo '<html><body>This position is no longer available.  Please wait while we direct you to the job list...<script>setTimeout("document.location.href=\'?m=careers&&p=showAll\';", 1500);</script></body></html>';
+                echo '<html><body>This position is no longer available. Please return to the open positions list to view current opportunities.<script>setTimeout("document.location.href=\'?m=careers&amp;p=showAll\';", 1500);</script></body></html>';
                 die();
             }
 
@@ -822,7 +822,7 @@ class CareersUI extends UserInterface
             if (!$this->isRequiredIDValid('ID', $_POST))
             {
                 // FIXME: Generate valid XHTML error pages. Create an error/fatal method!
-                echo '<html><body>This position is invalid or no longer available. Please wait while we direct you to the job list...<script>setTimeout("document.location.href=\'?m=careers&&p=showAll\';", 1500);</script></body></html>';
+                echo '<html><body>This position is invalid or no longer available. Please return to the open positions list to view current opportunities.<script>setTimeout("document.location.href=\'?m=careers&amp;p=showAll\';", 1500);</script></body></html>';
                 die();
             }
 
@@ -868,7 +868,7 @@ class CareersUI extends UserInterface
                 if (!isset($jobOrderData['public']) || $jobOrderData['public'] == 0)
                 {
                     // FIXME: Generate valid XHTML error pages. Create an error/fatal method!
-                    echo '<html><body>This position is no longer available.  Please wait while we direct you to the job list...<script>setTimeout("document.location.href=\'?m=careers&&p=showAll\';", 1500);</script></body></html>';
+                    echo '<html><body>This position is no longer available. Please return to the open positions list to view current opportunities.<script>setTimeout("document.location.href=\'?m=careers&amp;p=showAll\';", 1500);</script></body></html>';
                     die();
                 }
 
@@ -947,7 +947,7 @@ class CareersUI extends UserInterface
             $jobOrderData = $jobOrders->get($jobID);
             if (!isset($jobOrderData['public']) || $jobOrderData['public'] == 0)
             {
-                echo '<html><body>This position is no longer available.  Please wait while we direct you to the job list...<script>setTimeout("document.location.href=\'?m=careers&&p=showAll\';", 1500);</script></body></html>';
+                echo '<html><body>This position is no longer available. Please return to the open positions list to view current opportunities.<script>setTimeout("document.location.href=\'?m=careers&amp;p=showAll\';", 1500);</script></body></html>';
                 die ();
             }
 
@@ -1065,9 +1065,7 @@ class CareersUI extends UserInterface
                     {
                         $isRegistered = false;
                         // Error Message
-                        $template['Content'] = str_replace('<registeredLoginTitle>', '<h1 style="color: #800000;">No applicants were '
-                            . 'found matching your criteria.</h1><h3>Once you apply to any of our positions, you will automatically '
-                            . 'be registered.<br /><br />', $template['Content']
+                        $template['Content'] = str_replace('<registeredLoginTitle>', '<h1 style="color: #800000;">We couldn\'t find an applicant account with that information.</h1><h3>Apply to a current position to create an account, or return to the open positions.<br /><br />', $template['Content']
                         );
                     }
                     else
@@ -1267,7 +1265,7 @@ class CareersUI extends UserInterface
             $validator .= '
                 if (document.getElementById(\'emailconfirm\').value != document.getElementById(\'email\').value)
                 {
-                    alert(\'Your E-Mail address doesn\\\'t match the retyped E-Mail address.\');
+                    alert(\'Your email address doesn\\\'t match the confirmation email address.\');
                     document.getElementById(\'emailconfirm\').focus();
                     return false;
                 }';
@@ -1279,14 +1277,14 @@ class CareersUI extends UserInterface
             $validator .= '
                 if (document.getElementById(\'email\').value == \'\')
                 {
-                    alert(\'Please enter an E-Mail address.\');
+                    alert(\'Please enter an email address.\');
                     document.getElementById(\'email\').focus();
                     return false;
                 }
                 if (document.getElementById(\'email\').value.indexOf(\'@\') == -1 ||
                     document.getElementById(\'email\').value.indexOf(\'.\') == -1)
                 {
-                    alert(\'Please enter a valid E-Mail address.\');
+                    alert(\'Please enter a valid email address.\');
                     document.getElementById(\'email\').focus();
                     return false;
                 }';
@@ -1413,7 +1411,7 @@ class CareersUI extends UserInterface
             $validator .= '
                 if (document.getElementById(\'email2\').value == \'\')
                 {
-                    alert(\'Please enter an E-Mail address.\');
+                    alert(\'Please enter an email address.\');
                     document.getElementById(\'email2\').focus();
                     return false;
                 }';
@@ -1681,26 +1679,26 @@ class CareersUI extends UserInterface
         switch ($jobOrderID)
         {
             case 41001:
-                $facts['classification'] = 'Part-Time W-2';
-                $facts['schedule'] = 'Monday-Friday, set daytime schedule';
+                $facts['classification'] = 'Part-Time Year-Round W-2';
+                $facts['schedule'] = 'Monday-Friday, agreed set daytime schedule';
                 $facts['season'] = 'Year-round, approximately 20-30 hours per week';
                 break;
 
             case 41002:
                 $facts['classification'] = 'Part-Time Seasonal W-2';
-                $facts['schedule'] = 'Most Saturdays, some Sundays';
+                $facts['schedule'] = 'Most Saturdays, with some Sundays and early-morning availability';
                 $facts['season'] = 'September-November and April-June';
                 break;
 
             case 41003:
                 $facts['classification'] = 'Part-Time Seasonal Contract (Independent Contractor)';
-                $facts['schedule'] = 'Primarily weekends';
-                $facts['season'] = 'September-November and April-June';
+                $facts['schedule'] = 'Primarily weekends, usually from morning through early or mid-afternoon';
+                $facts['season'] = 'Part-time seasonal contract assignments are generally available September-November and April-June';
                 break;
 
             case 41005:
                 $facts['classification'] = 'Part-Time Seasonal W-2';
-                $facts['schedule'] = 'Primarily Saturdays, some Sundays';
+                $facts['schedule'] = 'Primarily Saturdays, with some Sundays and early-morning availability';
                 $facts['season'] = 'September-November and April-June';
                 break;
         }
@@ -1953,7 +1951,7 @@ class CareersUI extends UserInterface
 
         if (empty($email))
         {
-            CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'E-Mail address is a required field - please have your administrator edit your templates to include the email field.');
+            CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Email address is required. Please return to the application and complete the email field.');
         }
 
         if (empty($source))

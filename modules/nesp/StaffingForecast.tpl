@@ -309,6 +309,20 @@
                 </div>
             </div>
 
+            <div class="nesp-panel">
+                <h3>Preliminary Fall 2026 Gap</h3>
+                <p class="nesp-help-text">Uses approved September-November historical rows only.</p>
+                <table class="nesp-table">
+                    <tr><th>Season</th><td><?php $this->_($this->forecast['fall2026Gap']['season_label']); ?></td></tr>
+                    <tr><th>Historical fall events</th><td><?php echo((int) $this->forecast['fall2026Gap']['historical_fall_events']); ?></td></tr>
+                    <tr><th>Historical peak-day staffing</th><td><?php echo((int) $this->forecast['fall2026Gap']['historical_peak_day_staffing']); ?></td></tr>
+                    <tr><th>Recommended pool</th><td><?php echo((int) $this->forecast['fall2026Gap']['recommended_pool']); ?></td></tr>
+                    <tr><th>Recommended backup</th><td><?php echo((int) $this->forecast['fall2026Gap']['recommended_backup']); ?></td></tr>
+                    <tr><th>Preliminary hiring gap</th><td><?php echo((int) $this->forecast['fall2026Gap']['preliminary_hiring_gap']); ?></td></tr>
+                    <tr><th>Confidence</th><td><?php $this->_($this->forecast['fall2026Gap']['confidence']); ?></td></tr>
+                </table>
+            </div>
+
             <div class="nesp-two-column">
                 <div class="nesp-panel">
                     <h3>Week-by-Week</h3>

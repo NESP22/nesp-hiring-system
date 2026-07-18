@@ -1,6 +1,6 @@
 # NESP External Recruiting Setup Status
 
-Updated July 13, 2026.
+Updated July 18, 2026.
 
 This status note preserves the safe stopping points for external recruiting.
 The NESP careers portal remains the single intended application destination.
@@ -20,6 +20,8 @@ The NESP careers portal remains the single intended application destination.
 ## Indeed
 
 Current review tabs exist for all four roles, but they are not ready to publish.
+The employer dashboard currently shows five incomplete drafts, including a
+duplicate Customer Service draft.
 
 Blocking issue:
 
@@ -43,6 +45,69 @@ Compliant options to investigate:
 - Indeed ATS or XML job-feed path that can index the NESP careers URL.
 - Manual publication only if Craig approves Indeed/email as an additional
   workflow, which is not currently approved.
+
+OpenCATS feed hardening released July 18:
+
+- The Indeed XML template now uses NESP publisher/company identity instead of
+  the legacy CATS values.
+- Feed URLs point to the public NESP job-detail page with `source=Indeed` and
+  the existing feed reference, so applicants can use the NESP Apply Now flow.
+- Feed records now include a requisition ID, ISO-8601 publish date, configured
+  salary, and the Indeed account email required by the XML feed format.
+- The feed is live at
+  `https://careers.nesportsphoto.com/xml/index.php?t=indeed` and was verified
+  over HTTPS on July 18. It reports the OpenCATS publisher identity, the four
+  NESP requisition IDs, the corrected availability facts, and HTTPS job links.
+  Indeed XML-feed onboarding is still required before Indeed can ingest it.
+
+Indeed ATS account check completed July 18:
+
+- OpenCATS was added to the Indeed employer account's ATS selection.
+- Indeed confirmed that OpenCATS does not currently have an available Indeed
+  integration. This records the relationship in the account but does not
+  create automatic candidate or job synchronization.
+- Keep the public NESP HTTPS feed and role-specific NESP Apply Now links as the
+  source of truth until Indeed approves or supports a direct integration.
+
+July 18 verification:
+
+- The current Indeed dashboard still shows five incomplete drafts, including a
+  duplicate Customer Service draft.
+- At least one draft still shows `Application method: Email`.
+- Opening the application-method editor triggers Indeed's account
+  re-verification prompt and requests a confirmation code before the setting
+  can be changed.
+- Do not publish the drafts until the application method is changed to a
+  compliant external NESP application path and verified on the review page.
+
+Public copy release verification:
+
+- Copy polish was merged and deployed to `careers.nesportsphoto.com` on July
+  18 in release `1ff4541`.
+- The live customer-service page now opens with a clear year-round role
+  summary and shows approximately 20-30 hours per week.
+- The live staff photographer, freelance photographer, and field assistant
+  pages now use distinct applicant-focused openings and show the seasonal
+  windows September-November and April-June.
+- The live Indeed XML feed contains the same copy and corrected availability
+  facts for all four requisitions.
+
+Draft copy prepared July 18:
+
+- Customer Service (`41001`): 1 opening; part-time; year-round; approximately
+  20-30 hours per week; `$22-$25/hour`.
+- Staff Photographer (`41002`): 20 openings; part-time, temporary, seasonal;
+  September-November and April-June; approximately 20-30 hours per week;
+  `$22-$25/hour`.
+- Freelance Photographer (`41003`): existing separate 7-opening draft;
+  part-time seasonal contract assignments generally available September-November
+  and April-June; `$22-$27/hour`.
+- Table Greeter / Field Assistant (`41005`): 20 openings; part-time,
+  temporary, seasonal; September-November and April-June; `$18/hour`.
+
+The current Indeed dashboard still reports incomplete drafts, so they remain
+unpublished until each draft is rechecked and the application method is
+verified as the matching NESP/OpenCATS form.
 
 ## Craigslist
 
@@ -81,3 +146,14 @@ Priority targets remain:
 
 For each channel, confirm whether it supports an external NESP application link
 before posting.
+
+July 18 platform checks:
+
+- MassHire JobQuest advertises free employer job posting, but requires an
+  employer account before a job can be posted.
+- SeasonalJobs.com requires an employer account and currently presents paid
+  packages of $49 for one job or $99 for five jobs.
+- ProductionHUB requires an account to post a basic job.
+- LinkedIn requires a signed-in employer account before job posting.
+- CoolWorks and JobsInSports require an employer account or employer purchase
+  flow before posting.

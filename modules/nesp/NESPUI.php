@@ -17,17 +17,19 @@ class NESPUI extends UserInterface
         $this->_authenticationRequired = true;
         $this->_moduleDirectory = 'nesp';
         $this->_moduleName = 'nesp';
-        $this->_moduleTabText = 'NESP Hiring*al=' . ACCESS_LEVEL_SA;
+        $this->_moduleTabText = 'NESP Hiring*al=' . ACCESS_LEVEL_READ;
         $this->_subTabs = array(
-            'Needs Craig' => CATSUtility::getIndexName() . '?m=nesp*al=' . ACCESS_LEVEL_READ,
-            'Waiting' => CATSUtility::getIndexName() . '?m=nesp&amp;a=waiting*al=' . ACCESS_LEVEL_READ,
-            'Interviews' => CATSUtility::getIndexName() . '?m=nesp&amp;a=interviews*al=' . ACCESS_LEVEL_READ,
-            'Questionnaires' => CATSUtility::getIndexName() . '?m=nesp&amp;a=questionnaires*al=' . ACCESS_LEVEL_READ,
+            'My Assignments' => CATSUtility::getIndexName() . '?m=nesp&amp;a=assignedCandidates*al=' . ACCESS_LEVEL_READ,
+            'My Availability' => CATSUtility::getIndexName() . '?m=nesp&amp;a=myAvailability*al=' . ACCESS_LEVEL_READ,
+            'Needs Craig' => CATSUtility::getIndexName() . '?m=nesp*al=' . ACCESS_LEVEL_SA,
+            'Waiting' => CATSUtility::getIndexName() . '?m=nesp&amp;a=waiting*al=' . ACCESS_LEVEL_SA,
+            'Interviews' => CATSUtility::getIndexName() . '?m=nesp&amp;a=interviews*al=' . ACCESS_LEVEL_SA,
+            'Questionnaires' => CATSUtility::getIndexName() . '?m=nesp&amp;a=questionnaires*al=' . ACCESS_LEVEL_SA,
             'Manage Question Sets' => CATSUtility::getIndexName() . '?m=nesp&amp;a=questionSets*al=' . ACCESS_LEVEL_SA,
-            'Phone Screens' => CATSUtility::getIndexName() . '?m=nesp&amp;a=phoneScreens*al=' . ACCESS_LEVEL_READ,
-            'Job Ads' => CATSUtility::getIndexName() . '?m=nesp&amp;a=jobAds*al=' . ACCESS_LEVEL_READ,
-            'Completed' => CATSUtility::getIndexName() . '?m=nesp&amp;a=completed*al=' . ACCESS_LEVEL_READ,
-            'Staffing Forecast' => CATSUtility::getIndexName() . '?m=nesp&amp;a=staffingForecast*al=' . ACCESS_LEVEL_READ,
+            'Phone Screens' => CATSUtility::getIndexName() . '?m=nesp&amp;a=phoneScreens*al=' . ACCESS_LEVEL_SA,
+            'Job Ads' => CATSUtility::getIndexName() . '?m=nesp&amp;a=jobAds*al=' . ACCESS_LEVEL_SA,
+            'Completed' => CATSUtility::getIndexName() . '?m=nesp&amp;a=completed*al=' . ACCESS_LEVEL_SA,
+            'Staffing Forecast' => CATSUtility::getIndexName() . '?m=nesp&amp;a=staffingForecast*al=' . ACCESS_LEVEL_SA,
             'Interviewer Settings' => CATSUtility::getIndexName() . '?m=nesp&amp;a=settings*al=' . ACCESS_LEVEL_SA
         );
 
@@ -37,6 +39,12 @@ class NESPUI extends UserInterface
     public function handleRequest()
     {
         $action = $this->getAction();
+
+        if (($action === null || $action === '' || $action === 'dashboard') &&
+            $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $action = 'assignedCandidates';
+        }
 
         if (!$this->_workflow->isSchemaInstalled())
         {

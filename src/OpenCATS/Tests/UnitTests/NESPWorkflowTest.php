@@ -398,7 +398,7 @@ class NESPWorkflowTest extends TestCase
         $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('weekend_sports_photographer');
         $labels = strtolower(json_encode($questions));
 
-        $this->assertStringContainsString('spring 2026 pre-zoom meeting info and survey', strtolower($intro));
+        $this->assertStringContainsString('fall 2026 and spring 2027 pre-interview information and survey', strtolower($intro));
         $this->assertStringContainsString('massachusetts, new hampshire, rhode island, connecticut, and vermont', strtolower($intro));
         $this->assertStringContainsString('last 5 photography events', $labels);
         $this->assertStringContainsString('online portfolio', $labels);
@@ -424,7 +424,7 @@ class NESPWorkflowTest extends TestCase
         $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('photography_assistant_poser');
         $labels = strtolower(json_encode($questions));
 
-        $this->assertStringContainsString('spring 2026 pre-zoom meeting info and survey', strtolower($intro));
+        $this->assertStringContainsString('fall 2026 and spring 2027 pre-interview information and survey', strtolower($intro));
         $this->assertStringContainsString('massachusetts, new hampshire, rhode island, connecticut, and vermont', strtolower($intro));
         $this->assertStringContainsString('email address', $labels);
         $this->assertStringContainsString('your name', $labels);

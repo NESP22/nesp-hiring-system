@@ -857,6 +857,14 @@
         display: none;
     }
 
+    .nesp-workflow .nesp-table-stacked tr:first-child {
+        display: block;
+    }
+
+    .nesp-workflow .nesp-table-stacked tr.nesp-table-header {
+        display: none;
+    }
+
     .nesp-workflow .nesp-table tr {
         border: 1px solid var(--nesp-dashboard-line-soft);
         box-sizing: border-box;

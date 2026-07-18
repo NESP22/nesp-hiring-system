@@ -1316,6 +1316,7 @@ class TemplateUtility
         echo '<head>', "\n";
         echo '<title>OpenCATS - ', Template::escapeHtml($pageTitle), '</title>', "\n";
         echo '<meta http-equiv="Content-Type" content="text/html; charset=', HTML_ENCODING, '" />', "\n";
+        echo '<meta name="viewport" content="width=device-width, initial-scale=1" />', "\n";
         echo '<link rel="icon" href="images/favicon.ico" type="image/x-icon" />', "\n";
         echo '<link rel="shortcut icon" href="images/favicon.ico" type="image/x-icon" />', "\n";
         echo '<link rel="alternate" type="application/rss+xml" title="RSS" href="',

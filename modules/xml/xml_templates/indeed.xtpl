@@ -1,5 +1,5 @@
 # This is Indeed.com's XML export template to be used when automatically
-# adding jobs to their database from OPENCATS' career portal site.
+# adding jobs to their database from the New England Sports Photo careers portal.
 
 >>header
 <?xml version="1.0" encoding="utf-8"?>
