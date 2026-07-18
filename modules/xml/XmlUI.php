@@ -178,6 +178,12 @@ class XmlUI extends UserInterface
             $url = substr($url, 0, -4);
         }
 
+        $feedUrl = $url;
+        if ($templateName === 'indeed')
+        {
+            $feedUrl = 'https://careers.nesportsphoto.com/';
+        }
+
         if ($settings['allowBrowse'] == 1)
         {
             // browse the jobs, adding a section body for each job
@@ -231,7 +237,7 @@ class XmlUI extends UserInterface
 
                         case 'jobURL':
                             $uri = sprintf("%scareers/?p=showJob&ID=%d&source=Indeed&nesp_source=indeed&ref=%s",
-                                $url,
+                                $feedUrl,
                                 $row['jobOrderID'],
                                 $templateName
                             );
