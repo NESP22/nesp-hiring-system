@@ -39,6 +39,7 @@ include_once(LEGACY_ROOT . '/lib/JobOrders.php');
 include_once(LEGACY_ROOT . '/lib/XmlJobExport.php');
 include_once(LEGACY_ROOT . '/lib/HttpLogger.php');
 include_once(LEGACY_ROOT . '/lib/CareerPortal.php');
+include_once(LEGACY_ROOT . '/lib/NESPJobDescriptionFormatter.php');
 
 define('XTPL_HEADER_STRING',    'header');
 define('XTPL_FOOTER_STRING',    'footer');
@@ -183,6 +184,11 @@ class XmlUI extends UserInterface
             foreach ($rs as $rowIndex => $row)
             {
                 $txtJobPosting = $templateJob;
+                $publishedAt = strtotime((string) $row['dateCreatedSort']);
+                if ($publishedAt === false)
+                {
+                    continue;
+                }
 
                 foreach ($tags as $tag)
                 {
@@ -207,13 +213,24 @@ class XmlUI extends UserInterface
                         case 'jobPostDate':
                             $txtJobPosting = XmlTemplate::replaceTemplateTags(
                                 $tag,
-                                $row['dateCreatedSort'],
+                                gmdate('c', $publishedAt),
+                                $txtJobPosting
+                            );
+                            break;
+
+                        case 'requisitionId':
+                            $requisitionId = !empty($row['jobID'])
+                                ? $row['jobID']
+                                : $row['jobOrderID'];
+                            $txtJobPosting = XmlTemplate::replaceTemplateTags(
+                                $tag,
+                                $requisitionId,
                                 $txtJobPosting
                             );
                             break;
 
                         case 'jobURL':
-                            $uri = sprintf("%scareers/?p=showJob&ID=%d&ref=%s",
+                            $uri = sprintf("%scareers/?p=showJob&ID=%d&source=Indeed&nesp_source=indeed&ref=%s",
                                 $url,
                                 $row['jobOrderID'],
                                 $templateName
@@ -245,7 +262,28 @@ class XmlUI extends UserInterface
                         case 'hiringCompany':
                             $txtJobPosting = XmlTemplate::replaceTemplateTags(
                                 $tag,
-                                'CATS (www.catsone.com)',
+                                'New England Sports Photo',
+                                $txtJobPosting
+                            );
+                            break;
+
+                        case 'salary':
+                            $txtJobPosting = XmlTemplate::replaceTemplateTags(
+                                $tag,
+                                $row['salary'],
+                                $txtJobPosting
+                            );
+                            break;
+
+                        case 'feedEmail':
+                            $feedEmail = getenv('NESP_INDEED_FEED_EMAIL');
+                            if ($feedEmail === false)
+                            {
+                                $feedEmail = '';
+                            }
+                            $txtJobPosting = XmlTemplate::replaceTemplateTags(
+                                $tag,
+                                $feedEmail,
                                 $txtJobPosting
                             );
                             break;
@@ -284,9 +322,12 @@ class XmlUI extends UserInterface
                             break;
 
                         case 'jobDescription':
-                            $txtJobPosting = XmlTemplate::replaceTemplateTags(
+                            $txtJobPosting = XmlTemplate::replaceTemplateTagsCDATA(
                                 $tag,
-                                $row['jobDescription'],
+                                NESPJobDescriptionFormatter::formatIndeed(
+                                    $row['jobDescription'],
+                                    $row['jobOrderID']
+                                ),
                                 $txtJobPosting
                             );
                             break;

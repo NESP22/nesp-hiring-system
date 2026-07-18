@@ -669,6 +669,8 @@ class JobOrders
                 joborder.openings AS openings,
                 joborder.openings_available AS openingsAvailable,
                 joborder.duration AS duration,
+                joborder.rate_max AS maxRate,
+                joborder.salary AS salary,
                 joborder.city AS city,
                 joborder.state AS state,
                 joborder.country AS country,

@@ -2,10 +2,10 @@
 # adding jobs to their database from OPENCATS' career portal site.
 
 >>header
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="utf-8"?>
 <source>
-<publisher>OPENCATS Applicant Tracking System</publisher>
-<publisherurl>http://www.opencats.org</publisherurl>
+<publisher>OpenCATS</publisher>
+<publisherurl>https://careers.nesportsphoto.com/</publisherurl>
 <lastBuildDate>$[date]</lastBuildDate>
 <<header
 
@@ -13,14 +13,18 @@
 <job>
 <title><![CDATA[$[jobTitle]]]></title>
 <date><![CDATA[$[jobPostDate]]]></date>
-<referencenumber><![CDATA[$[jobID]]]></referencenumber>
+<referencenumber><![CDATA[$[jobOrderID]]]></referencenumber>
+<requisitionid><![CDATA[$[requisitionId]]]></requisitionid>
 <url><![CDATA[$[jobURL]]]></url>
 <company><![CDATA[$[hiringCompany]]]></company>
+<sourcename><![CDATA[New England Sports Photo]]></sourcename>
 <city><![CDATA[$[jobCity]]]></city>
 <state><![CDATA[$[jobState]]]></state>
 <country><![CDATA[$[jobCountry]]]></country>
 <postalcode><![CDATA[$[jobZipCode]]]></postalcode>
+<email><![CDATA[$[feedEmail]]]></email>
 <description><![CDATA[$[jobDescription]]]></description>
+<salary><![CDATA[$[salary]]]></salary>
 </job>
 <<job
 
