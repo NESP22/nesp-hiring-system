@@ -8244,6 +8244,7 @@ class NESPWorkflow
             'waiting_on' => $waitingOn,
             'summary' => $summary,
             'last_activity' => $row['date_modified'],
+            'due_at' => $row['due_at'],
             'next_action_label' => $nextAction,
             'primary_action_url' => $primaryActionURL,
             'candidate_url' => $candidateURL,

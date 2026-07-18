@@ -217,6 +217,110 @@
     outline: 3px solid var(--nesp-dashboard-focus);
 }
 
+.nesp-workflow .nesp-operator-focus {
+    border: 1px solid var(--nesp-dashboard-line);
+    background: #081d39;
+    display: grid;
+    gap: 14px;
+    grid-template-columns: minmax(220px, .75fr) minmax(0, 1.25fr);
+    margin: 0 0 16px;
+    padding: 14px;
+}
+
+.nesp-workflow .nesp-focus-copy h3 {
+    color: #ffffff;
+    font-size: 22px;
+    line-height: 1.2;
+    margin: 0 0 6px;
+}
+
+.nesp-workflow .nesp-focus-copy p {
+    color: var(--nesp-dashboard-muted);
+    font-size: 13px;
+    line-height: 1.45;
+    margin: 0;
+}
+
+.nesp-workflow .nesp-start-list {
+    border-left: 3px solid var(--nesp-dashboard-red);
+    color: var(--nesp-dashboard-text);
+    display: grid;
+    gap: 5px;
+    font-size: 13px;
+    line-height: 1.35;
+    margin: 12px 0 0;
+    padding: 0 0 0 24px;
+}
+
+.nesp-workflow .nesp-start-list li {
+    color: var(--nesp-dashboard-text);
+    padding-left: 2px;
+}
+
+.nesp-workflow .nesp-attention-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.nesp-workflow .nesp-attention-card {
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    background: var(--nesp-dashboard-panel);
+    color: var(--nesp-dashboard-text);
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 12px;
+    text-decoration: none;
+}
+
+.nesp-workflow .nesp-attention-card.active,
+.nesp-workflow .nesp-attention-card:hover,
+.nesp-workflow .nesp-attention-card:focus {
+    border-color: #9fc9ff;
+    background: var(--nesp-dashboard-panel-soft);
+    outline: 3px solid var(--nesp-dashboard-focus);
+}
+
+.nesp-workflow .nesp-attention-card span {
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: bold;
+    line-height: 1.25;
+}
+
+.nesp-workflow .nesp-attention-card strong {
+    color: #ffffff;
+    font-size: 31px;
+    line-height: 1;
+}
+
+.nesp-workflow .nesp-attention-card em {
+    color: var(--nesp-dashboard-muted);
+    font-size: 11px;
+    font-style: normal;
+    line-height: 1.3;
+}
+
+.nesp-workflow .nesp-secondary-tools {
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    background: rgba(8, 29, 57, .58);
+    margin: 0 0 18px;
+    padding: 10px;
+}
+
+.nesp-workflow .nesp-secondary-tools > span {
+    color: var(--nesp-dashboard-muted);
+    display: block;
+    font-size: 12px;
+    font-weight: bold;
+    margin: 0 0 8px;
+}
+
+.nesp-workflow .nesp-secondary-tools .nesp-dashboard-nav {
+    margin-bottom: 0;
+}
+
 .nesp-workflow .nesp-queue-section {
     margin: 0 0 18px;
 }
@@ -298,6 +402,11 @@
     color: var(--nesp-dashboard-text);
 }
 
+.nesp-workflow .nesp-card-meta {
+    border-top: 1px solid var(--nesp-dashboard-line-soft);
+    padding-top: 10px;
+}
+
 .nesp-workflow .nesp-primary-action,
 .nesp-workflow .nesp-primary-button,
 .nesp-workflow .nesp-secondary-button {
@@ -311,6 +420,11 @@
     font-size: 13px;
     font-weight: bold;
     cursor: pointer;
+}
+
+.nesp-workflow .nesp-primary-action-small {
+    font-size: 12px;
+    padding: 7px 9px;
 }
 
 .nesp-workflow .nesp-primary-action:hover,
@@ -470,6 +584,17 @@
     flex-wrap: wrap;
 }
 
+.nesp-workflow details.nesp-inline-details {
+    border-top: 0;
+    margin-top: 0;
+    padding-top: 0;
+}
+
+.nesp-workflow details.nesp-inline-details[open] {
+    align-items: center;
+    gap: 8px;
+}
+
 .nesp-workflow .nesp-task-next {
     background: #081d39;
     border: 1px solid var(--nesp-dashboard-line-soft);
@@ -552,6 +677,32 @@
     color: var(--nesp-dashboard-muted);
     padding: 14px;
     font-size: 13px;
+}
+
+.nesp-workflow .nesp-empty-action {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: space-between;
+}
+
+.nesp-workflow .nesp-empty-action strong {
+    color: var(--nesp-dashboard-muted);
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.nesp-workflow .nesp-secondary-workspace {
+    border-top: 1px solid var(--nesp-dashboard-line-soft);
+    margin: 22px 0 18px;
+    padding-top: 16px;
+}
+
+.nesp-workflow .nesp-secondary-workspace > h3 {
+    color: var(--nesp-dashboard-muted);
+    font-size: 15px;
+    margin: 0 0 10px;
 }
 
 .nesp-workflow .nesp-success {
@@ -800,11 +951,23 @@
     white-space: normal;
 }
 
+@media (max-width: 1024px) {
+    .nesp-workflow .nesp-operator-focus {
+        grid-template-columns: 1fr;
+    }
+
+    .nesp-workflow .nesp-attention-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 700px) {
     .nesp-workflow #contents {
         padding: 14px 10px 28px;
     }
 
+    .nesp-workflow .nesp-operator-focus,
+    .nesp-workflow .nesp-attention-grid,
     .nesp-workflow .nesp-card-grid,
     .nesp-workflow .nesp-card-grid-compact,
     .nesp-workflow .nesp-card-grid-tight,
@@ -848,13 +1011,21 @@
     .nesp-workflow .nesp-table,
     .nesp-workflow .nesp-table tbody,
     .nesp-workflow .nesp-table tr,
+    .nesp-workflow .nesp-table th,
     .nesp-workflow .nesp-table td {
         display: block;
         width: 100%;
     }
 
-    .nesp-workflow .nesp-table tr:first-child {
+    .nesp-workflow .nesp-data-table tr:first-child {
         display: none;
+    }
+
+    .nesp-workflow .nesp-table th {
+        border: 0;
+        border-bottom: 1px solid var(--nesp-dashboard-line-soft);
+        box-sizing: border-box;
+        padding: 8px;
     }
 
     .nesp-workflow .nesp-table tr {
@@ -867,11 +1038,15 @@
         border: 0;
         border-bottom: 1px solid var(--nesp-dashboard-line-soft);
         box-sizing: border-box;
-        padding: 8px 8px 8px 108px;
+        padding: 8px;
         position: relative;
     }
 
-    .nesp-workflow .nesp-table td:before {
+    .nesp-workflow .nesp-table td[data-label] {
+        padding-left: 108px;
+    }
+
+    .nesp-workflow .nesp-table td[data-label]:before {
         color: var(--nesp-dashboard-muted);
         content: attr(data-label);
         font-weight: bold;
