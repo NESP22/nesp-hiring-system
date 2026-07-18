@@ -1681,27 +1681,27 @@ class CareersUI extends UserInterface
         switch ($jobOrderID)
         {
             case 41001:
-                $facts['classification'] = 'Part-Time Seasonal W-2';
+                $facts['classification'] = 'Part-Time W-2';
                 $facts['schedule'] = 'Monday-Friday, set daytime schedule';
-                $facts['season'] = 'Spring and fall peak seasons';
+                $facts['season'] = 'Year-round, approximately 20-30 hours per week';
                 break;
 
             case 41002:
-                $facts['classification'] = 'Seasonal W-2';
+                $facts['classification'] = 'Part-Time Seasonal W-2';
                 $facts['schedule'] = 'Most Saturdays, some Sundays';
-                $facts['season'] = 'Late April through early June';
+                $facts['season'] = 'September-November and April-June';
                 break;
 
             case 41003:
-                $facts['classification'] = 'Freelance/Independent Contractor';
+                $facts['classification'] = 'Part-Time Seasonal Contract (Independent Contractor)';
                 $facts['schedule'] = 'Primarily weekends';
-                $facts['season'] = 'Seasonal Picture Day assignments';
+                $facts['season'] = 'September-November and April-June';
                 break;
 
             case 41005:
-                $facts['classification'] = 'Seasonal W-2';
+                $facts['classification'] = 'Part-Time Seasonal W-2';
                 $facts['schedule'] = 'Primarily Saturdays, some Sundays';
-                $facts['season'] = 'Mid-April through early June';
+                $facts['season'] = 'September-November and April-June';
                 break;
         }
 
