@@ -1,249 +1,213 @@
 .nesp-workflow {
-    --nesp-dashboard-bg: #061f46;
-    --nesp-dashboard-panel: #0b2b57;
-    --nesp-dashboard-panel-strong: #102f5f;
-    --nesp-dashboard-panel-soft: #123866;
-    --nesp-dashboard-line: #315f93;
-    --nesp-dashboard-line-soft: #234b7c;
-    --nesp-dashboard-text: #eef5ff;
-    --nesp-dashboard-muted: #c5d4e6;
-    --nesp-dashboard-link: #9fc9ff;
-    --nesp-dashboard-red: #cf001c;
-    --nesp-dashboard-focus: rgba(159, 201, 255, .34);
+    min-height: 100vh;
+    background: #f4f7fb;
+    overflow-x: hidden;
+}
+
+#main.nesp-workflow {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    border: 0;
+    padding-top: 0;
+    background: #f4f7fb;
+    color: #1b2733;
 }
 
 .nesp-workflow #contents {
-    max-width: 1160px;
+    width: min(1280px, calc(100% - 32px));
+    max-width: none;
     margin: 0 auto;
-    padding: 18px 18px 32px;
+    padding: 20px 0 36px;
+    box-sizing: border-box;
+    background: #f4f7fb;
     font-family: Arial, Helvetica, sans-serif;
-    background: var(--nesp-dashboard-bg);
-    color: var(--nesp-dashboard-text);
+    color: #1b2733;
 }
 
-.nesp-workflow p,
-.nesp-workflow li,
-.nesp-workflow dd,
-.nesp-workflow td {
-    color: var(--nesp-dashboard-text);
+.nesp-page-title {
+    margin: 0 0 18px;
+    border-bottom: 1px solid #d7dee8;
+    padding: 0 0 14px;
 }
 
-.nesp-workflow .nesp-page-title {
-    margin: 0 0 16px;
-    border: 1px solid var(--nesp-dashboard-line);
-    border-bottom: 4px solid var(--nesp-dashboard-red);
-    background: var(--nesp-dashboard-panel);
-    padding: 16px;
-}
-
-.nesp-workflow .nesp-brand-lockup {
-    align-items: center;
-    display: flex;
-    gap: 18px;
-}
-
-.nesp-workflow .nesp-brand-lockup img {
-    flex: 0 0 auto;
-    height: auto;
-    max-width: 176px;
-    width: 28%;
-}
-
-.nesp-workflow .nesp-kicker {
-    color: #ff8a9a;
-    display: block;
-    font-size: 11px;
-    font-weight: bold;
-    letter-spacing: 0;
-    line-height: 1.3;
-    margin: 0 0 3px;
-    text-transform: uppercase;
-}
-
-.nesp-workflow .nesp-page-title h2 {
+.nesp-page-title h2 {
     margin: 0 0 6px;
-    color: #ffffff;
-    font-size: 25px;
+    color: #071e41;
+    font-size: 24px;
     font-weight: bold;
-    line-height: 1.18;
 }
 
-.nesp-workflow .nesp-page-title p {
+.nesp-page-title p {
     margin: 0;
-    color: var(--nesp-dashboard-muted);
+    color: #4f5e70;
     font-size: 13px;
     line-height: 1.5;
 }
 
-.nesp-workflow .nesp-safety-banner {
+.nesp-safety-banner {
     margin: 0 0 16px;
-    border: 1px solid #c99a35;
-    background: #33280f;
-    color: #ffe7a6;
+    border: 1px solid #d6b256;
+    border-radius: 8px;
+    background: #fff7df;
+    color: #4c3b0f;
     padding: 11px 13px;
     font-size: 13px;
     font-weight: bold;
 }
 
-.nesp-workflow .nesp-step-row {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin: 0 0 16px;
-}
-
-.nesp-workflow .nesp-step {
-    align-items: center;
-    background: var(--nesp-dashboard-panel);
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    color: var(--nesp-dashboard-muted);
-    display: flex;
-    gap: 8px;
-    min-width: 0;
-    padding: 10px;
-}
-
-.nesp-workflow .nesp-step span {
-    align-items: center;
-    background: var(--nesp-dashboard-red);
-    color: #ffffff;
-    display: inline-flex;
-    flex: 0 0 24px;
-    font-size: 12px;
-    font-weight: bold;
-    height: 24px;
-    justify-content: center;
-}
-
-.nesp-workflow .nesp-step strong {
-    color: var(--nesp-dashboard-text);
-    font-size: 12px;
-    line-height: 1.25;
-}
-
-.nesp-workflow .nesp-step.is-current {
-    border-color: #75a7df;
-    box-shadow: inset 3px 0 0 var(--nesp-dashboard-red);
-}
-
-.nesp-workflow .nesp-card-grid {
+.nesp-card-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     margin: 0 0 18px;
 }
 
-.nesp-workflow .nesp-card-grid-compact {
+.nesp-card-grid-compact {
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
-.nesp-workflow .nesp-card-grid-tight {
+.nesp-card-grid-tight {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.nesp-workflow .nesp-card,
-.nesp-workflow .nesp-panel {
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    background: var(--nesp-dashboard-panel);
-    color: var(--nesp-dashboard-text);
-    padding: 14px;
+.nesp-card,
+.nesp-panel {
+    border: 1px solid #d7dee8;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 16px;
     overflow-x: auto;
+    box-shadow: 0 2px 10px rgba(15, 35, 58, .05);
 }
 
-.nesp-workflow .nesp-card-label {
+.nesp-card-label {
     display: block;
-    color: var(--nesp-dashboard-muted);
+    color: #536579;
     font-size: 12px;
     line-height: 1.4;
 }
 
-.nesp-workflow .nesp-card strong {
+.nesp-card strong {
     display: block;
-    color: #ffffff;
+    color: #071e41;
     font-size: 30px;
     line-height: 1.2;
     margin-top: 4px;
 }
 
-.nesp-workflow .nesp-card-hint {
-    color: #ff8a9a;
-    display: block;
-    font-size: 11px;
-    font-weight: bold;
-    margin-top: 3px;
-}
-
-.nesp-workflow .nesp-two-column {
+.nesp-two-column {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 14px;
 }
 
-.nesp-workflow .nesp-panel h3 {
+.nesp-panel h3 {
     margin: 0 0 10px;
-    color: #ffffff;
-    font-size: 17px;
+    color: #071e41;
+    font-size: 18px;
+    line-height: 1.25;
 }
 
-.nesp-workflow .nesp-panel h4 {
-    margin: 0 0 8px;
-    color: var(--nesp-dashboard-text);
-    font-size: 14px;
+.nesp-panel h4 {
+    margin: 8px 0 4px;
+    padding-top: 10px;
+    border-top: 1px solid #e4eaf2;
+    color: #071e41;
+    font-size: 15px;
+    line-height: 1.3;
 }
 
-.nesp-workflow .nesp-dashboard-nav {
+.nesp-interviewer-note {
+    margin-bottom: 18px;
+}
+
+.nesp-interview-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 14px;
+    border-left: 5px solid #315f93;
+}
+
+.nesp-interview-hero h3 {
+    margin-bottom: 6px;
+}
+
+.nesp-interview-hero p {
+    max-width: 700px;
+    margin: 0;
+    color: #536579;
+    line-height: 1.5;
+}
+
+.nesp-contact-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.nesp-dashboard-nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin: 0 0 16px;
+    margin: 0 0 18px;
+    padding: 8px;
+    border: 1px solid #d7dee8;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .96);
+    box-shadow: 0 2px 10px rgba(15, 35, 58, .06);
 }
 
-.nesp-workflow .nesp-dashboard-nav a {
-    border: 1px solid var(--nesp-dashboard-line);
-    background: var(--nesp-dashboard-panel);
-    color: var(--nesp-dashboard-text);
-    padding: 7px 10px;
+.nesp-dashboard-nav a {
+    border: 1px solid #b9c5d3;
+    border-radius: 6px;
+    background: #f7f9fc;
+    color: #24384d;
+    padding: 8px 11px;
     text-decoration: none;
     font-size: 12px;
     font-weight: bold;
 }
 
-.nesp-workflow .nesp-dashboard-nav a.active,
-.nesp-workflow .nesp-dashboard-nav a:hover,
-.nesp-workflow .nesp-dashboard-nav a:focus {
-    border-color: #9fc9ff;
-    background: var(--nesp-dashboard-panel-soft);
+.nesp-dashboard-nav a.active,
+.nesp-dashboard-nav a:hover {
+    border-color: #315f93;
+    background: #315f93;
     color: #ffffff;
-    outline: 3px solid var(--nesp-dashboard-focus);
 }
 
-.nesp-workflow .nesp-queue-section {
+.nesp-queue-section {
     margin: 0 0 18px;
 }
 
-.nesp-workflow .nesp-queue-section h3 {
+.nesp-queue-section h3 {
     margin: 0 0 10px;
-    color: #ffffff;
+    color: #071e41;
     font-size: 18px;
 }
 
-.nesp-workflow .nesp-task-grid {
+.nesp-task-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
 }
 
-.nesp-workflow .nesp-task-card {
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    background: var(--nesp-dashboard-panel);
-    color: var(--nesp-dashboard-text);
+.nesp-task-card {
+    border: 1px solid #cfd8e4;
+    background: #ffffff;
     padding: 12px;
     min-height: 210px;
     display: flex;
     flex-direction: column;
 }
 
-.nesp-workflow .nesp-task-topline {
+.nesp-task-topline {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -251,35 +215,35 @@
     margin: 0 0 6px;
 }
 
-.nesp-workflow .nesp-task-topline strong {
-    color: #ffffff;
+.nesp-task-topline strong {
+    color: #071e41;
     font-size: 15px;
     line-height: 1.25;
 }
 
-.nesp-workflow .nesp-task-topline span {
+.nesp-task-topline span {
     flex: 0 0 auto;
-    background: var(--nesp-dashboard-panel-soft);
-    color: var(--nesp-dashboard-text);
+    background: #edf1f6;
+    color: #425466;
     font-size: 11px;
     padding: 3px 6px;
 }
 
-.nesp-workflow .nesp-task-role,
-.nesp-workflow .nesp-muted {
-    color: var(--nesp-dashboard-muted);
+.nesp-task-role,
+.nesp-muted {
+    color: #596b7d;
     font-size: 12px;
     line-height: 1.35;
 }
 
-.nesp-workflow .nesp-task-card p {
-    color: var(--nesp-dashboard-text);
+.nesp-task-card p {
+    color: #283747;
     font-size: 13px;
     line-height: 1.45;
     margin: 10px 0;
 }
 
-.nesp-workflow .nesp-task-card dl {
+.nesp-task-card dl {
     display: grid;
     grid-template-columns: 86px minmax(0, 1fr);
     gap: 5px 8px;
@@ -288,24 +252,26 @@
     line-height: 1.35;
 }
 
-.nesp-workflow .nesp-task-card dt {
-    color: var(--nesp-dashboard-muted);
+.nesp-task-card dt {
+    color: #66778a;
     font-weight: bold;
 }
 
-.nesp-workflow .nesp-task-card dd {
+.nesp-task-card dd {
     margin: 0;
-    color: var(--nesp-dashboard-text);
+    color: #1b2733;
 }
 
-.nesp-workflow .nesp-primary-action,
-.nesp-workflow .nesp-primary-button,
-.nesp-workflow .nesp-secondary-button {
+.nesp-primary-action,
+.nesp-primary-button,
+.nesp-secondary-button {
     display: inline-block;
     border: 1px solid #315f93;
+    border-radius: 6px;
     background: #315f93;
     color: #ffffff;
-    padding: 9px 12px;
+    min-height: 36px;
+    padding: 9px 13px;
     text-align: center;
     text-decoration: none;
     font-size: 13px;
@@ -313,415 +279,263 @@
     cursor: pointer;
 }
 
-.nesp-workflow .nesp-primary-action:hover,
-.nesp-workflow .nesp-primary-action:focus,
-.nesp-workflow .nesp-primary-button:hover,
-.nesp-workflow .nesp-primary-button:focus,
-.nesp-workflow .nesp-secondary-button:hover,
-.nesp-workflow .nesp-secondary-button:focus,
-.nesp-workflow .nesp-secondary-action:hover,
-.nesp-workflow .nesp-secondary-action:focus,
-.nesp-workflow .nesp-secondary-actions a:hover,
-.nesp-workflow .nesp-secondary-actions a:focus {
-    outline: 3px solid var(--nesp-dashboard-focus);
-}
-
-.nesp-workflow .nesp-primary-action:active,
-.nesp-workflow .nesp-primary-button:active,
-.nesp-workflow .nesp-secondary-button:active,
-.nesp-workflow .nesp-secondary-action:active,
-.nesp-workflow .nesp-secondary-actions a:active {
-    background: var(--nesp-dashboard-panel-soft);
-    color: #ffffff;
-}
-
-.nesp-workflow .nesp-primary-action:disabled,
-.nesp-workflow .nesp-primary-button:disabled,
-.nesp-workflow .nesp-secondary-button:disabled,
-.nesp-workflow .nesp-secondary-action:disabled {
-    background: #334960;
-    border-color: #4f6578;
-    color: #b8c6d7;
-    cursor: not-allowed;
-    opacity: .72;
-}
-
-.nesp-workflow .nesp-secondary-button {
+.nesp-secondary-button {
     border-color: #4f6578;
     background: #4f6578;
 }
 
-.nesp-workflow .nesp-action-form {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+.nesp-primary-button:hover,
+.nesp-secondary-button:hover,
+.nesp-primary-action:hover {
+    filter: brightness(.95);
 }
 
-.nesp-workflow .nesp-action-row {
-    align-items: flex-end;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 14px;
-}
-
-.nesp-workflow .nesp-action-row form {
-    align-items: flex-end;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 0;
-}
-
-.nesp-workflow .nesp-status-pill {
-    display: inline-block;
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    background: var(--nesp-dashboard-panel-soft);
-    color: var(--nesp-dashboard-text);
-    font-size: 12px;
-    font-weight: bold;
-    padding: 4px 7px;
-}
-
-.nesp-workflow .nesp-inline-fields {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 140px;
-    gap: 10px;
-}
-
-.nesp-workflow .nesp-question-editor-row {
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    display: grid;
-    grid-template-columns: 80px minmax(140px, 1fr) 130px 110px;
-    gap: 10px;
-    margin: 0 0 12px;
-    padding: 12px;
-}
-
-.nesp-workflow .nesp-question-editor-row label:nth-last-child(-n+3) {
-    grid-column: 1 / -1;
-}
-
-.nesp-workflow .nesp-form-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-}
-
-.nesp-workflow .nesp-form-grid button {
-    align-self: end;
-}
-
-.nesp-workflow .nesp-copy-box {
-    width: 100%;
-    box-sizing: border-box;
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    background: #081d39;
-    color: var(--nesp-dashboard-text);
-    padding: 10px;
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
-}
-
-.nesp-workflow .nesp-secondary-action,
-.nesp-workflow .nesp-secondary-actions a {
-    color: var(--nesp-dashboard-link);
+.nesp-secondary-action,
+.nesp-secondary-actions a {
+    color: #315f93;
     font-size: 12px;
     font-weight: bold;
     text-decoration: none;
 }
 
-.nesp-workflow button.nesp-secondary-action {
-    background: transparent;
-    border: 1px solid var(--nesp-dashboard-link);
-    padding: 8px 11px;
-    cursor: pointer;
-}
-
-.nesp-workflow button.nesp-secondary-action:hover,
-.nesp-workflow button.nesp-secondary-action:focus {
-    background: var(--nesp-dashboard-panel-soft);
-    color: #ffffff;
-}
-
-.nesp-workflow .nesp-secondary-actions {
+.nesp-secondary-actions {
     display: flex;
     gap: 12px;
     margin-top: 8px;
 }
 
-.nesp-workflow details.nesp-secondary-actions {
-    display: block;
-    border-top: 1px solid var(--nesp-dashboard-line-soft);
-    padding-top: 8px;
-}
-
-.nesp-workflow details.nesp-secondary-actions summary {
-    color: var(--nesp-dashboard-link);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: bold;
-}
-
-.nesp-workflow details.nesp-secondary-actions[open] {
-    display: flex;
-    flex-wrap: wrap;
-}
-
-.nesp-workflow .nesp-task-next {
-    background: #081d39;
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    color: var(--nesp-dashboard-muted);
-    font-size: 12px;
-    line-height: 1.35;
-    margin: 0 0 10px;
-    padding: 8px;
-}
-
-.nesp-workflow .nesp-button-row {
+.nesp-button-row {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.nesp-workflow .nesp-inline-form {
+.nesp-inline-form {
     margin-top: 10px;
 }
 
-.nesp-workflow .nesp-import-review {
+.nesp-stacked-form {
     display: grid;
-    gap: 14px;
-    margin: 0 0 18px;
+    gap: 10px;
+    margin: 8px 0 16px;
+    max-width: 760px;
 }
 
-.nesp-workflow .nesp-import-review h3 {
-    color: #ffffff;
-    font-size: 17px;
-    line-height: 1.3;
-    margin: 0;
+.nesp-stacked-form label {
+    display: grid;
+    gap: 4px;
+    font-weight: bold;
 }
 
-.nesp-workflow .nesp-upload-form {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.nesp-workflow .nesp-file-input {
+.nesp-stacked-form input[type="text"],
+.nesp-stacked-form textarea {
     box-sizing: border-box;
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    background: #081d39;
-    color: var(--nesp-dashboard-text);
-    max-width: 100%;
-    padding: 8px;
+    width: 100%;
 }
 
-.nesp-workflow .nesp-file-input:focus {
-    border-color: #9fc9ff;
-    outline: 3px solid var(--nesp-dashboard-focus);
-}
-
-.nesp-workflow .nesp-help-text {
+.nesp-help-text {
     margin: 0 0 10px;
-    color: var(--nesp-dashboard-muted);
+    color: #536579;
     font-size: 12px;
     line-height: 1.45;
 }
 
-.nesp-workflow .nesp-reference-list {
+.nesp-reference-list {
     margin-top: 12px;
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    background: #081d39;
+    border: 1px solid #d7dee8;
+    background: #f7f9fc;
     padding: 10px;
-    color: var(--nesp-dashboard-text);
+    color: #394b5f;
     font-size: 12px;
     line-height: 1.45;
 }
 
-.nesp-workflow .nesp-reference-list ul {
+.nesp-reference-list ul {
     margin: 6px 0 0 18px;
     padding: 0;
 }
 
-.nesp-workflow .nesp-empty {
-    border: 1px dashed #6f95bf;
-    background: #081d39;
-    color: var(--nesp-dashboard-muted);
+.nesp-empty {
+    border: 1px dashed #c9d3df;
+    background: #f7f9fc;
+    color: #536579;
     padding: 14px;
     font-size: 13px;
 }
 
-.nesp-workflow .nesp-success {
-    border: 1px solid #3aa36f;
-    background: #103522;
-    color: #c9f7dd;
-    margin: 0 0 16px;
-    padding: 14px;
+.nesp-form,
+.nesp-scorecard-form {
+    display: grid;
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.nesp-form label,
+.nesp-scorecard-form label {
+    display: grid;
+    gap: 6px;
+    color: #253647;
     font-size: 13px;
     font-weight: bold;
+    line-height: 1.35;
 }
 
-.nesp-workflow .nesp-form,
-.nesp-workflow .nesp-scorecard-form {
-    display: grid;
-    gap: 10px;
-    margin-top: 12px;
-}
-
-.nesp-workflow .nesp-form label,
-.nesp-workflow .nesp-scorecard-form label {
-    display: grid;
-    gap: 5px;
-    color: var(--nesp-dashboard-text);
-    font-size: 12px;
-    font-weight: bold;
-}
-
-.nesp-workflow .nesp-form input,
-.nesp-workflow .nesp-form select,
-.nesp-workflow .nesp-form textarea,
-.nesp-workflow .nesp-form-control,
-.nesp-workflow .nesp-scorecard-form select,
-.nesp-workflow .nesp-scorecard-form textarea {
+.nesp-form input,
+.nesp-form select,
+.nesp-form textarea,
+.nesp-scorecard-form select,
+.nesp-scorecard-form textarea {
     box-sizing: border-box;
     width: 100%;
-    border: 1px solid #7996b6;
-    background: #081d39;
-    color: var(--nesp-dashboard-text);
-    padding: 7px;
-    font-size: 13px;
+    border: 1px solid #b8c5d3;
+    border-radius: 6px;
+    padding: 9px 10px;
+    background: #ffffff;
+    font: 13px/1.45 Arial, Helvetica, sans-serif;
 }
 
-.nesp-workflow .nesp-form input:focus,
-.nesp-workflow .nesp-form select:focus,
-.nesp-workflow .nesp-form textarea:focus,
-.nesp-workflow .nesp-form-control:focus,
-.nesp-workflow .nesp-scorecard-form select:focus,
-.nesp-workflow .nesp-scorecard-form textarea:focus,
-.nesp-workflow textarea[readonly]:focus {
-    border-color: #9fc9ff;
-    outline: 3px solid var(--nesp-dashboard-focus);
+.nesp-form input,
+.nesp-form select,
+.nesp-scorecard-form select {
+    min-height: 38px;
 }
 
-.nesp-workflow .nesp-form-label {
-    color: var(--nesp-dashboard-text);
-    display: block;
-    font-size: 12px;
-    font-weight: bold;
-    margin: 0 0 5px;
+.nesp-form textarea,
+.nesp-scorecard-form textarea {
+    min-height: 84px;
+    resize: vertical;
 }
 
-.nesp-workflow .nesp-fieldset {
-    border: 1px solid var(--nesp-dashboard-line-soft);
+.nesp-fieldset {
+    border: 1px solid #d8dee8;
     border-radius: 6px;
     margin: 0;
-    padding: 10px 12px;
+    padding: 12px;
+    background: #fbfcfe;
 }
 
-.nesp-workflow .nesp-fieldset legend {
-    background: var(--nesp-dashboard-bg);
-    color: var(--nesp-dashboard-text);
+.nesp-fieldset legend {
+    color: #475569;
     font-weight: 700;
     padding: 0 4px;
 }
 
-.nesp-workflow .nesp-checkbox-row {
+.nesp-checkbox-row {
     align-items: flex-start;
     display: flex;
     gap: 8px;
     line-height: 1.35;
 }
 
-.nesp-workflow .nesp-checkbox-row input[type="checkbox"] {
+.nesp-checkbox-row input[type="checkbox"] {
     flex: 0 0 auto;
     margin-top: 2px;
-    width: auto;
+    width: 16px;
+    min-height: 16px;
 }
 
-.nesp-workflow .nesp-form-wide {
-    grid-template-columns: repeat(3, minmax(180px, 1fr));
+.nesp-form-wide {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    align-items: start;
 }
 
-.nesp-workflow .nesp-form-wide textarea,
-.nesp-workflow .nesp-form-wide .nesp-fieldset,
-.nesp-workflow .nesp-form-wide .nesp-confirm-box {
+.nesp-form-wide textarea,
+.nesp-form-wide .nesp-fieldset,
+.nesp-form-wide .nesp-confirm-box,
+.nesp-form-wide h4 {
     grid-column: 1 / -1;
 }
 
-.nesp-workflow .nesp-confirm-box {
-    background: #33200f;
-    border: 1px solid #c77731;
+.nesp-form-wide > label:has(textarea[name="description"]),
+.nesp-form-wide > label:has(input[name="displayName"]) {
+    grid-column: span 2;
+}
+
+.nesp-inline-fields {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(88px, 120px);
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #d7dee8;
+    border-radius: 8px;
+    background: #fbfcfe;
+}
+
+.nesp-question-editor-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 88px minmax(180px, 1fr) minmax(150px, 190px) minmax(120px, 150px);
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid #d7dee8;
+    border-left: 5px solid #315f93;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 1px 6px rgba(15, 35, 58, .05);
+}
+
+.nesp-question-editor-row label:has(textarea) {
+    grid-column: 1 / -1;
+}
+
+.nesp-question-editor-row textarea[name="questionLabel[]"] {
+    min-height: 90px;
+}
+
+.nesp-question-editor-row textarea[name="questionHelp[]"],
+.nesp-question-editor-row textarea[name="questionChoices[]"] {
+    min-height: 64px;
+}
+
+.nesp-confirm-box {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
     border-radius: 6px;
-    color: #ffd2a6;
+    color: #9a3412;
     padding: 10px 12px;
 }
 
-.nesp-workflow .nesp-table {
+.nesp-copy-box-label {
+    display: grid;
+    gap: 8px;
+    font-weight: bold;
+}
+
+.nesp-copy-box {
+    box-sizing: border-box;
+    font: 13px/1.5 Menlo, Consolas, monospace;
+    min-height: 220px;
+    width: 100%;
+}
+
+.nesp-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12px;
-    background: var(--nesp-dashboard-panel);
-    color: var(--nesp-dashboard-text);
+    font-size: 13px;
+    background: #ffffff;
 }
 
-.nesp-workflow .nesp-table caption {
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    position: absolute;
-    width: 1px;
-}
-
-.nesp-workflow .nesp-table th,
-.nesp-workflow .nesp-table td {
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    padding: 8px;
+.nesp-table th,
+.nesp-table td {
+    border: 1px solid #d7dee8;
+    padding: 9px 10px;
     text-align: left;
     vertical-align: top;
-    line-height: 1.45;
+    line-height: 1.5;
 }
 
-.nesp-workflow .nesp-table th {
-    background: var(--nesp-dashboard-panel-strong);
-    color: #ffffff;
+.nesp-table th {
+    background: #f0f4f9;
+    color: #071e41;
+    font-size: 12px;
+    position: static;
 }
 
-.nesp-workflow .nesp-table-scroll {
-    overflow-x: auto;
-    width: 100%;
+.nesp-table tr:nth-child(even) td {
+    background: #fbfcfe;
 }
 
-.nesp-workflow .nesp-review-table {
-    min-width: 980px;
-}
-
-.nesp-workflow .nesp-badge {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: bold;
-    line-height: 1.3;
-    padding: 3px 6px;
-}
-
-.nesp-workflow .nesp-badge-success {
-    background: #143c2a;
-    color: #b8f3cd;
-}
-
-.nesp-workflow .nesp-badge-warning {
-    background: #33280f;
-    color: #ffe7a6;
-}
-
-.nesp-workflow .nesp-badge-muted {
-    background: #24384d;
-    color: #dce8f6;
-}
-
-.nesp-workflow .nesp-status {
+.nesp-status {
     display: inline-block;
     min-width: 64px;
     padding: 3px 8px;
@@ -730,185 +544,92 @@
     font-size: 11px;
 }
 
-.nesp-workflow .nesp-status-off {
-    background: #24384d;
-    color: #dce8f6;
+.nesp-status-off {
+    background: #edf1f6;
+    color: #4a5968;
 }
 
-.nesp-workflow .nesp-status-on {
-    background: #143c2a;
-    color: #b8f3cd;
+.nesp-status-on {
+    background: #e5f5ec;
+    color: #166335;
 }
 
-.nesp-workflow .nesp-list {
+.nesp-list {
     margin: 0;
     padding-left: 18px;
     font-size: 13px;
     line-height: 1.6;
 }
 
-.nesp-workflow .nesp-detail-list {
-    display: grid;
-    grid-template-columns: minmax(120px, 180px) 1fr;
-    gap: 8px 14px;
-    margin: 0 0 14px;
-    font-size: 13px;
-}
-
-.nesp-workflow .nesp-detail-list dt {
-    color: var(--nesp-dashboard-muted);
-    font-weight: bold;
-}
-
-.nesp-workflow .nesp-detail-list dd {
-    margin: 0;
-    min-width: 0;
-    overflow-wrap: anywhere;
-}
-
-.nesp-workflow .nesp-field-label {
-    color: var(--nesp-dashboard-text);
-    display: block;
-    font-size: 12px;
-    font-weight: bold;
-    margin: 0 0 5px;
-}
-
-.nesp-workflow .nesp-script-preview {
-    margin: 0;
-    padding: 12px;
-    background: #081d39;
-    border: 1px solid var(--nesp-dashboard-line-soft);
-    color: var(--nesp-dashboard-text);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    font-size: 12px;
-    line-height: 1.55;
-}
-
-.nesp-workflow textarea[readonly],
-.nesp-workflow .nesp-table textarea {
-    width: 100%;
-    box-sizing: border-box;
-    resize: vertical;
-}
-
-.nesp-workflow code {
-    display: inline-block;
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    white-space: normal;
-}
-
 @media (max-width: 700px) {
     .nesp-workflow #contents {
-        padding: 14px 10px 28px;
+        width: calc(100% - 20px);
+        padding: 14px 0 28px;
     }
 
-    .nesp-workflow .nesp-card-grid,
-    .nesp-workflow .nesp-card-grid-compact,
-    .nesp-workflow .nesp-card-grid-tight,
-    .nesp-workflow .nesp-two-column,
-    .nesp-workflow .nesp-form-wide,
-    .nesp-workflow .nesp-inline-fields,
-    .nesp-workflow .nesp-question-editor-row,
-    .nesp-workflow .nesp-task-grid,
-    .nesp-workflow .nesp-step-row {
+    .nesp-card-grid,
+    .nesp-card-grid-compact,
+    .nesp-card-grid-tight,
+    .nesp-two-column,
+    .nesp-form-wide,
+    .nesp-task-grid,
+    .nesp-question-editor-row,
+    .nesp-inline-fields {
         grid-template-columns: 1fr;
     }
 
-    .nesp-workflow .nesp-brand-lockup {
-        align-items: flex-start;
+    .nesp-dashboard-nav {
+        position: static;
+        display: grid;
+        grid-template-columns: 1fr;
     }
 
-    .nesp-workflow .nesp-brand-lockup img {
-        max-width: 118px;
-        width: 36%;
+    .nesp-dashboard-nav a,
+    .nesp-primary-action,
+    .nesp-primary-button,
+    .nesp-secondary-button {
+        min-height: 44px;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    .nesp-workflow .nesp-page-title h2 {
+    .nesp-interview-hero {
+        display: grid;
+        gap: 14px;
+    }
+
+    .nesp-contact-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .nesp-page-title h2 {
         font-size: 21px;
     }
 
-    .nesp-workflow .nesp-action-form .nesp-primary-action,
-    .nesp-workflow .nesp-action-form .nesp-secondary-action,
-    .nesp-workflow .nesp-action-row form,
-    .nesp-workflow .nesp-action-row input,
-    .nesp-workflow .nesp-action-row button,
-    .nesp-workflow .nesp-upload-form .nesp-secondary-button,
-    .nesp-workflow .nesp-file-input {
-        box-sizing: border-box;
-        width: 100%;
+    .nesp-table {
+        font-size: 11px;
     }
 
-    .nesp-workflow .nesp-question-editor-row label:nth-last-child(-n+3) {
-        grid-column: auto;
+    .nesp-table th,
+    .nesp-table td {
+        padding: 7px 6px;
     }
 
-    .nesp-workflow .nesp-table,
-    .nesp-workflow .nesp-table tbody,
-    .nesp-workflow .nesp-table tr,
-    .nesp-workflow .nesp-table td {
-        display: block;
-        width: 100%;
+    .nesp-card,
+    .nesp-panel {
+        padding: 13px;
     }
 
-    .nesp-workflow .nesp-table tr:first-child {
-        display: none;
+    .nesp-form,
+    .nesp-scorecard-form {
+        gap: 12px;
     }
 
-    .nesp-workflow .nesp-table tr {
-        border: 1px solid var(--nesp-dashboard-line-soft);
-        box-sizing: border-box;
-        margin: 0 0 10px;
-    }
-
-    .nesp-workflow .nesp-table td {
-        border: 0;
-        border-bottom: 1px solid var(--nesp-dashboard-line-soft);
-        box-sizing: border-box;
-        padding: 8px 8px 8px 108px;
-        position: relative;
-    }
-
-    .nesp-workflow .nesp-table td:before {
-        color: var(--nesp-dashboard-muted);
-        content: attr(data-label);
-        font-weight: bold;
-        left: 8px;
-        position: absolute;
-        top: 8px;
-        width: 86px;
-    }
-
-    .nesp-workflow .nesp-review-table {
-        display: table;
-        min-width: 980px;
-    }
-
-    .nesp-workflow .nesp-review-table tbody {
-        display: table-row-group;
-    }
-
-    .nesp-workflow .nesp-review-table tr,
-    .nesp-workflow .nesp-review-table tr:first-child {
-        display: table-row;
-    }
-
-    .nesp-workflow .nesp-review-table th,
-    .nesp-workflow .nesp-review-table td {
-        display: table-cell;
-        width: auto;
-        padding: 8px;
-        position: static;
-    }
-
-    .nesp-workflow .nesp-review-table td:before {
-        content: none;
-    }
-
-    .nesp-workflow .nesp-detail-list {
+    .nesp-button-row {
+        display: grid;
         grid-template-columns: 1fr;
-        gap: 3px;
     }
 }
