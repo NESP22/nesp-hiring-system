@@ -230,7 +230,7 @@ class XmlUI extends UserInterface
                             break;
 
                         case 'jobURL':
-                            $uri = sprintf("%scareers/?p=showJob&ID=%d&source=Indeed&ref=%s",
+                            $uri = sprintf("%scareers/?p=showJob&ID=%d&source=Indeed&nesp_source=indeed&ref=%s",
                                 $url,
                                 $row['jobOrderID'],
                                 $templateName

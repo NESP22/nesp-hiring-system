@@ -41,6 +41,7 @@ include_once(LEGACY_ROOT . '/lib/DatabaseSearch.php');
 include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 include_once(LEGACY_ROOT . '/lib/Questionnaire.php');
 include_once(LEGACY_ROOT . '/lib/NESPApplicationQuestions.php');
+include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
 include_once(LEGACY_ROOT . '/lib/DocumentToText.php');
 include_once(LEGACY_ROOT . '/lib/FileUtility.php');
 include_once(LEGACY_ROOT . '/lib/ParseUtility.php');
@@ -489,6 +490,10 @@ class CareersUI extends UserInterface
             $emailconfirm = isset($_POST[$id='emailconfirm']) ? $_POST[$id] : '';
             $keySkills = isset($_POST[$id='keySkills']) ? $_POST[$id] : '';
             $source = isset($_POST[$id='source']) ? $_POST[$id] : '';
+            if (empty($source))
+            {
+                $source = NESPRecruitingAds::sourceFromRequest($_GET);
+            }
             $employer = isset($_POST[$id='employer']) ? $_POST[$id] : '';
             // for <input-resumeUploadPreview>
             $resumeContents = isset($_POST[$id='resumeContents']) ? $_POST[$id] : '';
@@ -919,6 +924,12 @@ class CareersUI extends UserInterface
             $template['Content'] = $template['Content - Job Details'];
 
             $jobID = $_GET['ID'];
+            $trackingSource = isset($_GET['nesp_source'])
+                ? NESPRecruitingAds::normalizeSourceKey($_GET['nesp_source'])
+                : '';
+            $trackingSourceQuery = $trackingSource !== ''
+                ? '&nesp_source=' . rawurlencode($trackingSource)
+                : '';
 
             /* Filter out non numeric characters */
             for ($i = 0; $i < strlen($jobID); $i++)
@@ -992,7 +1003,8 @@ class CareersUI extends UserInterface
             {
                 $applyToJobUrl = CATSUtility::getIndexName() . '?m=careers'
                     . (isset($_GET['templateName']) ? '&templateName=' . urlencode($_GET['templateName']) : '')
-                    . '&p=candidateRegistration&ID=' . (string) $jobID;
+                    . '&p=candidateRegistration&ID=' . (string) $jobID
+                    . $trackingSourceQuery;
                 $applyToJobUrl = (string) $applyToJobUrl;
                 if (preg_match('/^\s*javascript:/i', $applyToJobUrl))
                 {
@@ -1009,7 +1021,8 @@ class CareersUI extends UserInterface
             {
                 $applyToJobUrl = CATSUtility::getIndexName() . '?m=careers'
                     . (isset($_GET['templateName']) ? '&templateName=' . urlencode($_GET['templateName']) : '')
-                    . '&p=applyToJob&ID=' . (string) $jobID;
+                    . '&p=applyToJob&ID=' . (string) $jobID
+                    . $trackingSourceQuery;
                 $applyToJobUrl = (string) $applyToJobUrl;
                 if (preg_match('/^\s*javascript:/i', $applyToJobUrl))
                 {
