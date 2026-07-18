@@ -457,11 +457,11 @@ class NESPWorkflow
             'photography_assistant_poser' => array(
                 'label' => 'Field Staff Pre-Interview',
                 'match' => array('table greeter', 'field assistant', 'field staff', 'assistant', 'poser'),
-                'intro' => 'Spring 2026 Pre-Zoom Meeting Info and Survey. Please complete prior to the Zoom meeting. Try to answer all questions to the best of your ability and knowledge. Remember to hit Submit at the end, otherwise it will not record your information. Events take place in the New England area of the United States: Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.',
+                'intro' => 'Fall 2026 and Spring 2027 Pre-Interview Information and Survey. Please complete this survey before your Zoom meeting. Answer each question as accurately as you can, then select Submit so your responses are recorded. Assignments take place throughout New England, including Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.',
                 'questions' => array(
                     array('key' => 'confirmed_email', 'label' => 'Email address.', 'type' => 'text', 'required' => true),
                     array('key' => 'confirmed_name', 'label' => 'Your name.', 'type' => 'text', 'required' => true),
-                    array('key' => 'new_england_spring_availability', 'label' => 'Are you or will you be in the New England area during April, May, and early June? Events are in Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'new_england_spring_availability', 'label' => 'Are you available for seasonal assignments in New England during September-November and April-June? Events are in Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.', 'type' => 'textarea', 'required' => true),
                     array('key' => 'position_for_zoom', 'label' => 'Which position are you scheduling a Zoom meeting for? Photographer or Table Greeter / Field Assistant?', 'type' => 'textarea', 'required' => true),
                     array('key' => 'current_date_time', 'label' => 'Current date and time.', 'type' => 'text', 'required' => true),
                     array('key' => 'primary_work', 'label' => 'Primary work, if any.', 'type' => 'textarea', 'required' => true),
@@ -477,11 +477,11 @@ class NESPWorkflow
             'weekend_sports_photographer' => array(
                 'label' => 'Photographer Pre-Interview',
                 'match' => array('weekend sports photographer', 'staff photographer', 'freelance photographer', 'sports photographer', 'photographer'),
-                'intro' => 'Spring 2026 Pre-Zoom Meeting Info and Survey. Please complete prior to the Zoom meeting. Try to answer all questions to the best of your ability and knowledge. Remember to hit Submit at the end, otherwise it will not record your information. Events take place in the New England area of the United States: Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.',
+                'intro' => 'Fall 2026 and Spring 2027 Pre-Interview Information and Survey. Please complete this survey before your Zoom meeting. Answer each question as accurately as you can, then select Submit so your responses are recorded. Assignments take place throughout New England, including Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.',
                 'questions' => array(
                     array('key' => 'confirmed_email', 'label' => 'Email address.', 'type' => 'text', 'required' => true),
                     array('key' => 'confirmed_name', 'label' => 'Your name.', 'type' => 'text', 'required' => true),
-                    array('key' => 'new_england_spring_availability', 'label' => 'Are you or will you be in the New England area during April, May, and early June? Events are in Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.', 'type' => 'textarea', 'required' => true),
+                    array('key' => 'new_england_spring_availability', 'label' => 'Are you available for seasonal assignments in New England during September-November and April-June? Events are in Massachusetts, New Hampshire, Rhode Island, Connecticut, and Vermont.', 'type' => 'textarea', 'required' => true),
                     array('key' => 'position_for_zoom', 'label' => 'Which position are you scheduling a Zoom meeting for? Photographer or Table Greeter / Field Assistant?', 'type' => 'textarea', 'required' => true),
                     array('key' => 'current_date_time', 'label' => 'Current date and time.', 'type' => 'text', 'required' => true),
                     array('key' => 'primary_work', 'label' => 'Primary work, if any.', 'type' => 'textarea', 'required' => true),

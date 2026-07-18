@@ -46,10 +46,9 @@ jobs:
           role_ids = {role['id'] for role in config.get('roles', [])}
           expected = {
               'freelance_contract_youth_sports_photographer',
-              'on_site_picture_day_table_staff',
               'part_time_customer_service_representative',
-              'photography_assistant_poser',
-              'w2_seasonal_youth_sports_photographer',
+              'weekend_staff_portrait_team_photographer_youth_sports',
+              'weekend_table_greeter_field_assistant',
           }
           if role_ids != expected:
               raise SystemExit(f'Unexpected role set: {sorted(role_ids)}')
@@ -58,6 +57,9 @@ jobs:
           for role in config['roles']:
               if not role.get('compensation', {}).get('approval_required'):
                   raise SystemExit(f"Compensation must remain approval-gated: {role['id']}")
+          inactive_ids = {role['id'] for role in config.get('inactive_roles', [])}
+          if 'photography_assistant_poser' not in inactive_ids:
+              raise SystemExit('Photography Assistant/Poser must remain explicitly inactive until approved.')
           print('NESP hiring role configuration is valid and approval-gated.')
           PY
 

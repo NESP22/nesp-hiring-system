@@ -199,7 +199,7 @@ class CareersUI extends UserInterface
             $candidate = $this->ProcessCandidateRegistration($template['Content - Candidate Registration'], $fields);
             if ($candidate === false)
             {
-                echo '<html><body>You have not registered yet.  Please wait while we direct you to the job list...<script>setTimeout("document.location.href=\'?m=careers&&p=showAll\';", 1500);</script></body></html>';
+                echo '<html><body>You have not registered yet. Please return to the open positions list to begin your application.<script>setTimeout("document.location.href=\'?m=careers&amp;p=showAll\';", 1500);</script></body></html>';
                 die();
             }
 
@@ -307,7 +307,7 @@ class CareersUI extends UserInterface
             $candidate = $this->ProcessCandidateRegistration($template['Content - Candidate Registration'], $fields, true);
             if ($candidate === false)
             {
-                echo '<html><body>You have not registered yet.  Please wait while we direct you to the job list...<script>setTimeout("document.location.href=\'?m=careers&&p=showAll\';", 1500);</script></body></html>';
+                echo '<html><body>You have not registered yet. Please return to the open positions list to begin your application.<script>setTimeout("document.location.href=\'?m=careers&amp;p=showAll\';", 1500);</script></body></html>';
                 die();
             }
 
@@ -822,7 +822,7 @@ class CareersUI extends UserInterface
             if (!$this->isRequiredIDValid('ID', $_POST))
             {
                 // FIXME: Generate valid XHTML error pages. Create an error/fatal method!
-                echo '<html><body>This position is invalid or no longer available. Please wait while we direct you to the job list...<script>setTimeout("document.location.href=\'?m=careers&&p=showAll\';", 1500);</script></body></html>';
+                echo '<html><body>This position is invalid or no longer available. Please return to the open positions list to view current opportunities.<script>setTimeout("document.location.href=\'?m=careers&amp;p=showAll\';", 1500);</script></body></html>';
                 die();
             }
 
@@ -1951,7 +1951,7 @@ class CareersUI extends UserInterface
 
         if (empty($email))
         {
-            CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'E-Mail address is a required field - please have your administrator edit your templates to include the email field.');
+            CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Email address is required. Please return to the application and complete the email field.');
         }
 
         if (empty($source))
