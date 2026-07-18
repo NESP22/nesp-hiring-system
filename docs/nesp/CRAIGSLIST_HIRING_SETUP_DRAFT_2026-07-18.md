@@ -6,6 +6,25 @@
 **Scope:** Field Staff/Table Greeter, Photographer (staff), and Photographer (freelance/independent contractor)
 **Out of scope:** Customer Service. Customer Service remains a year-round role and is not included in this package.
 
+## Source Authority
+
+For role facts, this package uses only the existing NESP listing data:
+
+- [Weekend Table Greeter / Field Assistant](job-ads/on-site-table-team.md)
+- [Weekend Staff Portrait & Team Photographer - Youth Sports](job-ads/seasonal-per-diem-photographer-w2.md)
+- [Freelance/Contract Youth Sports Photographer](job-ads/freelance-photographer.md)
+- [NESP direct application links and role IDs](EXTERNAL_RECRUITING_CAMPAIGN_2026.md)
+
+Craigslist site, category, fee, reply mailbox, map, image, and verification fields are platform fields researched separately. No value for a missing NESP listing field is invented here.
+
+## Listing Reconciliation
+
+- The earlier draft's `September-November and April-June` availability is not present in the existing scoped listings and conflicts with their stated seasons. It has been removed.
+- Field Staff/Table Greeter: the listing states `Mid-April through early June; training and early assignments may begin in April`.
+- Staff Photographer: the listing states `Spring season generally runs from late April through early June; optional after-school weekday assignments and future seasonal opportunities may be available`.
+- Freelance Photographer: the listing states `Seasonal youth-sports Picture Day assignments, primarily weekends`; it does not provide named calendar months. No months are added to the draft.
+- The listing data does not provide an approved Craigslist reply mailbox, image asset, exact Craigslist category, or Craigslist fee. Those remain genuinely missing platform fields.
+
 ## Approval Gate
 
 Craig must approve the complete three-post package before anyone creates or uses a Craigslist account, accepts Craigslist terms, enters a reply mailbox or phone number, uploads an image, enters payment details, or publishes a post.
@@ -27,8 +46,8 @@ Start with one post per role in the **Boston > Northwest/Merrimack** site. Methu
 | Role | Posting type | Primary category | Initial site | Draft status |
 | --- | --- | --- | --- | --- |
 | Weekend Table Greeter / Field Assistant | Job offered | `jobs > general labor` | Boston > Northwest/Merrimack | Ready for approval |
-| Weekend Youth Sports Staff Photographer | Job offered | `jobs > art / media / design` | Boston > Northwest/Merrimack | Ready for approval |
-| Freelance Youth Sports Photographer | Job offered; employment type `contract` if shown | `jobs > art / media / design` | Boston > Northwest/Merrimack | Classification review required |
+| Weekend Staff Portrait & Team Photographer - Youth Sports | Job offered | `jobs > art / media / design` | Boston > Northwest/Merrimack | Ready for approval |
+| Freelance/Contract Youth Sports Photographer | Job offered; employment type `contract` if shown | `jobs > art / media / design` | Boston > Northwest/Merrimack | Classification review required |
 
 Do not create one multi-role ad. Craigslist asks for one job description per job post. Do not cross-post these drafts into Boston, Rhode Island, New Hampshire, Connecticut, Vermont, or other sites at launch. Craigslist says a posting is tied to one site and cannot be posted to more than one site at a time; a different site requires a new posting from the beginning.
 
@@ -45,9 +64,9 @@ These are the fields and checkpoints confirmed by Craigslist's current public he
 1. Geographic site and optional subarea. Select Boston, then Northwest/Merrimack. The site cannot be changed later.
 2. Posting type. Select `job offered`.
 3. Category. Select one truthful job category per role. Each selected category can incur a fee.
-4. Job title. Use the singular title below; keep the location and pay visible without keyword stuffing.
+4. Job title. Use the singular listing title below; keep the copy truthful and do not add unsupported role facts.
 5. Posting description. Paste the role-specific body below as plain text. Craigslist permits URLs in jobs posts; use only the NESP application URL.
-6. Posting details. Where shown, set employment type and compensation to match the body. Staff and field roles are W-2; the freelance role must remain `contract` only if the approved classification decision supports it.
+6. Posting details. Where shown, set employment type and compensation to match the body. Staff and field roles use the exact W-2 listing classifications; the freelance role uses the exact listed classification `Freelance/Independent Contractor` and remains blocked pending the existing classification review.
 7. Reply-to email. A valid email is required. Use a Craig-approved recruiting mailbox or Craigslist mail relay. Do not place a personal email, phone number, applicant data, or credentials in this document.
 8. Location and map. Use the truthful assignment territory in the body. Do not publish a private home address. If the map requires an address or ZIP code, Craig should use an approved NESP business location or other approved public location and confirm the pin before continuing.
 9. Images. Optional. Use no image unless Craig approves the exact NESP-owned logo or cleared event image and confirms it contains no applicant, child, or other personal data.
@@ -56,44 +75,53 @@ These are the fields and checkpoints confirmed by Craigslist's current public he
 ## Draft Post 1: Field Staff/Table Greeter
 
 **Role ID:** `41005`
-**Title:** `Weekend Table Greeter / Field Assistant - Youth Sports - $18/hr`
+**Title:** `Weekend Table Greeter / Field Assistant`
 **Posting type:** `job offered`
 **Category:** `jobs > general labor` (fallback: closest truthful field/event category shown by the live form)
 **Site:** `Boston > Northwest/Merrimack`
 **Compensation:** `$18 per hour`
-**Employment type:** `part-time` / seasonal W-2, if the live form offers that choice
+**Employment type:** `Part-time, temporary, seasonal W-2` if the live form offers a matching choice
 **Application:** `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41005`
 
 ### Body
 
 ```text
-New England Sports Photo is hiring friendly, organized Table Greeters / Field Assistants for youth-sports Picture Day events.
+New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
+
+We are hiring friendly, organized field assistants to help Picture Day run smoothly at youth-sports events. This is an active weekend role for someone who enjoys helping people, keeping details straight, and supporting a photographer and event team in the field.
 
 Pay: $18 per hour
-Employment type: Part-time, temporary seasonal W-2
-Availability: Work is available during the September-November and April-June seasons.
-Schedule: Primarily early weekend mornings, especially Saturdays, with some Sundays and optional weekday assignments.
-Territory: Primarily Massachusetts, with additional assignments in Connecticut, Rhode Island, and New Hampshire.
-Work location: Youth-sports fields and facilities. Reliable transportation is required.
+Employment type: Part-time, temporary, seasonal W-2
+Territory: Primarily Massachusetts, with additional events in Connecticut, Rhode Island, and New Hampshire
+Work location: Youth-sports fields and facilities
+Typical schedule: Primarily Saturdays, with some Sundays and early-morning availability
+Season: Mid-April through early June; training and early assignments may begin in April
+Paid drive time both directions
 
 What you'll do:
 - Welcome and check in families
-- Organize teams and help manage Picture Day flow
+- Organize teams and manage Picture Day flow
+- Guide athletes using NESP posing guides
 - Review order forms for completeness and accuracy
+- Assign player number codes carefully
 - Help keep portrait and team sessions on schedule
-- Support photographers in the field
+- Support photographers
+- Assist with reasonable setup and breakdown duties
 
 What we're looking for:
-- Friendly, professional communication
-- Organized and detail-oriented work habits
+- Friendly and professional communication
+- Organized, detail-oriented work habits
+- Comfort directing groups
+- Reliability and punctuality
+- Comfort working outdoors
 - Reliable transportation and a valid driver's license
-- Comfort standing for extended periods and working outdoors
+- Ability to stand for extended periods
 - Ability to lift up to 25 pounds
-- Ability to pass required background checks, if required for an assignment and handled with required notice and authorization
+- Ability to pass required background checks
 
-NESP provides training, Picture Day workflow guidance, posing guides, and event-team support. No prior photography experience is required.
+NESP provides training, Picture Day workflow guidance, posing guides, and support from the event team. No prior photography experience is required.
 
-Apply through the NESP careers page:
+Apply with your location, weekend availability, transportation information, and any customer-service, event, coaching, childcare, camp, school, retail, or team-support experience that shows reliability and comfort helping people:
 https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41005
 
 Applications are reviewed by the New England Sports Photo hiring team.
@@ -102,45 +130,51 @@ Applications are reviewed by the New England Sports Photo hiring team.
 ## Draft Post 2: Photographer (Staff)
 
 **Role ID:** `41002`
-**Title:** `Weekend Youth Sports Staff Photographer - $22-$25/hr`
+**Title:** `Weekend Staff Portrait & Team Photographer - Youth Sports`
 **Posting type:** `job offered`
 **Category:** `jobs > art / media / design` (fallback: `jobs > tv / film / video`)
 **Site:** `Boston > Northwest/Merrimack`
 **Compensation:** `$22-$25 per hour, based on experience`
-**Employment type:** `part-time` / temporary seasonal W-2, if the live form offers that choice
+**Employment type:** `Part-time, temporary, seasonal W-2` if the live form offers a matching choice
 **Application:** `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41002`
 
 ### Body
 
 ```text
-New England Sports Photo is hiring seasonal W-2 staff photographers for youth-sports Picture Day events.
+New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
+
+We are hiring weekend staff photographers to create individual portraits and team photographs at youth-sports Picture Day events. Photography experience is helpful, but the bigger requirements are reliability, a professional attitude, comfort working with children and families, and willingness to learn a structured Picture Day system.
 
 Pay: $22-$25 per hour, based on experience
-Employment type: Part-time, temporary seasonal W-2
-Availability: Work is available during the September-November and April-June seasons.
-Schedule: Primarily early weekend mornings, especially Saturdays, with some Sundays and optional weekday after-school assignments.
-Territory: Primarily Massachusetts, with additional assignments in Connecticut, Rhode Island, Vermont, and New Hampshire.
-Equipment: NESP provides the camera equipment, lighting, paid training, and Picture Day workflow guidance.
+Employment type: Part-time, temporary, seasonal W-2
+Territory: Primarily Massachusetts, with additional assignments in Connecticut, Rhode Island, Vermont, and New Hampshire
+Typical schedule: Most assignments are on Saturdays, with some Sundays and early-morning weekend availability
+Season: Spring season generally runs from late April through early June; optional after-school weekday assignments and future seasonal opportunities may be available
+Equipment: NESP provides professional equipment for staff photographer assignments
 
 What you'll do:
 - Photograph individual athletes and teams using NESP equipment
 - Set up cameras, lighting, and related gear
-- Work professionally with athletes, parents, coaches, and league staff
+- Represent NESP professionally at assigned locations
+- Work comfortably with athletes, parents, coaches, and league staff
+- Assist with setup and breakdown
 - Follow the NESP Picture Day workflow
 - Help keep events organized and on schedule
 
 What we're looking for:
-- Reliable transportation and a valid driver's license
-- Ability to travel to assigned youth-sports locations
-- Early-morning weekend availability
+- Valid driver's license
+- Reliable personal transportation
+- Ability to travel to assigned locations
 - Comfort working with children and families
-- Photography, youth-sports, school, event, or customer-facing experience is helpful
+- Strong communication and organizational skills
+- Dependability for accepted assignments
 - Ability to learn technical skills and follow a structured process
-- Ability to pass required background checks and youth-sports screenings, if required for an assignment and handled with required notice and authorization
+- Ability to pass required background checks and youth-sports screenings
 
-Personal camera equipment is not required for this W-2 staff role.
+NESP provides the camera equipment and lighting used for staff photographer assignments, along with paid training, event workflow guidance, and Picture Day processes. You do not need to provide your own camera gear for this W-2 staff role.
+Paid drive time is handled in accordance with NESP policy.
 
-Apply through the NESP careers page:
+Apply with your availability, location, transportation information, and any photography, youth-sports, school, event, or customer-facing experience:
 https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41002
 
 Applications are reviewed by the New England Sports Photo hiring team.
@@ -149,44 +183,54 @@ Applications are reviewed by the New England Sports Photo hiring team.
 ## Draft Post 3: Photographer (Freelance/Independent Contractor)
 
 **Role ID:** `41003`
-**Title:** `Freelance Youth Sports Photographer - $22-$27/hr`
+**Title:** `Freelance/Contract Youth Sports Photographer`
 **Posting type:** `job offered`
 **Category:** `jobs > art / media / design` (fallback: closest truthful photography/creative job category)
 **Site:** `Boston > Northwest/Merrimack`
 **Compensation:** `$22-$27 per hour, based on experience`
-**Employment type:** `contract` only after classification approval
+**Employment type:** `Freelance/Independent Contractor`; use a Craigslist `contract` option only if it is the matching platform field and after classification approval
 **Application:** `https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41003`
 
 ### Body
 
 ```text
-New England Sports Photo is seeking freelance/independent-contractor photographers for youth-sports Picture Day assignments.
+New England Sports Photo is a family-owned youth sports photography company with more than 50 years of experience serving leagues and families throughout New England.
 
-Pay: $22-$27 per hour, based on experience and approved assignment terms
-Classification: Freelance / Independent Contractor
-Availability: Work is available during the September-November and April-June seasons.
-Schedule: Primarily early weekend Picture Day assignments, with some Sundays and optional weekday work when available.
-Territory: Massachusetts, Rhode Island, New Hampshire, and Connecticut.
-Equipment: Freelance photographers provide their own approved professional camera body, external speedlight, suitable portrait zoom lens, reliable transportation, and backup equipment as needed.
+We are looking for experienced freelance photographers who enjoy efficient portrait and team photography in active outdoor youth-sports settings. This role is best suited for photographers who already own approved professional equipment, understand camera and flash settings, and want recurring seasonal assignments with a structured workflow.
+
+Pay: $22-$27 per hour, based on experience
+Classification: Freelance/Independent Contractor
+Typical schedule: Seasonal youth-sports Picture Day assignments, primarily weekends
+Territory: Massachusetts, Rhode Island, New Hampshire, and Connecticut
 
 What you'll do:
-- Photograph individual youth athletes and teams at assigned Picture Day events
-- Use appropriate camera and flash settings in active outdoor conditions
+- Photograph individual player portraits and team photographs
+- Use on-camera flash appropriately during outdoor sessions
 - Travel to assigned youth-sports locations
-- Follow NESP's Picture Day process and event instructions
-- Work professionally with athletes, families, coaches, and league staff
+- Follow NESP's structured Picture Day process
+- Adjust camera and flash settings as conditions change
+- Work efficiently while maintaining a positive experience for families and leagues
 
 What we're looking for:
-- Relevant portrait, event, school, sports, or volume-photography experience
 - Working knowledge of shutter speed, aperture, ISO, and flash
-- Approved professional equipment suitable for portrait work
-- Reliable transportation and early-weekend availability
 - Comfort working with children and families
-- Ability to follow structured processes and communicate clearly
+- Friendly, energetic, professional, and dependable approach
+- Ability to work early weekend assignments
+- Ability to follow structured processes
+- Willingness to learn NESP techniques
+- Reliable transportation
 
-This is a separate freelance/independent-contractor opportunity, not the NESP W-2 staff-photographer role. The engagement terms and classification must be reviewed and approved before an assignment is offered.
+Equipment you provide:
+- Approved professional or advanced camera body; mirrorless preferred with appropriate DSLR bodies also considered
+- Approximately 20MP or higher
+- External speedlight with manual and TTL operation
+- Portrait zoom covering approximately 24-70mm through 24-120mm full-frame equivalent
+- Reliable vehicle capable of safely transporting required equipment
 
-Apply through the NESP careers page:
+NESP provides the Picture Day workflow, assignment details, on-site process expectations, and guidance on NESP techniques. Staff/W-2 photographers use NESP equipment; freelance photographers provide their own approved equipment.
+Travel and paid-time terms are handled according to the approved contractor assignment terms for the work offered.
+
+Apply with your location, availability, equipment list, transportation information, and a link or description of relevant portrait, event, school, sports, or volume-photography experience:
 https://careers.nesportsphoto.com/careers/?p=applyToJob&ID=41003
 
 Applications are reviewed by the New England Sports Photo hiring team.
@@ -239,13 +283,13 @@ Applications are reviewed by the New England Sports Photo hiring team.
 - Show the hourly range in both the Craigslist compensation field and the body. Massachusetts requires covered employers with 25 or more Massachusetts employees to disclose a good-faith pay range in job postings beginning October 29, 2025; showing the range for all three posts is the safer operating standard.
 - State W-2 status for the field and staff-photographer roles. Do not describe W-2 benefits in the contractor post.
 - State freelance/independent-contractor status prominently and keep that post blocked until the classification review is complete. A label, hourly rate, equipment ownership, or contractor agreement alone does not determine Massachusetts classification.
-- State the September-November and April-June availability exactly. Do not call these roles year-round.
+- State each role's listing season exactly. Do not add September-November or call these roles year-round.
 - State territory, travel, early weekend hours, outdoor work, equipment expectations, and physical requirements only when they are genuinely job-related and accurate.
 - Keep background-check language conditional and job-related. Do not request a Social Security number, date of birth, driver's-license scan, bank information, password, or other sensitive data in Craigslist copy or replies.
 - Do not ask applicants to send a photograph. Route applicants to the matching NESP application page; the existing NESP application workflow owns the role-specific questions.
 - Keep the copy neutral and inclusive. Do not use preferences such as "young," "recent graduate," gendered language, or any protected-trait requirement. Review any screening requirement for job-relatedness and accommodation handling.
 - Use only NESP-owned or cleared images. The draft contains no personal data and no image upload is required.
-- Do not promise benefits, mileage, paid drive time, hours, assignments, or contractor terms unless Craig confirms the current approved terms for the specific role.
+- Keep pay, schedule, territory, equipment, travel, and paid-time language exactly to the listing data. The field listing states paid drive time both directions; the staff listing says paid drive time is handled in accordance with NESP policy; the freelance listing says travel and paid-time terms follow the approved contractor assignment terms for the work offered.
 
 ## Exact Manual Steps After Approval
 
@@ -291,5 +335,5 @@ Craigslist sources checked on 2026-07-18:
 - **Base:** local `master` at `16caf79` (clean isolated worktree)
 - **PR:** not opened; this is a draft-only local documentation change and no remote publication was requested.
 - **Files:** `docs/nesp/CRAIGSLIST_HIRING_SETUP_DRAFT_2026-07-18.md`
-- **Blockers:** live Craigslist fee/category confirmation requires Craig's approved manual flow; freelance/independent-contractor classification review is required before that post can be created; no approved reply mailbox or image asset was supplied.
+- **Blockers:** the freelance listing has no named calendar months; the earlier September-November wording contradicted the scoped listings and was removed; live Craigslist fee/category confirmation requires Craig's approved manual flow; freelance/independent-contractor classification review is required before that post can be created; no approved reply mailbox or image asset was supplied.
 - **Approval gate:** one owner gate before account/terms/payment/publication, covering copy, site/category, reply mailbox, live fees/total budget, and contractor classification.
