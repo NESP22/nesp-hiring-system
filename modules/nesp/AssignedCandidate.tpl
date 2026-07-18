@@ -6,7 +6,28 @@
         <div id="contents">
             <div class="nesp-page-title">
                 <h2><?php $this->_($this->candidate['candidate_name']); ?></h2>
-                <p><?php $this->_($this->candidate['role_title']); ?> assignment. Candidate access is limited to this explicit grant.</p>
+                <p><?php $this->_($this->candidate['role_title']); ?> interview assignment</p>
+            </div>
+
+            <div class="nesp-dashboard-nav">
+                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignedCandidates">My Next Actions</a>
+                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=myAvailability">My Availability</a>
+            </div>
+
+            <div class="nesp-panel nesp-interview-hero">
+                <div>
+                    <span class="nesp-card-label">Interview checklist</span>
+                    <h3>Review, talk, then score</h3>
+                    <p>Use the candidate details below during the conversation. Save a draft if you need to come back later; submitting locks the scorecard for Craig to review.</p>
+                </div>
+                <div class="nesp-contact-actions">
+                    <?php if (!empty($this->candidate['phone_cell'])): ?>
+                        <a class="nesp-secondary-button" href="tel:<?php echo(htmlspecialchars(preg_replace('/[^0-9+]/', '', $this->candidate['phone_cell']), ENT_QUOTES, 'UTF-8')); ?>">Call candidate</a>
+                    <?php endif; ?>
+                    <?php if (!empty($this->candidate['email1'])): ?>
+                        <a class="nesp-secondary-button" href="mailto:<?php echo(htmlspecialchars($this->candidate['email1'], ENT_QUOTES, 'UTF-8')); ?>">Email candidate</a>
+                    <?php endif; ?>
+                </div>
             </div>
 
             <div class="nesp-two-column">
@@ -17,6 +38,8 @@
                         <tr><th>Waiting on</th><td><?php $this->_($this->candidate['waiting_on_key']); ?></td></tr>
                         <tr><th>Last activity</th><td><?php $this->_($this->candidate['last_activity']); ?></td></tr>
                         <tr><th>Summary</th><td><?php $this->_($this->candidate['summary']); ?></td></tr>
+                        <?php if (!empty($this->candidate['email1'])): ?><tr><th>Email</th><td><?php $this->_($this->candidate['email1']); ?></td></tr><?php endif; ?>
+                        <?php if (!empty($this->candidate['phone_cell'])): ?><tr><th>Phone</th><td><?php $this->_($this->candidate['phone_cell']); ?></td></tr><?php endif; ?>
                         <?php if ((int) $this->candidate['can_view_resume'] === 1): ?>
                         <tr><th>Skills</th><td><?php $this->_($this->candidate['key_skills']); ?></td></tr>
                         <tr><th>Notes</th><td><?php $this->_($this->candidate['notes']); ?></td></tr>
