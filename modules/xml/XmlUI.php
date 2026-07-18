@@ -183,6 +183,11 @@ class XmlUI extends UserInterface
             foreach ($rs as $rowIndex => $row)
             {
                 $txtJobPosting = $templateJob;
+                $publishedAt = strtotime((string) $row['dateCreatedSort']);
+                if ($publishedAt === false)
+                {
+                    $publishedAt = time();
+                }
 
                 foreach ($tags as $tag)
                 {
@@ -207,13 +212,24 @@ class XmlUI extends UserInterface
                         case 'jobPostDate':
                             $txtJobPosting = XmlTemplate::replaceTemplateTags(
                                 $tag,
-                                $row['dateCreatedSort'],
+                                gmdate('c', $publishedAt),
+                                $txtJobPosting
+                            );
+                            break;
+
+                        case 'requisitionId':
+                            $requisitionId = !empty($row['jobID'])
+                                ? $row['jobID']
+                                : $row['jobOrderID'];
+                            $txtJobPosting = XmlTemplate::replaceTemplateTags(
+                                $tag,
+                                $requisitionId,
                                 $txtJobPosting
                             );
                             break;
 
                         case 'jobURL':
-                            $uri = sprintf("%scareers/?p=showJob&ID=%d&ref=%s",
+                            $uri = sprintf("%scareers/?p=showJob&ID=%d&source=Indeed&ref=%s",
                                 $url,
                                 $row['jobOrderID'],
                                 $templateName
@@ -245,7 +261,18 @@ class XmlUI extends UserInterface
                         case 'hiringCompany':
                             $txtJobPosting = XmlTemplate::replaceTemplateTags(
                                 $tag,
-                                'CATS (www.catsone.com)',
+                                'New England Sports Photo',
+                                $txtJobPosting
+                            );
+                            break;
+
+                        case 'salary':
+                            $salary = !empty($row['salary'])
+                                ? $row['salary']
+                                : $row['maxRate'];
+                            $txtJobPosting = XmlTemplate::replaceTemplateTags(
+                                $tag,
+                                $salary,
                                 $txtJobPosting
                             );
                             break;
