@@ -5,38 +5,49 @@
         <?php TemplateUtility::printQuickSearch(); ?>
         <div id="contents">
             <div class="nesp-page-title">
-                <h2>NESP Interviewer Access</h2>
-                <p>Scoped interviewer permissions are enforced by profile state, approved job roles, explicit candidate grants, and server-side authorization.</p>
+                <h2>Interviewer access</h2>
+                <p>Use this quick check to confirm who can interview, what they can see, and what still needs attention.</p>
             </div>
 
-            <div class="nesp-card-grid">
+            <div class="nesp-card-grid nesp-card-grid-compact">
                 <div class="nesp-card">
-                    <span class="nesp-card-label">Active Interviewer Profiles</span>
+                    <span class="nesp-card-label">Active interviewers</span>
                     <strong><?php $this->_($this->summary['activeInterviewers']); ?></strong>
                 </div>
                 <div class="nesp-card">
-                    <span class="nesp-card-label">Active Candidate Grants</span>
+                    <span class="nesp-card-label">Candidate grants</span>
                     <strong><?php $this->_($this->summary['candidateGrants']); ?></strong>
                 </div>
                 <div class="nesp-card">
-                    <span class="nesp-card-label">Scheduled Interviews</span>
+                    <span class="nesp-card-label">Scheduled interviews</span>
                     <strong><?php $this->_($this->summary['scheduledInterviews']); ?></strong>
                 </div>
                 <div class="nesp-card">
-                    <span class="nesp-card-label">Draft Scorecards</span>
+                    <span class="nesp-card-label">Scorecards to review</span>
                     <strong><?php $this->_($this->summary['pendingScorecards']); ?></strong>
                 </div>
             </div>
 
-            <div class="nesp-panel">
-                <h3>Scoped Access Model</h3>
-                <ul class="nesp-list">
-                    <li>Interviewers will use individual OpenCATS accounts after scoped access is implemented and tested.</li>
-                    <li>Candidate visibility is based on explicit candidate and job grants, not broad OpenCATS recruiter permissions.</li>
-                    <li>Candidate grants require an active, open interviewer profile approved for that exact job.</li>
-                    <li>Scorecards and notes are tied to assigned interviews and stored in MariaDB.</li>
-                    <li>System administration, integration secrets, and feature flags remain administrator-only.</li>
-                </ul>
+            <div class="nesp-two-column">
+                <div class="nesp-panel">
+                    <h3>Access checklist</h3>
+                    <ul class="nesp-list">
+                        <li>Interviewer account is active.</li>
+                        <li>Interviewer is approved for the exact job role.</li>
+                        <li>Candidate access is granted explicitly.</li>
+                        <li>Assignments and scorecards stay tied to that interviewer.</li>
+                    </ul>
+                </div>
+
+                <div class="nesp-panel">
+                    <h3>Admin-only controls</h3>
+                    <ul class="nesp-list">
+                        <li>Account setup and access changes.</li>
+                        <li>Candidate and job grants.</li>
+                        <li>System settings and integration secrets.</li>
+                        <li>Audit history and override decisions.</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
