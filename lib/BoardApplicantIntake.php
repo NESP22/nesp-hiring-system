@@ -30,7 +30,9 @@ class BoardApplicantIntake
     {
         return array(
             self::DEFAULT_JOB_ORDER_ID => 'Part-Time Customer Service Representative',
-            41002 => 'Staff Photographer'
+            41002 => 'Staff Photographer',
+            41003 => 'Freelance/Contract Youth Sports Photographer',
+            41005 => 'Weekend Table Greeter / Field Assistant'
         );
     }
 

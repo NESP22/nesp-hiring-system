@@ -23,7 +23,9 @@ generic CSV importer and does not expose a public route.
    candidate record, and selected job-order pipeline entry before passing the
    upload to OpenCATS `AttachmentCreator` as a resume.
 
-The initial job-order allowlist contains Customer Service job `41001`.
+The job-order allowlist contains Customer Service `41001`, Staff Photographer
+`41002`, Freelance/Contract Youth Sports Photographer `41003`, and Weekend
+Table Greeter / Field Assistant `41005`.
 
 ## Duplicate and idempotency rules
 
