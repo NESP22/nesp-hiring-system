@@ -25,10 +25,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-configure ldap \
     && docker-php-ext-install -j"$(nproc)" gd ldap mbstring mysqli soap zip \
-    && pecl install mcrypt-1.0.9 \
+    && curl -fsSL -o /tmp/mcrypt-1.0.9.tgz https://pecl.php.net/get/mcrypt-1.0.9.tgz \
+    && pecl install /tmp/mcrypt-1.0.9.tgz \
     && docker-php-ext-enable mcrypt \
     && a2enmod headers rewrite \
-    && rm -rf /var/lib/apt/lists/* /tmp/pear
+    && rm -rf /var/lib/apt/lists/* /tmp/pear /tmp/mcrypt-1.0.9.tgz
 
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
