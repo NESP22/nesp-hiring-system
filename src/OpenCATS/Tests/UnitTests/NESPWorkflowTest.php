@@ -265,12 +265,34 @@ class NESPWorkflowTest extends TestCase
     public function testRecruitingSourceParametersAreSafeAndTracked()
     {
         $this->assertSame('Indeed', NESPRecruitingAds::getSourceLabel('indeed'));
+        $this->assertSame('Handshake', NESPRecruitingAds::getSourceLabel('handshake'));
+        $this->assertSame('MassHire JobQuest / MassTalent', NESPRecruitingAds::getSourceLabel('masstalent'));
+        $this->assertSame('NESP Ad: MassHire JobQuest / MassTalent', NESPRecruitingAds::sourceFromRequest(array('nesp_source' => 'masshire_jobquest')));
         $this->assertSame('NESP Ad: Facebook', NESPRecruitingAds::sourceFromRequest(array('utm_source' => 'facebook')));
         $this->assertSame('', NESPRecruitingAds::sourceFromRequest(array('nesp_source' => 'not a platform')));
 
         $link = NESPRecruitingAds::trackedApplicationURL(41002, 'craigslist');
         $this->assertStringContainsString('ID=41002', $link);
         $this->assertStringContainsString('nesp_source=craigslist', $link);
+    }
+
+    public function testAlternativeBoardTrackerRowsAreManualAndDraftOnly()
+    {
+        $matrix = NESPRecruitingAds::getPlatformMatrix();
+        $byKey = array();
+        foreach ($matrix as $platform)
+        {
+            $byKey[$platform['platform_key']] = $platform;
+        }
+
+        $this->assertArrayHasKey('handshake', $byKey);
+        $this->assertArrayHasKey('masshire', $byKey);
+        $this->assertSame('Draft only', $byKey['handshake']['campaign_status']);
+        $this->assertSame('Draft only', $byKey['masshire']['campaign_status']);
+        $this->assertStringContainsString('Manual', $byKey['handshake']['posting_method']);
+        $this->assertStringContainsString('Manual', $byKey['masshire']['posting_method']);
+        $this->assertStringContainsString('tracked external application link', $byKey['handshake']['tracking_support']);
+        $this->assertStringContainsString('tracked external application link', $byKey['masshire']['tracking_support']);
     }
 
     public function testRecruitingAdTemplatesFlagMissingUnapprovedRoles()
