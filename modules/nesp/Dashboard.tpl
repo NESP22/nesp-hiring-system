@@ -13,6 +13,10 @@
                 Human-reviewed only: no automatic rejection, ranking, applicant email, phone calls, Zoom meetings, AI review, or external posting happens from this dashboard.
             </div>
 
+            <?php if (!empty($this->assignmentMessage)): ?>
+                <div class="nesp-confirm-box nesp-assignment-message"><?php $this->_($this->assignmentMessage); ?></div>
+            <?php endif; ?>
+
             <div class="nesp-dashboard-nav">
                 <?php foreach ($this->dashboardNavigation as $navItem): ?>
                     <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
@@ -201,6 +205,31 @@
                                             </div>
                                         <?php endif; ?>
                                         <a class="nesp-primary-action" href="<?php echo($card['primary_action_url']); ?>"><?php $this->_($card['next_action_label']); ?></a>
+                                        <?php if ($sectionKey === 'needsCraig' && !empty($this->canAssignInterviewers) && (!empty($card['assignable_interviewers']) || !empty($card['assignment_block_reason']))): ?>
+                                            <div class="nesp-assignment-panel">
+                                                <strong>Assign Interviewer</strong>
+                                                <?php if (!empty($card['assignable_interviewers'])): ?>
+                                                    <p class="nesp-muted">Choose an active interviewer approved for this role.</p>
+                                                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignInterviewer" class="nesp-assignment-form">
+                                                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                                        <input type="hidden" name="candidateID" value="<?php echo((int) $card['candidate_id']); ?>" />
+                                                        <input type="hidden" name="jobOrderID" value="<?php echo((int) $card['joborder_id']); ?>" />
+                                                        <label>
+                                                            Interviewer
+                                                            <select name="interviewerProfileID" required>
+                                                                <option value="">Choose interviewer</option>
+                                                                <?php foreach ($card['assignable_interviewers'] as $interviewer): ?>
+                                                                    <option value="<?php echo((int) $interviewer['interviewer_profile_id']); ?>"><?php $this->_($interviewer['display_name']); ?></option>
+                                                                <?php endforeach; ?>
+                                                            </select>
+                                                        </label>
+                                                        <button type="submit" class="nesp-secondary-button">Assign Interviewer</button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <p class="nesp-muted"><?php $this->_($card['assignment_block_reason']); ?></p>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
                                         <details class="nesp-secondary-actions">
                                             <summary>Details</summary>
                                             <a href="<?php echo($card['candidate_url']); ?>">Candidate</a>

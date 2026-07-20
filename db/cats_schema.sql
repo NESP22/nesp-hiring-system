@@ -1624,12 +1624,26 @@ CREATE TABLE `nesp_question_set_role_match` (
 
 /* Data for the table `nesp_question_set_role_match` */
 
+/* Table structure for table `nesp_question_set_builtin_release` */
+
+CREATE TABLE `nesp_question_set_builtin_release` (
+  `set_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `release_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `question_set_version_id` INT(11) NOT NULL,
+  `published_by_user_id` INT(11),
+  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+  PRIMARY KEY (`set_key`),
+  KEY `IDX_nesp_question_set_builtin_release_version` (`question_set_version_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 /* Table structure for table `nesp_screening_questionnaire` */
 
 CREATE TABLE `nesp_screening_questionnaire` (
   `screening_questionnaire_id` INT(11) NOT NULL AUTO_INCREMENT,
   `candidate_id` INT(11) NOT NULL,
   `joborder_id` INT(11) NOT NULL,
+  `active_candidate_job_key` CHAR(64) COLLATE utf8mb4_unicode_ci,
   `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_invited',
   `question_set_key` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `question_set_version` INT(11) NOT NULL DEFAULT 1,
@@ -1654,6 +1668,7 @@ CREATE TABLE `nesp_screening_questionnaire` (
   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   PRIMARY KEY (`screening_questionnaire_id`),
   UNIQUE KEY `IDX_questionnaire_token_hash` (`token_hash`),
+  UNIQUE KEY `IDX_questionnaire_active_candidate_job` (`active_candidate_job_key`),
   KEY `IDX_questionnaire_candidate_job` (`candidate_id`, `joborder_id`),
   KEY `IDX_questionnaire_status` (`status_key`),
   KEY `IDX_questionnaire_set_version` (`question_set_version_id`),

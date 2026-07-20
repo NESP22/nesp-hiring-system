@@ -480,6 +480,47 @@
     padding: 8px;
 }
 
+.nesp-workflow .nesp-assignment-panel {
+    border: 1px solid var(--nesp-dashboard-line-soft);
+    background: #081d39;
+    margin: 0 0 10px;
+    padding: 10px;
+}
+
+.nesp-workflow .nesp-assignment-panel strong {
+    color: #ffffff;
+    display: block;
+    font-size: 13px;
+    margin: 0 0 5px;
+}
+
+.nesp-workflow .nesp-assignment-panel p {
+    margin: 0 0 8px;
+}
+
+.nesp-workflow .nesp-assignment-form {
+    align-items: end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.nesp-workflow .nesp-assignment-form label {
+    flex: 1 1 180px;
+    margin: 0;
+}
+
+.nesp-workflow .nesp-assignment-form select {
+    box-sizing: border-box;
+    display: block;
+    margin-top: 4px;
+    width: 100%;
+}
+
+.nesp-workflow .nesp-assignment-message {
+    margin: 0 0 16px;
+}
+
 .nesp-workflow .nesp-button-row {
     display: flex;
     flex-wrap: wrap;
@@ -837,6 +878,12 @@
     .nesp-workflow .nesp-action-row button,
     .nesp-workflow .nesp-upload-form .nesp-secondary-button,
     .nesp-workflow .nesp-file-input {
+        box-sizing: border-box;
+        width: 100%;
+    }
+
+    .nesp-workflow .nesp-assignment-form,
+    .nesp-workflow .nesp-assignment-form button {
         box-sizing: border-box;
         width: 100%;
     }

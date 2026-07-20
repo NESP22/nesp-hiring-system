@@ -70,7 +70,7 @@ UPDATE `nesp_interviewer_profile`
 SET display_name = 'Nate',
     role_key = 'field_interviewer',
     is_active = 0,
-    account_state_key = 'ready_for_account_creation',
+    account_state_key = 'profile_created',
     timezone = 'America/New_York',
     availability_status_key = 'open',
     max_interviews_per_day = 3,
@@ -80,14 +80,14 @@ SET display_name = 'Nate',
     earliest_time = '09:00:00',
     latest_time = '17:00:00',
     may_recommend = 1,
-    private_admin_notes = 'Approved for Staff Photographer, Freelance Photographer, and Field Assistant only. Customer Service is explicitly forbidden.',
+    private_admin_notes = 'Profile only. Craig must explicitly assign approved job roles before this interviewer can receive candidates.',
     email_warning = '',
     date_modified = NOW()
 WHERE email = 'nate@nesportsphoto.com';
 
 INSERT INTO `nesp_interviewer_profile`
     (`user_id`, `display_name`, `email`, `role_key`, `is_active`, `can_view_resume`, `can_add_notes`, `can_submit_scorecard`, `account_state_key`, `timezone`, `availability_status_key`, `max_interviews_per_day`, `max_interviews_per_week`, `default_interview_minutes`, `buffer_minutes`, `earliest_time`, `latest_time`, `craig_must_attend`, `may_recommend`, `private_admin_notes`, `email_warning`, `date_created`, `date_modified`)
-SELECT NULL, 'Nate', 'nate@nesportsphoto.com', 'field_interviewer', 0, 1, 1, 1, 'ready_for_account_creation', 'America/New_York', 'open', 3, 12, 25, 15, '09:00:00', '17:00:00', 0, 1, 'Approved for Staff Photographer, Freelance Photographer, and Field Assistant only. Customer Service is explicitly forbidden.', '', NOW(), NOW()
+SELECT NULL, 'Nate', 'nate@nesportsphoto.com', 'field_interviewer', 0, 1, 1, 1, 'profile_created', 'America/New_York', 'open', 3, 12, 25, 15, '09:00:00', '17:00:00', 0, 1, 'Profile only. Craig must explicitly assign approved job roles before this interviewer can receive candidates.', '', NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `nesp_interviewer_profile` WHERE email = 'nate@nesportsphoto.com');
 
@@ -99,12 +99,18 @@ INNER JOIN (
     SELECT 'suthir@nesportsphoto.com' AS email, 41002 AS joborder_id, 'staff_photographer' AS role_key
     UNION ALL SELECT 'suthir@nesportsphoto.com', 41003, 'freelance_photographer'
     UNION ALL SELECT 'brandon@nesportsphoto.com', 41005, 'field_assistant'
-    UNION ALL SELECT 'nate@nesportsphoto.com', 41002, 'staff_photographer'
-    UNION ALL SELECT 'nate@nesportsphoto.com', 41003, 'freelance_photographer'
-    UNION ALL SELECT 'nate@nesportsphoto.com', 41005, 'field_assistant'
 ) role_map
     ON role_map.email = ip.email
 ON DUPLICATE KEY UPDATE
     role_key = VALUES(role_key),
     is_active = 1,
     date_modified = NOW();
+
+/* Nate is deliberately profile-only until Craig grants roles through the
+ * administrative workflow. This update also corrects an earlier seed run. */
+UPDATE `nesp_interviewer_job_role` ijr
+INNER JOIN `nesp_interviewer_profile` ip
+    ON ip.interviewer_profile_id = ijr.interviewer_profile_id
+SET ijr.is_active = 0,
+    ijr.date_modified = NOW()
+WHERE ip.email = 'nate@nesportsphoto.com';

@@ -19,6 +19,9 @@ questionnaire tables.
 - Candidate links store the published version ID and question snapshot at
   generation time, so old sent links do not change when future wording is
   edited.
+- This draft changes source defaults, tests, and documentation only. It does
+  not rewrite an existing published version or an already-issued link; Craig
+  must review and publish a new version from `Manage Question Sets` separately.
 - Generate/regenerate shows raw links only in the immediate copy-only response;
   the database stores hashed tokens only.
 - No question-set action sends email/SMS, calls applicants, creates Zoom
@@ -48,31 +51,31 @@ Job `41004` remains inactive/nonpublic and has no NESP prescreen questions.
 
 ## Photographer Pre-Interview Questionnaire
 
-The Staff Photographer and Freelance Photographer roles both use the
-Photographer Pre-Interview questionnaire. The applicant-facing title is:
+The Staff Photographer and Freelance Photographer roles both resolve to the
+same role-specific Photographer Pre-Interview question set. The applicant-facing
+intro begins:
 
-`Fall 2026 and Spring 2027 Pre-Interview Information and Survey`
+`Photographer Pre-Interview - Staff or Freelance. Fall 2026 and Spring 2027 Pre-Interview Information and Survey.`
 
 The Photographer questionnaire asks job-related questions about:
 
 - email address
 - applicant name
 - availability for seasonal assignments during September-November and April-June
-- whether the applicant is scheduling for Photographer or Table Greeter / Field
-  Assistant
+- confirmation that the questionnaire is for Photographer
 - current date and time
 - primary work, if any
-- last 5 photography events, or fewer if the applicant has fewer than 5
+- last 5 photography events, or fewer if the applicant has fewer than 5 (required)
 - online portfolio or website link, if applicable
 - LinkedIn link, if applicable
 - years freelancing
 - camera body make and model
 - lens make, focal length, and aperture range
-- flash ownership
-- indoor photography lighting experience using 2 or more monolights
+- flash ownership (required Yes/No)
+- indoor photography lighting experience using 2 or more monolights (required Yes/No)
 - valid driver's license and reliable personal vehicle access
-- willingness to travel 60 minutes, around 90 minutes, or farther
-- willingness and ability to get up early on weekend mornings
+- willingness to travel at least 60 minutes, around 90 minutes, or farther (select all)
+- willingness and ability to get up early on weekend mornings (required choice)
 - comfort with kindergarten through high school age players
 - arrival plan for a 7:30 AM first scheduled group
 - what interested the applicant in youth sports team and portrait photography
@@ -83,17 +86,16 @@ The questionnaire applies to both staff and freelance photographer candidates.
 ## Field Staff Pre-Interview Questionnaire
 
 The screening-questionnaire flow presents the Field Staff / Table Greeter path
-first. The applicant-facing title is:
+first. The applicant-facing intro begins:
 
-`Fall 2026 and Spring 2027 Pre-Interview Information and Survey`
+`Field Staff First - Table/Field Assistant Pre-Interview. Fall 2026 and Spring 2027 Pre-Interview Information and Survey.`
 
 The Field Staff questionnaire asks job-related questions about:
 
 - email address
 - applicant name
 - availability for seasonal assignments during September-November and April-June
-- whether the applicant is scheduling for Photographer or Table Greeter / Field
-  Assistant
+- confirmation that the questionnaire is for Table Greeter / Field Assistant
 - current date and time
 - primary work, if any
 - comfort talking with kids and adults
@@ -101,8 +103,8 @@ The Field Staff questionnaire asks job-related questions about:
 - comfort with kindergarten through high school age players
 - helping players get into correct picture positions and checking uniforms,
   gear, and equipment
-- valid driver's license and reliable personal vehicle access
-- willingness to travel 60 minutes, around 90 minutes, or farther
+- valid driver's license and reliable personal vehicle access (required Yes/No/Other)
+- willingness to travel at least 60 minutes, around 90 minutes, or farther (select all)
 - what interested the applicant in picture day event work at NESP
 
 The questionnaire remains human-reviewed. It does not automatically reject,
