@@ -121,13 +121,15 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertStringContainsString('approved job order', strtolower(implode(' ', $result['errors'])));
     }
 
-    public function testPublicAndBoardApplicantSourcesUseTheCentralWorkflowEnsureHelper()
+    public function testPublicAndBoardApplicantSourcesPrepareHumanReviewedQuestionnaires()
     {
         $careers = file_get_contents(LEGACY_ROOT . '/modules/careers/CareersUI.php');
         $intake = file_get_contents(LEGACY_ROOT . '/lib/BoardApplicantIntake.php');
 
-        $this->assertStringContainsString('ensureCandidateWorkflowRow', $careers);
+        $this->assertStringContainsString('routeCareerPortalApplicationToNeedsCraig', $careers);
         $this->assertStringContainsString('ensureCandidateWorkflowRow', $intake);
+        $this->assertStringContainsString('prepareQuestionnaireForHumanReview', $intake);
+        $this->assertStringContainsString('ready for human sending', $intake);
         $this->assertStringContainsString('Contact details required before any questionnaire or outreach.', $intake);
     }
 

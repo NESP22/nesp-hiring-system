@@ -3450,8 +3450,23 @@ class NESPWorkflow
         $summary = ($isNewApplication ? 'New public application submitted' : 'Applicant reapplied')
             . ' through the careers portal for ' . $roleTitle . '.';
 
-        // Prepare one role-specific link for human review. requestQuestionnaire()
-        // stores only a hash and reuses an active row; it never sends anything.
+        return $this->prepareQuestionnaireForHumanReview(
+            $candidateID,
+            $jobOrderID,
+            $actorUserID,
+            $summary,
+            $stageKey
+        );
+    }
+
+    /**
+     * Prepare a role-specific questionnaire link for human review only.
+     * This never delivers a message or makes an employment decision.
+     */
+    public function prepareQuestionnaireForHumanReview($candidateID, $jobOrderID, $actorUserID, $summary, $stageKey = 'new')
+    {
+        // requestQuestionnaire() stores only a hash and reuses an active row.
+        // It never sends anything outside OpenCATS.
         $questionnaire = $this->requestQuestionnaire($candidateID, $jobOrderID, $actorUserID);
         if (is_array($questionnaire) && !empty($questionnaire['questionnaire_id']))
         {

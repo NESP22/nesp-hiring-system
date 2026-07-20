@@ -13,9 +13,11 @@ generic CSV importer and does not expose a public route.
 4. Record the completed preview in the server-backed gate.
 5. Explicitly approve only valid, keyed, nonduplicate rows.
 6. Confirm the import action.
-7. The transaction creates each candidate and attaches it once to the selected
-   job order. It does not send email, SMS, calls, calendar invites, or other
-   external messages.
+7. The transaction creates each candidate, attaches it once to the selected
+   job order, and puts it in `Needs Craig`. When a reviewed row includes
+   contact details, the matching role-specific questionnaire link is prepared
+   for Craig's review. It does not send email, SMS, calls, calendar invites,
+   questionnaires, or other external messages.
 
 The initial job-order allowlist contains Customer Service job `41001`.
 

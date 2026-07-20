@@ -562,6 +562,23 @@ class BoardApplicantIntake
                     throw new RuntimeException('Workflow routing failed.');
                 }
 
+                // An approved board record with contact details can be prepared
+                // for Craig's review immediately. This produces a hashed,
+                // role-specific questionnaire link only; it never sends it.
+                if (!$contactDetailsRequired)
+                {
+                    if (!$workflow->prepareQuestionnaireForHumanReview(
+                        $candidateID,
+                        (int) $batch['joborder_id'],
+                        $actorUserID,
+                        'New approved ' . $batch['platform_key'] . ' application. A role-specific secure questionnaire link is ready for human sending.',
+                        'new'
+                    ))
+                    {
+                        throw new RuntimeException('Questionnaire review routing failed.');
+                    }
+                }
+
                 $sql = sprintf(
                     'UPDATE nesp_board_intake_row
                         SET review_status = "imported", candidate_id = %s,
