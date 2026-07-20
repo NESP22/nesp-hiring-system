@@ -433,6 +433,8 @@ class NESPWorkflowTest extends TestCase
         $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('weekend_sports_photographer');
         $labels = strtolower(json_encode($questions));
 
+        $this->assertStringContainsString('photographer pre-interview', strtolower($intro));
+        $this->assertStringContainsString('staff or freelance', strtolower($intro));
         $this->assertStringContainsString('fall 2026 and spring 2027 pre-interview information and survey', strtolower($intro));
         $this->assertStringContainsString('massachusetts, new hampshire, rhode island, connecticut, and vermont', strtolower($intro));
         $this->assertStringContainsString('last 5 photography events', $labels);
@@ -444,6 +446,20 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('45-75 minutes', $labels);
         $this->assertStringContainsString('7:30 am', $labels);
         $this->assertStringContainsString('youth sports team and portrait photographer', $labels);
+
+        $byKey = array();
+        foreach ($questions as $question)
+        {
+            $byKey[$question['key']] = $question;
+        }
+        $this->assertSame('single_choice', $byKey['position_for_zoom']['type']);
+        $this->assertSame(array('Photographer'), $byKey['position_for_zoom']['choices']);
+        $this->assertTrue($byKey['last_five_photography_events']['required']);
+        $this->assertSame('yes_no', $byKey['owns_flash']['type']);
+        $this->assertSame('yes_no', $byKey['indoor_lighting_experience']['type']);
+        $this->assertSame('multiple_choice', $byKey['travel_distance']['type']);
+        $this->assertCount(3, $byKey['travel_distance']['choices']);
+        $this->assertSame('single_choice', $byKey['early_weekend_mornings']['type']);
     }
 
     public function testFieldStaffQuestionnaireIsFirstAndUsesCraigPreInterviewWording()
@@ -459,6 +475,8 @@ class NESPWorkflowTest extends TestCase
         $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('photography_assistant_poser');
         $labels = strtolower(json_encode($questions));
 
+        $this->assertStringContainsString('field staff first', strtolower($intro));
+        $this->assertStringContainsString('table/field assistant pre-interview', strtolower($intro));
         $this->assertStringContainsString('fall 2026 and spring 2027 pre-interview information and survey', strtolower($intro));
         $this->assertStringContainsString('massachusetts, new hampshire, rhode island, connecticut, and vermont', strtolower($intro));
         $this->assertStringContainsString('email address', $labels);
@@ -468,6 +486,18 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('45-60 minutes', $labels);
         $this->assertStringContainsString('kindergarten through high school', $labels);
         $this->assertStringContainsString('picture day events', $labels);
+
+        $byKey = array();
+        foreach ($questions as $question)
+        {
+            $byKey[$question['key']] = $question;
+        }
+        $this->assertSame('single_choice', $byKey['position_for_zoom']['type']);
+        $this->assertSame(array('Table Greeter / Field Assistant'), $byKey['position_for_zoom']['choices']);
+        $this->assertSame('single_choice', $byKey['driver_license_vehicle']['type']);
+        $this->assertSame(array('Yes', 'No', 'Other'), $byKey['driver_license_vehicle']['choices']);
+        $this->assertSame('multiple_choice', $byKey['travel_distance']['type']);
+        $this->assertCount(3, $byKey['travel_distance']['choices']);
     }
 
     public function testQuestionnaireAnswerValidationRequiresCurrentServerQuestions()
