@@ -265,12 +265,32 @@ class NESPWorkflowTest extends TestCase
     public function testRecruitingSourceParametersAreSafeAndTracked()
     {
         $this->assertSame('Indeed', NESPRecruitingAds::getSourceLabel('indeed'));
+        $this->assertSame('Handshake', NESPRecruitingAds::getSourceLabel('handshake'));
+        $this->assertSame('MassHire JobQuest', NESPRecruitingAds::getSourceLabel('mass_hire'));
         $this->assertSame('NESP Ad: Facebook', NESPRecruitingAds::sourceFromRequest(array('utm_source' => 'facebook')));
+        $this->assertSame('NESP Ad: Handshake', NESPRecruitingAds::sourceFromRequest(array('nesp_source' => 'handshake')));
+        $this->assertSame('NESP Ad: MassHire JobQuest', NESPRecruitingAds::sourceFromRequest(array('nesp_source' => 'masshire_jobquest')));
         $this->assertSame('', NESPRecruitingAds::sourceFromRequest(array('nesp_source' => 'not a platform')));
 
         $link = NESPRecruitingAds::trackedApplicationURL(41002, 'craigslist');
         $this->assertStringContainsString('ID=41002', $link);
         $this->assertStringContainsString('nesp_source=craigslist', $link);
+    }
+
+    public function testRecruitingPlatformMatrixIncludesManualHandshakeAndMassHireTracking()
+    {
+        $platformsByKey = array();
+        foreach (NESPRecruitingAds::getPlatformMatrix() as $platform)
+        {
+            $platformsByKey[$platform['platform_key']] = $platform;
+        }
+
+        $this->assertArrayHasKey('handshake', $platformsByKey);
+        $this->assertArrayHasKey('masshire', $platformsByKey);
+        $this->assertSame('Draft only', $platformsByKey['handshake']['campaign_status']);
+        $this->assertSame('Draft only', $platformsByKey['masshire']['campaign_status']);
+        $this->assertStringContainsString('Manual', $platformsByKey['handshake']['posting_method']);
+        $this->assertStringContainsString('Manual', $platformsByKey['masshire']['posting_method']);
     }
 
     public function testRecruitingAdTemplatesFlagMissingUnapprovedRoles()
