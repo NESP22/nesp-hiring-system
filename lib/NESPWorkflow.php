@@ -3524,13 +3524,42 @@ class NESPWorkflow
     public function prepareQuestionnaireForHumanReview($candidateID, $jobOrderID, $actorUserID, $summary, $stageKey = 'new')
     {
         // requestQuestionnaire() stores only a hash and reuses an active row.
-        // A newly generated link can be delivered once only when the explicit
-        // applicant-email feature flag and mail configuration are both ready.
+        // Delivery is intentionally deferred until after the candidate workflow
+        // row has been written. A sender must never email a link for an applicant
+        // who is not yet visible in the human-review queue.
         $questionnaire = $this->requestQuestionnaire($candidateID, $jobOrderID, $actorUserID);
         if (is_array($questionnaire) && !empty($questionnaire['questionnaire_id']))
         {
             $questionnaireDetail = $this->getQuestionnaireDetail((int) $questionnaire['questionnaire_id']);
             $questionnaireStatus = isset($questionnaireDetail['status_key']) ? $questionnaireDetail['status_key'] : '';
+            if (in_array($questionnaireStatus, array('waiting', 'in_progress')))
+            {
+                return $this->setCandidateWorkflowStage(
+                    $candidateID,
+                    $jobOrderID,
+                    'applicant_clarification_requested',
+                    'Applicant',
+                    $summary . ' The secure questionnaire link was shared and is awaiting completion.',
+                    'Wait for questionnaire',
+                    $actorUserID
+                );
+            }
+
+            if (!$this->setCandidateWorkflowStage(
+                $candidateID,
+                $jobOrderID,
+                $stageKey,
+                'Craig',
+                $summary . ' A role-specific secure questionnaire link is ready for human sending.',
+                'Send questionnaire',
+                $actorUserID
+            ))
+            {
+                return false;
+            }
+
+            // The candidate, job link, workflow row, and questionnaire are now
+            // durable. Only a newly generated link may attempt the opted-in send.
             $delivery = $this->sendNewQuestionnaireEmail(
                 $questionnaireDetail,
                 isset($questionnaire['one_time_invitation_copy']) ? $questionnaire['one_time_invitation_copy'] : '',
@@ -3549,28 +3578,8 @@ class NESPWorkflow
                     $actorUserID
                 );
             }
-            if (in_array($questionnaireStatus, array('waiting', 'in_progress')))
-            {
-                return $this->setCandidateWorkflowStage(
-                    $candidateID,
-                    $jobOrderID,
-                    'applicant_clarification_requested',
-                    'Applicant',
-                    $summary . ' The secure questionnaire link was shared and is awaiting completion.',
-                    'Wait for questionnaire',
-                    $actorUserID
-                );
-            }
 
-            return $this->setCandidateWorkflowStage(
-                $candidateID,
-                $jobOrderID,
-                $stageKey,
-                'Craig',
-                $summary . ' A role-specific secure questionnaire link is ready for human sending.',
-                'Send questionnaire',
-                $actorUserID
-            );
+            return true;
         }
 
         return $this->setCandidateWorkflowStage(
@@ -3589,6 +3598,25 @@ class NESPWorkflow
         if (!$linkGenerated || empty($questionnaireDetail['screening_questionnaire_id']) || trim((string) $invitationCopy) === '')
         {
             return array('sent' => false, 'reason' => 'not_new');
+        }
+
+        // This is a second, fail-closed guard against delivery before routing.
+        // The sender is allowed to act only after the exact candidate/job pair
+        // has a durable workflow row for human review.
+        $candidateID = isset($questionnaireDetail['candidate_id']) ? (int) $questionnaireDetail['candidate_id'] : 0;
+        $jobOrderID = isset($questionnaireDetail['joborder_id']) ? (int) $questionnaireDetail['joborder_id'] : 0;
+        $workflowRow = ($candidateID > 0 && $jobOrderID > 0) ? $this->_db->getAssoc(sprintf(
+            'SELECT candidate_workflow_id
+             FROM nesp_candidate_workflow
+             WHERE candidate_id = %s
+               AND joborder_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($candidateID),
+            $this->_db->makeQueryInteger($jobOrderID)
+        )) : array();
+        if (empty($workflowRow))
+        {
+            return array('sent' => false, 'reason' => 'workflow_not_ready');
         }
 
         // A partially deployed schema must never turn into an accidental send
