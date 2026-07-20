@@ -22,8 +22,11 @@
                 </select>
             </label>
             <label>Source label <input name="sourceLabel" value="NESP Ad: Indeed" required /></label>
-            <label>CSV <input type="file" name="csv" accept=".csv,text/csv" required /></label>
-            <p>Required columns: external_id, first_name, last_name, email. Optional: phone. Resume and attachment URLs are not accepted.</p>
+            <label>CSV file <input type="file" name="csv" accept=".csv,text/csv" /></label>
+            <label>Or paste CSV text
+                <textarea name="csvText" rows="4" cols="80" placeholder="external_id,first_name,last_name,email"><?php if (isset($_POST['csvText'])) $this->_($_POST['csvText']); ?></textarea>
+            </label>
+            <p>Required columns: external_id, first_name, last_name, email. LinkedIn rows may omit email when external_id is present. Optional: phone. Resume and attachment URLs are not accepted.</p>
             <button type="submit">Create Review Batch</button>
         </form>
 
