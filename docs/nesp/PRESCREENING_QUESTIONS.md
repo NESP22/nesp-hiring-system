@@ -19,6 +19,9 @@ questionnaire tables.
 - Candidate links store the published version ID and question snapshot at
   generation time, so old sent links do not change when future wording is
   edited.
+- This draft changes source defaults, tests, and documentation only. It does
+  not rewrite an existing published version or an already-issued link; Craig
+  must review and publish a new version from `Manage Question Sets` separately.
 - Generate/regenerate shows raw links only in the immediate copy-only response;
   the database stores hashed tokens only.
 - No question-set action sends email/SMS, calls applicants, creates Zoom
