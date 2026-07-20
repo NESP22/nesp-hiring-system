@@ -18,6 +18,10 @@ generic CSV importer and does not expose a public route.
    contact details, the matching role-specific questionnaire link is prepared
    for Craig's review. It does not send email, SMS, calls, calendar invites,
    questionnaires, or other external messages.
+8. After import, an administrator may choose one local resume file for a
+   specific imported row. The server reconfirms that row's external identity,
+   candidate record, and selected job-order pipeline entry before passing the
+   upload to OpenCATS `AttachmentCreator` as a resume.
 
 The initial job-order allowlist contains Customer Service job `41001`.
 
@@ -45,11 +49,22 @@ The initial job-order allowlist contains Customer Service job `41001`.
 - After a successful import, staged names, email, and phone values are
   redacted. The candidate record and non-PII idempotency identity remain.
 
+## Local resume upload
+
+- Resume attachment is available only after the row and batch are imported.
+- The identity claim, candidate ID, and candidate-job mapping must still agree.
+- Only a PHP-confirmed local multipart upload is accepted.
+- Files are limited to 10 MB and the PDF, DOC, DOCX, RTF, and ODT extensions.
+- The upload creates a candidate resume attachment; it does not update the
+  candidate's name, email addresses, phone numbers, or other contact fields.
+- Duplicate attachments and incomplete mappings stop without a partial write.
+
 ## Deliberate exclusions
 
-- Resume and attachment URLs are rejected; they are not stored in notes.
+- Resume and attachment URLs are rejected; they are not stored in notes or
+  fetched by the intake workflow.
 - Raw CSV rows are not retained by the service.
-- No automatic board sync or applicant contact is included.
+- No automatic board sync, scraping, or applicant contact is included.
 - The feature does not alter questionnaire or interviewer screens.
 
 The route is `?m=boardintake` and requires administrator access plus CSRF
