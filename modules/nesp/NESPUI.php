@@ -703,7 +703,11 @@ class NESPUI extends UserInterface
         $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
         if (empty($profile))
         {
-            CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'No active interviewer profile is linked to your account.');
+            $this->_template->assign('active', $this);
+            $this->_template->assign('subActive', 'My Availability');
+            $this->_template->assign('canManageInterviewerProfiles', $this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA);
+            $this->_template->display('./modules/nesp/MyAvailabilitySetupRequired.tpl');
+            return;
         }
 
         $this->_template->assign('active', $this);
