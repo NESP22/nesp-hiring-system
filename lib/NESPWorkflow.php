@@ -3366,7 +3366,7 @@ class NESPWorkflow
             return false;
         }
 
-        if (!empty($row['candidate_workflow_id']) && !in_array($row['stage_key'], array('new', 'needs_review')))
+        if (!empty($row['candidate_workflow_id']) && !in_array($row['stage_key'], array('new', 'needs_review', 'follow_up_needed', 'applicant_clarification_requested')))
         {
             $this->logAuditEvent($actorUserID, 'career_portal_workflow_route_skipped', 'candidate_workflow', $row['candidate_workflow_id'], array(
                 'candidate_id' => $candidateID,
@@ -3385,6 +3385,37 @@ class NESPWorkflow
         $stageKey = $isNewApplication ? 'new' : 'needs_review';
         $summary = ($isNewApplication ? 'New public application submitted' : 'Applicant reapplied')
             . ' through the careers portal for ' . $roleTitle . '.';
+
+        // Prepare one role-specific link for human review. requestQuestionnaire()
+        // stores only a hash and reuses an active row; it never sends anything.
+        $questionnaire = $this->requestQuestionnaire($candidateID, $jobOrderID, $actorUserID);
+        if (is_array($questionnaire) && !empty($questionnaire['questionnaire_id']))
+        {
+            $questionnaireDetail = $this->getQuestionnaireDetail((int) $questionnaire['questionnaire_id']);
+            $questionnaireStatus = isset($questionnaireDetail['status_key']) ? $questionnaireDetail['status_key'] : '';
+            if (in_array($questionnaireStatus, array('waiting', 'in_progress')))
+            {
+                return $this->setCandidateWorkflowStage(
+                    $candidateID,
+                    $jobOrderID,
+                    'applicant_clarification_requested',
+                    'Applicant',
+                    $summary . ' The secure questionnaire link was shared and is awaiting completion.',
+                    'Wait for questionnaire',
+                    $actorUserID
+                );
+            }
+
+            return $this->setCandidateWorkflowStage(
+                $candidateID,
+                $jobOrderID,
+                $stageKey,
+                'Craig',
+                $summary . ' A role-specific secure questionnaire link is ready for human sending.',
+                'Send questionnaire',
+                $actorUserID
+            );
+        }
 
         return $this->setCandidateWorkflowStage(
             $candidateID,

@@ -397,6 +397,10 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_candidate_workflow',
             sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
         ));
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
 
         $this->mySQLQueryLocal(
             "UPDATE nesp_feature_flag
@@ -413,10 +417,30 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countRowsWhere(
             'nesp_candidate_workflow',
             sprintf(
-                "candidate_id = %d AND joborder_id = %d AND waiting_on_key = 'Craig' AND next_action_label = 'Review application' AND workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'new' LIMIT 1)",
+                "candidate_id = %d AND joborder_id = %d AND waiting_on_key = 'Craig' AND next_action_label = 'Send questionnaire' AND workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'new' LIMIT 1)",
                 $candidateID,
                 $jobOrderID
             )
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf(
+                "candidate_id = %d AND joborder_id = %d AND status_key = 'link_ready' AND CHAR_LENGTH(token_hash) = 64 AND invitation_copied_at IS NULL",
+                $candidateID,
+                $jobOrderID
+            )
+        ));
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_vapi_phone_screen',
+            sprintf('candidate_id = %d', $candidateID)
+        ));
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_interview',
+            sprintf('candidate_id = %d', $candidateID)
+        ));
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_audit_event',
+            "event_type = 'screening_questionnaire_invitation_copied'"
         ));
         $this->assertSame(1, $this->countRowsWhere(
             'nesp_audit_event',
@@ -427,6 +451,76 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countRowsWhere(
             'nesp_candidate_workflow',
             sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+    }
+
+    public function testCareerPortalReapplicationReusesQuestionnaireAndWaitsForApplicantAfterManualShare()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Reapply', 'Applicant');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->mySQLQueryLocal(
+            "UPDATE nesp_feature_flag
+             SET is_enabled = 1
+             WHERE flag_key = 'NESP_WORKFLOW_ENABLED'"
+        );
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $this->assertTrue($workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, 1, true));
+        $questionnaire = \DatabaseConnection::getInstance()->getAssoc(sprintf(
+            'SELECT screening_questionnaire_id
+             FROM nesp_screening_questionnaire
+             WHERE candidate_id = %d AND joborder_id = %d
+             ORDER BY screening_questionnaire_id DESC
+             LIMIT 1',
+            $candidateID,
+            $jobOrderID
+        ));
+        $this->assertNotEmpty($questionnaire);
+        $questionnaireID = (int) $questionnaire['screening_questionnaire_id'];
+        $this->assertTrue($workflow->markQuestionnaireInvitationCopied($questionnaireID, 1));
+
+        $this->assertTrue($workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, 1, false));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf(
+                "candidate_id = %d AND joborder_id = %d AND waiting_on_key = 'Applicant' AND next_action_label = 'Wait for questionnaire' AND workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'applicant_clarification_requested' LIMIT 1)",
+                $candidateID,
+                $jobOrderID
+            )
+        ));
+    }
+
+    public function testCareerPortalApplicationUsesRoleSpecificQuestionnaireSet()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Field', 'Applicant');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Table Greeter / Field Assistant - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->mySQLQueryLocal(
+            "UPDATE nesp_feature_flag
+             SET is_enabled = 1
+             WHERE flag_key = 'NESP_WORKFLOW_ENABLED'"
+        );
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $this->assertTrue($workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, 1, true));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf(
+                "candidate_id = %d AND joborder_id = %d AND question_set_key = 'photography_assistant_poser'",
+                $candidateID,
+                $jobOrderID
+            )
         ));
     }
 
