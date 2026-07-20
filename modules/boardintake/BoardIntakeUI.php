@@ -125,18 +125,26 @@ class BoardIntakeUI extends UserInterface
         $platform = isset($_POST['platform']) ? strtolower(trim($_POST['platform'])) : '';
         $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
         $sourceLabel = isset($_POST['sourceLabel']) ? trim($_POST['sourceLabel']) : '';
-        if (!isset($_FILES['csv']) || $_FILES['csv']['error'] !== UPLOAD_ERR_OK)
+        $contents = '';
+        if (isset($_FILES['csv']) && $_FILES['csv']['error'] === UPLOAD_ERR_OK)
         {
-            $this->showError('Choose a readable CSV file.');
-            return;
+            if ($_FILES['csv']['size'] > BoardApplicantIntake::MAX_CSV_BYTES)
+            {
+                $this->showError('CSV exceeds the 2 MB review limit.');
+                return;
+            }
+            $contents = file_get_contents($_FILES['csv']['tmp_name']);
         }
-        if ($_FILES['csv']['size'] > BoardApplicantIntake::MAX_CSV_BYTES)
+        else if (isset($_POST['csvText']) && trim($_POST['csvText']) !== '')
         {
-            $this->showError('CSV exceeds the 2 MB review limit.');
+            $contents = trim($_POST['csvText']);
+        }
+        else
+        {
+            $this->showError('Choose a readable CSV file or paste CSV text.');
             return;
         }
 
-        $contents = file_get_contents($_FILES['csv']['tmp_name']);
         $parsed = BoardApplicantIntake::parseCsv($contents, $platform, $jobOrderID, $sourceLabel);
         if ($parsed['errors'])
         {
