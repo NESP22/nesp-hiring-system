@@ -2144,8 +2144,9 @@ class CareersUI extends UserInterface
         NESPApplicationQuestions::logCandidateAnswers($jobOrderID, $candidateID, $_POST);
 
         $workflow = new NESPWorkflow();
-        // This creates a role-specific questionnaire link for Craig to review,
-        // but never sends it or advances the applicant without a human action.
+        // This creates a role-specific questionnaire link and routes the applicant
+        // to Needs Craig. It emails the link only when the explicit applicant-email
+        // feature flag and approved mail sender are configured.
         if (!$workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, $automatedUser['userID'], $newApplication)
             && !$workflow->ensureCandidateWorkflowRow($candidateID, $jobOrderID, $automatedUser['userID'], $source))
         {

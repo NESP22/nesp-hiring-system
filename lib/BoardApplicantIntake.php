@@ -3,6 +3,7 @@
 include_once(LEGACY_ROOT . '/lib/Candidates.php');
 include_once(LEGACY_ROOT . '/lib/Pipelines.php');
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+include_once(LEGACY_ROOT . '/lib/Attachments.php');
 
 /**
  * Controlled staging and import service for external board applicants.
@@ -15,6 +16,7 @@ class BoardApplicantIntake
 {
     const DEFAULT_JOB_ORDER_ID = 41001;
     const MAX_CSV_BYTES = 2097152;
+    const MAX_RESUME_BYTES = 10485760;
     const STAGING_RETENTION_DAYS = 30;
 
     private $_db;
@@ -28,13 +30,56 @@ class BoardApplicantIntake
     {
         return array(
             self::DEFAULT_JOB_ORDER_ID => 'Part-Time Customer Service Representative',
-            41002 => 'Staff Photographer'
+            41002 => 'Staff Photographer',
+            41003 => 'Freelance/Contract Youth Sports Photographer',
+            41005 => 'Weekend Table Greeter / Field Assistant'
         );
     }
 
     public static function allowedPlatforms()
     {
         return array('indeed', 'linkedin', 'craigslist', 'masshire', 'handshake', 'other');
+    }
+
+    public static function allowedResumeExtensions()
+    {
+        return array('pdf', 'doc', 'docx', 'rtf', 'odt');
+    }
+
+    public static function validateResumeUpload($file)
+    {
+        if (!is_array($file) || !isset($file['error']) || is_array($file['error']) ||
+            (int) $file['error'] !== UPLOAD_ERR_OK)
+        {
+            return 'Choose a readable local resume file.';
+        }
+        if (!isset($file['tmp_name']) || !is_string($file['tmp_name']) || trim($file['tmp_name']) === '')
+        {
+            return 'Choose a readable local resume file.';
+        }
+
+        if (!isset($file['size']) || is_array($file['size']))
+        {
+            return 'Choose a readable local resume file.';
+        }
+        $size = isset($file['size']) ? (int) $file['size'] : 0;
+        if ($size <= 0)
+        {
+            return 'The resume file is empty.';
+        }
+        if ($size > self::MAX_RESUME_BYTES)
+        {
+            return 'The resume exceeds the 10 MB upload limit.';
+        }
+
+        $name = isset($file['name']) && is_string($file['name']) ? $file['name'] : '';
+        $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if (!in_array($extension, self::allowedResumeExtensions(), true))
+        {
+            return 'Upload a PDF, DOC, DOCX, RTF, or ODT resume.';
+        }
+
+        return '';
     }
 
     public static function canonicalSourceLabel($platform, $sourceLabel)
@@ -622,6 +667,185 @@ class BoardApplicantIntake
         return array('imported' => $imported, 'skipped' => 0, 'failed' => 0);
     }
 
+    /**
+     * Imports every already-reviewed batch one batch at a time. Each batch keeps
+     * its own transaction so a duplicate or failure cannot undo another batch.
+     */
+    public function importAllApprovedRows($actorUserID)
+    {
+        $summary = array(
+            'imported' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+            'batches' => array()
+        );
+
+        foreach ($this->getOpenBatches() as $batch)
+        {
+            $batchID = (int) $batch['batch_id'];
+            if (empty($batch['previewed_at']) || empty($batch['approved_at']) ||
+                empty($batch['previewed_by_user_id']) || empty($batch['approved_by_user_id']))
+            {
+                $summary['batches'][] = array(
+                    'batch_id' => $batchID,
+                    'status' => 'skipped',
+                    'message' => 'Preview and explicit approval are still required.'
+                );
+                continue;
+            }
+
+            // Recheck immediately before import so an earlier batch cannot create a duplicate.
+            $this->applyDuplicateChecks($batchID);
+            $rows = $this->getRows($batchID, 'approved');
+            $eligible = 0;
+            foreach ($rows as $row)
+            {
+                if ($row['validation_status'] === 'valid' && $row['duplicate_status'] === 'none' &&
+                    !empty($row['external_id']) && !empty($row['idempotency_key']))
+                {
+                    $eligible++;
+                }
+            }
+
+            if ($eligible === 0)
+            {
+                $summary['skipped'] += count($rows);
+                $summary['batches'][] = array(
+                    'batch_id' => $batchID,
+                    'status' => 'skipped',
+                    'message' => 'No currently importable approved rows remain after duplicate checks.'
+                );
+                continue;
+            }
+
+            try
+            {
+                $result = $this->importApprovedRows($actorUserID, $batchID);
+                $summary['imported'] += (int) $result['imported'];
+                $summary['skipped'] += (int) $result['skipped'];
+                $summary['failed'] += (int) $result['failed'];
+                $summary['batches'][] = array(
+                    'batch_id' => $batchID,
+                    'status' => 'imported',
+                    'message' => (int) $result['imported'] . ' applicant(s) imported.'
+                );
+            }
+            catch (Throwable $e)
+            {
+                $summary['failed'] += $eligible;
+                $summary['batches'][] = array(
+                    'batch_id' => $batchID,
+                    'status' => 'stopped',
+                    'message' => 'Import stopped safely: ' . $e->getMessage()
+                );
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Confirms that an imported intake row still resolves through its claimed
+     * board identity to the same candidate and selected job order.
+     */
+    public function getConfirmedResumeTarget($batchID, $intakeRowID)
+    {
+        $batchID = (int) $batchID;
+        $intakeRowID = (int) $intakeRowID;
+        if ($batchID <= 0 || $intakeRowID <= 0)
+        {
+            throw new RuntimeException('Choose a specific imported applicant.');
+        }
+
+        $sql = sprintf(
+            'SELECT
+                intake_row.intake_row_id,
+                intake_row.candidate_id,
+                intake_batch.joborder_id,
+                intake_identity.identity_id,
+                candidate_joborder.candidate_joborder_id
+             FROM nesp_board_intake_row AS intake_row
+             INNER JOIN nesp_board_intake_batch AS intake_batch
+                ON intake_batch.batch_id = intake_row.batch_id
+             INNER JOIN nesp_board_intake_identity AS intake_identity
+                ON intake_identity.intake_row_id = intake_row.intake_row_id
+               AND intake_identity.platform_key = intake_row.platform_key
+               AND intake_identity.external_id = intake_row.external_id
+               AND intake_identity.candidate_id = intake_row.candidate_id
+             INNER JOIN candidate
+                ON candidate.candidate_id = intake_row.candidate_id
+             INNER JOIN candidate_joborder
+                ON candidate_joborder.candidate_id = intake_row.candidate_id
+               AND candidate_joborder.joborder_id = intake_batch.joborder_id
+             WHERE intake_row.batch_id = %s
+               AND intake_row.intake_row_id = %s
+               AND intake_row.review_status = "imported"
+               AND intake_batch.status_key = "imported"
+               AND intake_row.candidate_id IS NOT NULL
+             LIMIT 1',
+            $this->_db->makeQueryInteger($batchID),
+            $this->_db->makeQueryInteger($intakeRowID)
+        );
+        $target = $this->_db->getAssoc($sql);
+        if (empty($target) || !isset($target['candidate_id']) || !isset($target['joborder_id']) ||
+            (int) $target['candidate_id'] <= 0 || (int) $target['joborder_id'] <= 0)
+        {
+            throw new RuntimeException('Candidate identity and job mapping could not be confirmed.');
+        }
+
+        return array(
+            'batch_id' => $batchID,
+            'intake_row_id' => $intakeRowID,
+            'candidate_id' => (int) $target['candidate_id'],
+            'joborder_id' => (int) $target['joborder_id']
+        );
+    }
+
+    /**
+     * Attaches one locally uploaded resume without changing candidate fields.
+     */
+    public function attachResumeUpload($batchID, $intakeRowID, $fileField,
+        $attachmentCreator = null, $isUploadedFile = null)
+    {
+        $target = $this->getConfirmedResumeTarget($batchID, $intakeRowID);
+        if (!isset($_FILES[$fileField]))
+        {
+            throw new RuntimeException('Choose a readable local resume file.');
+        }
+
+        $validationError = self::validateResumeUpload($_FILES[$fileField]);
+        if ($validationError !== '')
+        {
+            throw new RuntimeException($validationError);
+        }
+
+        $isUploadedFile = $isUploadedFile ?: 'is_uploaded_file';
+        if (!call_user_func($isUploadedFile, $_FILES[$fileField]['tmp_name']))
+        {
+            throw new RuntimeException('Only a local file upload is accepted.');
+        }
+
+        $attachmentCreator = $attachmentCreator ?: new AttachmentCreator();
+        $created = $attachmentCreator->createFromUpload(
+            DATA_ITEM_CANDIDATE,
+            $target['candidate_id'],
+            $fileField,
+            false,
+            true
+        );
+        if (!$created)
+        {
+            if ($attachmentCreator->duplicatesOccurred())
+            {
+                throw new RuntimeException('This resume is already attached to the candidate.');
+            }
+            throw new RuntimeException('The resume could not be attached.');
+        }
+
+        $target['attachment_id'] = (int) $attachmentCreator->getAttachmentID();
+        return $target;
+    }
+
     public function getBatch($batchID)
     {
         $this->purgeExpiredStaging();
@@ -644,6 +868,13 @@ class BoardApplicantIntake
     {
         $this->purgeExpiredStaging();
         return $this->_db->getAllAssoc('SELECT * FROM nesp_board_intake_batch WHERE status_key = "review" ORDER BY date_created DESC');
+    }
+
+    public function getRecentImportedBatches()
+    {
+        return $this->_db->getAllAssoc(
+            'SELECT * FROM nesp_board_intake_batch WHERE status_key = "imported" ORDER BY date_modified DESC LIMIT 20'
+        );
     }
 
     public function purgeExpiredStaging()

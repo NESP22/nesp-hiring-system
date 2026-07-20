@@ -15,7 +15,7 @@ class NESPWorkflowTest extends TestCase
         $flags = NESPWorkflow::getDefaultFeatureFlags();
         $keys = array();
 
-        $this->assertCount(11, $flags);
+        $this->assertCount(12, $flags);
         foreach ($flags as $flag)
         {
             $keys[] = $flag[0];
@@ -57,6 +57,14 @@ class NESPWorkflowTest extends TestCase
         $this->assertTrue(NESPWorkflow::isInterviewerZoomLinksEnabledByDefault());
 
         putenv('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
+    }
+
+    public function testApplicantQuestionnaireEmailRequiresFlagAndConfiguredSender()
+    {
+        $this->assertFalse(NESPWorkflow::isApplicantEmailDeliveryReady(false, '1', 'hiring@nesportsphoto.com'));
+        $this->assertFalse(NESPWorkflow::isApplicantEmailDeliveryReady(true, '0', 'hiring@nesportsphoto.com'));
+        $this->assertFalse(NESPWorkflow::isApplicantEmailDeliveryReady(true, '1', 'not-an-email'));
+        $this->assertTrue(NESPWorkflow::isApplicantEmailDeliveryReady(true, '1', 'hiring@nesportsphoto.com'));
     }
 
     public function testZoomParticipantLinkValidationRejectsHostLinks()

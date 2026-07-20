@@ -4,6 +4,11 @@ use PHPUnit\Framework\TestCase;
 
 include_once(LEGACY_ROOT . '/lib/BoardApplicantIntake.php');
 
+if (!defined('DATA_ITEM_CANDIDATE'))
+{
+    define('DATA_ITEM_CANDIDATE', 100);
+}
+
 class BoardApplicantIntakeTest extends TestCase
 {
     public function testCsvPreviewRequiresExplicitFieldsAndDoesNotAcceptAttachmentUrls()
@@ -97,6 +102,14 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertSame('', BoardApplicantIntake::canonicalSourceLabel('unknown', 'NESP Ad: Unknown'));
         $this->assertArrayHasKey(41001, BoardApplicantIntake::allowedJobOrders());
         $this->assertSame('Staff Photographer', BoardApplicantIntake::allowedJobOrders()[41002]);
+        $this->assertSame(
+            'Freelance/Contract Youth Sports Photographer',
+            BoardApplicantIntake::allowedJobOrders()[41003]
+        );
+        $this->assertSame(
+            'Weekend Table Greeter / Field Assistant',
+            BoardApplicantIntake::allowedJobOrders()[41005]
+        );
     }
 
     public function testCsvPreviewAllowsStaffPhotographerJobOrder()
@@ -111,11 +124,26 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertSame('valid', $result['rows'][0]['validation_status']);
     }
 
+    public function testCsvPreviewAllowsFreelancePhotographerAndFieldAssistantJobOrders()
+    {
+        foreach (array(41003, 41005) as $jobOrderID)
+        {
+            $result = BoardApplicantIntake::parseCsv(
+                "external_id,first_name,last_name,email\nA-{$jobOrderID},Alex,Applicant,alex@example.test\n",
+                'indeed', $jobOrderID, 'NESP Ad: Indeed'
+            );
+
+            $this->assertSame(array(), $result['errors'], 'Job order ' . $jobOrderID . ' should be supported.');
+            $this->assertCount(1, $result['rows']);
+            $this->assertSame('valid', $result['rows'][0]['validation_status']);
+        }
+    }
+
     public function testCsvPreviewRejectsUnsupportedJobOrder()
     {
         $result = BoardApplicantIntake::parseCsv(
-            "external_id,first_name,last_name,email\nA-41003,Alex,Applicant,alex@example.test\n",
-            'indeed', 41003, 'NESP Ad: Indeed'
+            "external_id,first_name,last_name,email\nA-41004,Alex,Applicant,alex@example.test\n",
+            'indeed', 41004, 'NESP Ad: Indeed'
         );
 
         $this->assertStringContainsString('approved job order', strtolower(implode(' ', $result['errors'])));
@@ -131,6 +159,20 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertStringContainsString('prepareQuestionnaireForHumanReview', $intake);
         $this->assertStringContainsString('ready for human sending', $intake);
         $this->assertStringContainsString('Contact details required before any questionnaire or outreach.', $intake);
+    }
+
+    public function testBulkImportKeepsReviewAndDuplicateSafeguards()
+    {
+        $intake = file_get_contents(LEGACY_ROOT . '/lib/BoardApplicantIntake.php');
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/boardintake/BoardIntakeUI.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/boardintake/Review.tpl');
+
+        $this->assertStringContainsString('importAllApprovedRows', $intake);
+        $this->assertStringContainsString('applyDuplicateChecks($batchID)', $intake);
+        $this->assertStringContainsString('importApprovedRows($actorUserID, $batchID)', $intake);
+        $this->assertStringContainsString("case 'importAllApproved'", $ui);
+        $this->assertStringContainsString('Import All Ready Applicants', $template);
+        $this->assertStringContainsString('explicit row approval', $template);
     }
 
     public function testDuplicateReviewFlagsRepeatedEmailOrNameRows()
@@ -184,5 +226,179 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertCount(2, $db->calls);
         $this->assertTrue($db->calls[0]['ignoreErrors']);
         $this->assertTrue($db->calls[1]['ignoreErrors']);
+    }
+
+    public function testResumeUploadValidationAllowsOnlyBoundedResumeFiles()
+    {
+        $valid = array(
+            'name' => 'resume.PDF',
+            'tmp_name' => '/tmp/php-upload',
+            'size' => 1024,
+            'error' => UPLOAD_ERR_OK
+        );
+
+        $this->assertSame('', BoardApplicantIntake::validateResumeUpload($valid));
+
+        $invalidType = $valid;
+        $invalidType['name'] = 'resume.html';
+        $this->assertStringContainsString('PDF', BoardApplicantIntake::validateResumeUpload($invalidType));
+
+        $tooLarge = $valid;
+        $tooLarge['size'] = BoardApplicantIntake::MAX_RESUME_BYTES + 1;
+        $this->assertStringContainsString('10 MB', BoardApplicantIntake::validateResumeUpload($tooLarge));
+
+        $empty = $valid;
+        $empty['size'] = 0;
+        $this->assertStringContainsString('empty', BoardApplicantIntake::validateResumeUpload($empty));
+
+        $nested = $valid;
+        $nested['tmp_name'] = array('/tmp/php-upload');
+        $this->assertStringContainsString('local resume', BoardApplicantIntake::validateResumeUpload($nested));
+    }
+
+    public function testResumeTargetRequiresImportedIdentityAndJobMapping()
+    {
+        $db = new class {
+            public $sql = '';
+
+            public function makeQueryInteger($value)
+            {
+                return (string) (int) $value;
+            }
+
+            public function getAssoc($sql)
+            {
+                $this->sql = $sql;
+                return array('candidate_id' => 91, 'joborder_id' => 41002);
+            }
+        };
+
+        $target = (new BoardApplicantIntake($db))->getConfirmedResumeTarget(12, 34);
+
+        $this->assertSame(91, $target['candidate_id']);
+        $this->assertSame(41002, $target['joborder_id']);
+        $this->assertStringContainsString('intake_identity.candidate_id = intake_row.candidate_id', $db->sql);
+        $this->assertStringContainsString('candidate_joborder.joborder_id = intake_batch.joborder_id', $db->sql);
+        $this->assertStringContainsString('intake_row.review_status = "imported"', $db->sql);
+        $this->assertStringContainsString('intake_batch.status_key = "imported"', $db->sql);
+    }
+
+    public function testResumeUploadUsesConfirmedCandidateAndExistingAttachmentCreator()
+    {
+        $db = new class {
+            public function makeQueryInteger($value)
+            {
+                return (string) (int) $value;
+            }
+
+            public function getAssoc($sql)
+            {
+                return array('candidate_id' => 91, 'joborder_id' => 41002);
+            }
+        };
+        $creator = new class {
+            public $call = array();
+
+            public function createFromUpload($dataItemType, $dataItemID, $fileField, $isProfileImage, $extractText)
+            {
+                $this->call = func_get_args();
+                return true;
+            }
+
+            public function duplicatesOccurred()
+            {
+                return false;
+            }
+
+            public function getAttachmentID()
+            {
+                return 73;
+            }
+        };
+        $originalFiles = $_FILES;
+        $_FILES['resume'] = array(
+            'name' => 'candidate-resume.pdf',
+            'tmp_name' => '/tmp/php-upload',
+            'type' => 'application/pdf',
+            'size' => 2048,
+            'error' => UPLOAD_ERR_OK
+        );
+
+        try
+        {
+            $result = (new BoardApplicantIntake($db))->attachResumeUpload(
+                12,
+                34,
+                'resume',
+                $creator,
+                function ($path) { return $path === '/tmp/php-upload'; }
+            );
+        }
+        finally
+        {
+            $_FILES = $originalFiles;
+        }
+
+        $this->assertSame(array(DATA_ITEM_CANDIDATE, 91, 'resume', false, true), $creator->call);
+        $this->assertSame(73, $result['attachment_id']);
+        $this->assertSame(41002, $result['joborder_id']);
+    }
+
+    public function testResumeUploadFailsBeforeAttachmentWhenMappingIsMissing()
+    {
+        $db = new class {
+            public function makeQueryInteger($value)
+            {
+                return (string) (int) $value;
+            }
+
+            public function getAssoc($sql)
+            {
+                return array();
+            }
+        };
+        $creator = new class {
+            public $called = false;
+
+            public function createFromUpload()
+            {
+                $this->called = true;
+                return true;
+            }
+        };
+
+        try
+        {
+            (new BoardApplicantIntake($db))->attachResumeUpload(12, 34, 'resume', $creator);
+            $this->fail('An unconfirmed candidate mapping must stop the upload.');
+        }
+        catch (RuntimeException $e)
+        {
+            $this->assertStringContainsString('identity and job mapping', $e->getMessage());
+        }
+
+        $this->assertFalse($creator->called);
+    }
+
+    public function testResumeUploadPathHasNoUrlRetrievalOrCandidateContactMutation()
+    {
+        $method = new ReflectionMethod(BoardApplicantIntake::class, 'attachResumeUpload');
+        $lines = file($method->getFileName());
+        $source = implode('', array_slice(
+            $lines,
+            $method->getStartLine() - 1,
+            $method->getEndLine() - $method->getStartLine() + 1
+        ));
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/boardintake/BoardIntakeUI.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/boardintake/Review.tpl');
+
+        $this->assertStringContainsString('createFromUpload', $source);
+        $this->assertStringContainsString('is_uploaded_file', $source);
+        $this->assertStringNotContainsString('createFromFile', $source);
+        $this->assertStringNotContainsString('file_get_contents', $source);
+        $this->assertStringNotContainsString('Candidates', $source);
+        $this->assertStringContainsString("case 'uploadResume'", $ui);
+        $this->assertStringContainsString('type="file" name="resume"', $template);
+        $this->assertStringNotContainsString('name="resumeURL"', $template);
     }
 }

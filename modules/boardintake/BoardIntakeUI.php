@@ -106,6 +106,14 @@ class BoardIntakeUI extends UserInterface
                 $this->requirePostCSRF();
                 $this->importApproved();
                 break;
+            case 'importAllApproved':
+                $this->requirePostCSRF();
+                $this->importAllApproved();
+                break;
+            case 'uploadResume':
+                $this->requirePostCSRF();
+                $this->uploadResume();
+                break;
             default:
                 $this->review();
                 break;
@@ -214,26 +222,67 @@ class BoardIntakeUI extends UserInterface
         CATSUtility::transferRelativeURI('m=boardintake&batchID=' . $batchID);
     }
 
-    private function assignView($batch, $rows)
+    private function importAllApproved()
+    {
+        try
+        {
+            $summary = $this->_intake->importAllApprovedRows($this->_userID);
+        }
+        catch (Throwable $e)
+        {
+            $this->showError('Bulk import stopped safely: ' . $e->getMessage());
+            return;
+        }
+
+        $this->assignView(array(), array(), $summary);
+    }
+
+    private function uploadResume()
+    {
+        $batchID = isset($_POST['batchID']) ? (int) $_POST['batchID'] : 0;
+        $intakeRowID = isset($_POST['intakeRowID']) ? (int) $_POST['intakeRowID'] : 0;
+        try
+        {
+            $this->_intake->attachResumeUpload($batchID, $intakeRowID, 'resume');
+        }
+        catch (Throwable $e)
+        {
+            $this->showError('Resume upload stopped safely: ' . $e->getMessage(), $batchID);
+            return;
+        }
+
+        CATSUtility::transferRelativeURI(
+            'm=boardintake&batchID=' . $batchID . '&resumeUploaded=1'
+        );
+    }
+
+    private function assignView($batch, $rows, $bulkImportSummary = null)
     {
         $this->_template->assign('active', $this);
         $this->_template->assign('batch', $batch);
         $this->_template->assign('rows', $rows);
         $this->_template->assign('batches', $this->_intake->getOpenBatches());
+        $this->_template->assign('importedBatches', $this->_intake->getRecentImportedBatches());
         $this->_template->assign('platforms', BoardApplicantIntake::allowedPlatforms());
         $this->_template->assign('jobOrders', BoardApplicantIntake::allowedJobOrders());
+        $this->_template->assign('bulkImportSummary', $bulkImportSummary);
+        $this->_template->assign('resumeUploaded', isset($_GET['resumeUploaded']) && $_GET['resumeUploaded'] === '1');
         $this->_template->display('./modules/boardintake/Review.tpl');
     }
 
-    private function showError($message)
+    private function showError($message, $batchID = 0)
     {
+        $batch = $batchID ? $this->_intake->getBatch($batchID) : array();
         $this->_template->assign('active', $this);
         $this->_template->assign('errorMessage', $message);
-        $this->_template->assign('batch', array());
-        $this->_template->assign('rows', array());
+        $this->_template->assign('batch', $batch);
+        $this->_template->assign('rows', $batch ? $this->_intake->getRows($batchID) : array());
         $this->_template->assign('batches', $this->_intake->getOpenBatches());
+        $this->_template->assign('importedBatches', $this->_intake->getRecentImportedBatches());
         $this->_template->assign('platforms', BoardApplicantIntake::allowedPlatforms());
         $this->_template->assign('jobOrders', BoardApplicantIntake::allowedJobOrders());
+        $this->_template->assign('bulkImportSummary', null);
+        $this->_template->assign('resumeUploaded', false);
         $this->_template->display('./modules/boardintake/Review.tpl');
     }
 
