@@ -97,6 +97,14 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertSame('', BoardApplicantIntake::canonicalSourceLabel('unknown', 'NESP Ad: Unknown'));
         $this->assertArrayHasKey(41001, BoardApplicantIntake::allowedJobOrders());
         $this->assertSame('Staff Photographer', BoardApplicantIntake::allowedJobOrders()[41002]);
+        $this->assertSame(
+            'Freelance/Contract Youth Sports Photographer',
+            BoardApplicantIntake::allowedJobOrders()[41003]
+        );
+        $this->assertSame(
+            'Weekend Table Greeter / Field Assistant',
+            BoardApplicantIntake::allowedJobOrders()[41005]
+        );
     }
 
     public function testCsvPreviewAllowsStaffPhotographerJobOrder()
@@ -111,11 +119,26 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertSame('valid', $result['rows'][0]['validation_status']);
     }
 
+    public function testCsvPreviewAllowsFreelancePhotographerAndFieldAssistantJobOrders()
+    {
+        foreach (array(41003, 41005) as $jobOrderID)
+        {
+            $result = BoardApplicantIntake::parseCsv(
+                "external_id,first_name,last_name,email\nA-{$jobOrderID},Alex,Applicant,alex@example.test\n",
+                'indeed', $jobOrderID, 'NESP Ad: Indeed'
+            );
+
+            $this->assertSame(array(), $result['errors'], 'Job order ' . $jobOrderID . ' should be supported.');
+            $this->assertCount(1, $result['rows']);
+            $this->assertSame('valid', $result['rows'][0]['validation_status']);
+        }
+    }
+
     public function testCsvPreviewRejectsUnsupportedJobOrder()
     {
         $result = BoardApplicantIntake::parseCsv(
-            "external_id,first_name,last_name,email\nA-41003,Alex,Applicant,alex@example.test\n",
-            'indeed', 41003, 'NESP Ad: Indeed'
+            "external_id,first_name,last_name,email\nA-41004,Alex,Applicant,alex@example.test\n",
+            'indeed', 41004, 'NESP Ad: Indeed'
         );
 
         $this->assertStringContainsString('approved job order', strtolower(implode(' ', $result['errors'])));

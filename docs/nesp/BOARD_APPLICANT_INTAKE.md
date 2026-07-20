@@ -19,7 +19,9 @@ generic CSV importer and does not expose a public route.
    for Craig's review. It does not send email, SMS, calls, calendar invites,
    questionnaires, or other external messages.
 
-The initial job-order allowlist contains Customer Service job `41001`.
+The job-order allowlist contains Customer Service `41001`, Staff Photographer
+`41002`, Freelance/Contract Youth Sports Photographer `41003`, and Weekend
+Table Greeter / Field Assistant `41005`.
 
 ## Duplicate and idempotency rules
 
