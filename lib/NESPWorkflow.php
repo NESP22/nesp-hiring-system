@@ -10,6 +10,7 @@
 include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
 include_once(LEGACY_ROOT . '/lib/NESPGoogleCalendarFreeBusy.php');
+include_once(LEGACY_ROOT . '/lib/Mailer.php');
 
 class NESPWorkflow
 {
@@ -33,6 +34,7 @@ class NESPWorkflow
             array('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0),
             array('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0),
             array('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0),
+            array('NESP_APPLICANT_EMAIL_ENABLED', 'Applicant Questionnaire Email', 'Sends one secure role-specific questionnaire email only after a new applicant has a valid email and linked job.', 0),
             NESPGoogleCalendarFreeBusy::getDefaultFeatureFlag()
         );
     }
@@ -50,6 +52,7 @@ class NESPWorkflow
             'NESP_AI_REVIEW_ENABLED',
             'NESP_STAFFING_FORECAST_ENABLED',
             'NESP_STAFFING_DRIVE_IMPORT_ENABLED',
+            'NESP_APPLICANT_EMAIL_ENABLED',
             NESPGoogleCalendarFreeBusy::FEATURE_FLAG
         );
     }
@@ -351,6 +354,15 @@ class NESPWorkflow
         }
 
         return in_array(strtolower(trim((string) $value)), array('1', 'true', 'yes', 'on'), true);
+    }
+
+    public static function isApplicantEmailDeliveryReady($featureEnabled, $mailerConfigured, $fromAddress)
+    {
+        return (bool) $featureEnabled
+            && (string) $mailerConfigured === '1'
+            && defined('MAIL_MAILER')
+            && MAIL_MAILER !== MAILER_MODE_DISABLED
+            && filter_var(trim((string) $fromAddress), FILTER_VALIDATE_EMAIL) !== false;
     }
 
     public static function buildManualInterviewInvitationCopy($firstName, $roleTitle, $scheduledStart, $durationMinutes, $timezone, $joinURL)
@@ -2195,7 +2207,7 @@ class NESPWorkflow
             FROM
                 nesp_feature_flag
             WHERE
-                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_INTERVIEWER_AVAILABILITY_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_INTERVIEWER_ZOOM_LINKS_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED", "NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED")
+                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_INTERVIEWER_AVAILABILITY_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_INTERVIEWER_ZOOM_LINKS_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED", "NESP_APPLICANT_EMAIL_ENABLED", "NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED")
             ORDER BY
                 display_name'
         );
@@ -2271,7 +2283,7 @@ class NESPWorkflow
 
     public function getIntegrationStatuses()
     {
-        return $this->_db->getAllAssoc(
+        $statuses = $this->_db->getAllAssoc(
             'SELECT
                 integration_key,
                 display_name,
@@ -2283,6 +2295,51 @@ class NESPWorkflow
                 nesp_integration_status
             ORDER BY
                 display_name'
+        );
+
+        foreach ($statuses as &$status)
+        {
+            if ($status['integration_key'] === 'email')
+            {
+                $delivery = $this->getApplicantEmailDeliveryStatus();
+                $status['status_key'] = $delivery['status_key'];
+                $status['message'] = $delivery['message'];
+            }
+        }
+        unset($status);
+
+        return $statuses;
+    }
+
+    public function getApplicantEmailDeliveryStatus()
+    {
+        $settings = new MailerSettings();
+        $mailer = $settings->getAll();
+        $enabled = $this->isFeatureFlagEnabled('NESP_APPLICANT_EMAIL_ENABLED');
+        $ready = self::isApplicantEmailDeliveryReady(
+            $enabled,
+            isset($mailer['configured']) ? $mailer['configured'] : '0',
+            isset($mailer['fromAddress']) ? $mailer['fromAddress'] : ''
+        );
+
+        if (!$enabled)
+        {
+            return array(
+                'status_key' => 'disabled',
+                'message' => 'Disabled. No applicant questionnaire email can be sent.'
+            );
+        }
+        if (!$ready)
+        {
+            return array(
+                'status_key' => 'not_configured',
+                'message' => 'Enabled for questionnaire delivery, but the approved mail sender is not configured. No email will be sent.'
+            );
+        }
+
+        return array(
+            'status_key' => 'enabled',
+            'message' => 'Sends one role-specific secure questionnaire email after a new applicant has a valid email and linked job. No reminders or other applicant messages are sent.'
         );
     }
 
@@ -3460,18 +3517,38 @@ class NESPWorkflow
     }
 
     /**
-     * Prepare a role-specific questionnaire link for human review only.
-     * This never delivers a message or makes an employment decision.
+     * Prepare a role-specific questionnaire link. Delivery stays manual unless
+     * the explicit applicant-email feature flag and sender configuration are ready.
+     * This never makes an employment decision.
      */
     public function prepareQuestionnaireForHumanReview($candidateID, $jobOrderID, $actorUserID, $summary, $stageKey = 'new')
     {
         // requestQuestionnaire() stores only a hash and reuses an active row.
-        // It never sends anything outside OpenCATS.
+        // A newly generated link can be delivered once only when the explicit
+        // applicant-email feature flag and mail configuration are both ready.
         $questionnaire = $this->requestQuestionnaire($candidateID, $jobOrderID, $actorUserID);
         if (is_array($questionnaire) && !empty($questionnaire['questionnaire_id']))
         {
             $questionnaireDetail = $this->getQuestionnaireDetail((int) $questionnaire['questionnaire_id']);
             $questionnaireStatus = isset($questionnaireDetail['status_key']) ? $questionnaireDetail['status_key'] : '';
+            $delivery = $this->sendNewQuestionnaireEmail(
+                $questionnaireDetail,
+                isset($questionnaire['one_time_invitation_copy']) ? $questionnaire['one_time_invitation_copy'] : '',
+                !empty($questionnaire['link_generated']),
+                $actorUserID
+            );
+            if (!empty($delivery['sent']))
+            {
+                return $this->setCandidateWorkflowStage(
+                    $candidateID,
+                    $jobOrderID,
+                    'applicant_clarification_requested',
+                    'Applicant',
+                    $summary . ' The secure questionnaire link was emailed and is awaiting completion.',
+                    'Wait for questionnaire',
+                    $actorUserID
+                );
+            }
             if (in_array($questionnaireStatus, array('waiting', 'in_progress')))
             {
                 return $this->setCandidateWorkflowStage(
@@ -3505,6 +3582,85 @@ class NESPWorkflow
             'Review application',
             $actorUserID
         );
+    }
+
+    private function sendNewQuestionnaireEmail($questionnaireDetail, $invitationCopy, $linkGenerated, $actorUserID)
+    {
+        if (!$linkGenerated || empty($questionnaireDetail['screening_questionnaire_id']) || trim((string) $invitationCopy) === '')
+        {
+            return array('sent' => false, 'reason' => 'not_new');
+        }
+
+        // A partially deployed schema must never turn into an accidental send
+        // attempt or a database error. The migration is required before this
+        // feature can send anything.
+        if (!$this->isColumnInstalled('nesp_screening_questionnaire', 'auto_email_status_key'))
+        {
+            return array('sent' => false, 'reason' => 'schema_not_ready');
+        }
+
+        $email = trim(isset($questionnaireDetail['email1']) ? (string) $questionnaireDetail['email1'] : '');
+        $deliveryStatus = $this->getApplicantEmailDeliveryStatus();
+        if ($deliveryStatus['status_key'] !== 'enabled' || filter_var($email, FILTER_VALIDATE_EMAIL) === false)
+        {
+            return array('sent' => false, 'reason' => 'not_ready');
+        }
+
+        $questionnaireID = (int) $questionnaireDetail['screening_questionnaire_id'];
+        // Reserve the one delivery attempt before calling the mailer. This
+        // fails closed after a crash rather than accidentally sending twice.
+        $this->_db->query(sprintf(
+            'UPDATE nesp_screening_questionnaire
+             SET auto_email_status_key = "sending",
+                 auto_email_attempted_at = UTC_TIMESTAMP(),
+                 date_modified = NOW()
+             WHERE screening_questionnaire_id = %s
+               AND status_key = "link_ready"
+               AND auto_email_status_key = "not_attempted"
+               AND token_revoked_at IS NULL',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            return array('sent' => false, 'reason' => 'already_attempted');
+        }
+
+        $subject = 'Next step: NESP questionnaire for ' . trim((string) $questionnaireDetail['role_title']);
+        $mailer = new Mailer($actorUserID === null ? -1 : $actorUserID);
+        $sent = $mailer->sendToOne(
+            array($email, trim((string) $questionnaireDetail['first_name'])),
+            $subject,
+            $invitationCopy,
+            true,
+            false
+        );
+
+        if (!$sent)
+        {
+            $this->_db->query(sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET auto_email_status_key = "failed",
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND auto_email_status_key = "sending"',
+                $this->_db->makeQueryInteger($questionnaireID)
+            ));
+            $this->logAuditEvent($actorUserID, 'screening_questionnaire_auto_email_failed', 'screening_questionnaire', $questionnaireID, array());
+            return array('sent' => false, 'reason' => 'delivery_failed');
+        }
+
+        $this->_db->query(sprintf(
+            'UPDATE nesp_screening_questionnaire
+             SET status_key = "waiting",
+                 auto_email_status_key = "sent",
+                 auto_email_sent_at = UTC_TIMESTAMP(),
+                 date_modified = NOW()
+             WHERE screening_questionnaire_id = %s
+               AND auto_email_status_key = "sending"',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_auto_email_sent', 'screening_questionnaire', $questionnaireID, array());
+        return array('sent' => true, 'reason' => 'sent');
     }
 
     public function getInterviewDetail($interviewID)

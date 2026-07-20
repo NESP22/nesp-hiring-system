@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS `nesp_screening_questionnaire` (
   `token_used_at` DATETIME,
   `link_created_at` DATETIME,
   `invitation_copied_at` DATETIME,
+  `auto_email_status_key` VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_attempted',
+  `auto_email_attempted_at` DATETIME,
+  `auto_email_sent_at` DATETIME,
   `started_at` DATETIME,
   `submitted_at` DATETIME,
   `requested_by_user_id` INT(11),
@@ -39,6 +42,7 @@ CREATE TABLE IF NOT EXISTS `nesp_screening_questionnaire` (
   UNIQUE KEY `IDX_questionnaire_active_candidate_job` (`active_candidate_job_key`),
   KEY `IDX_questionnaire_candidate_job` (`candidate_id`, `joborder_id`),
   KEY `IDX_questionnaire_status` (`status_key`),
+  KEY `IDX_questionnaire_auto_email_status` (`auto_email_status_key`),
   KEY `IDX_questionnaire_set_version` (`question_set_version_id`),
   KEY `IDX_questionnaire_reviewer` (`reviewer_profile_id`, `review_status_key`),
   KEY `IDX_questionnaire_submitted` (`submitted_at`)
