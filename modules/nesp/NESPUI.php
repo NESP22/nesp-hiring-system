@@ -117,6 +117,12 @@ class NESPUI extends UserInterface
                 $this->createInterviewerRoleRule();
                 break;
 
+            case 'deactivateInterviewerRoleRule':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->deactivateInterviewerRoleRule();
+                break;
+
             case 'createCandidateGrant':
                 $this->adminOnly();
                 $this->requirePostCSRF();
@@ -666,6 +672,17 @@ class NESPUI extends UserInterface
         if ($this->_workflow->createInterviewerRoleRule($interviewerProfileID, $jobOrderID, $roleMatchText, $assignmentMode, $priority, $notes, $this->_userID) === false)
         {
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Choose an interviewer and enter a role match or job ID.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
+    private function deactivateInterviewerRoleRule()
+    {
+        $ruleID = isset($_POST['roleRuleID']) ? (int) $_POST['roleRuleID'] : 0;
+        if ($this->_workflow->deactivateInterviewerRoleRule($ruleID, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an active routing rule to remove.');
         }
 
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
