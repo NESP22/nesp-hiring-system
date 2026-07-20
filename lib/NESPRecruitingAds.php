@@ -19,6 +19,8 @@ class NESPRecruitingAds
             'instagram' => 'Instagram',
             'linkedin' => 'LinkedIn',
             'craigslist' => 'Craigslist',
+            'masshire' => 'MassHire',
+            'handshake' => 'Handshake',
             'college_board' => 'College board',
             'referral' => 'Referral',
             'other' => 'Other'

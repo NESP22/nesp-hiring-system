@@ -2,6 +2,7 @@
 
 include_once(LEGACY_ROOT . '/lib/Candidates.php');
 include_once(LEGACY_ROOT . '/lib/Pipelines.php');
+include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 
 /**
  * Controlled staging and import service for external board applicants.
@@ -26,7 +27,8 @@ class BoardApplicantIntake
     public static function allowedJobOrders()
     {
         return array(
-            self::DEFAULT_JOB_ORDER_ID => 'Part-Time Customer Service Representative'
+            self::DEFAULT_JOB_ORDER_ID => 'Part-Time Customer Service Representative',
+            41002 => 'Staff Photographer'
         );
     }
 
@@ -522,6 +524,12 @@ class BoardApplicantIntake
                 if (!$pipelines->add($candidateID, (int) $batch['joborder_id'], $actorUserID))
                 {
                     throw new RuntimeException('Pipeline attachment failed or already exists.');
+                }
+
+                $workflow = new NESPWorkflow($this->_db);
+                if (!$workflow->ensureCandidateWorkflowRow($candidateID, (int) $batch['joborder_id'], $actorUserID, $batch['source_label']))
+                {
+                    throw new RuntimeException('Workflow routing failed.');
                 }
 
                 $sql = sprintf(

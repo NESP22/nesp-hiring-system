@@ -60,16 +60,38 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertSame('', BoardApplicantIntake::canonicalSourceLabel('indeed', 'Indeed'));
         $this->assertSame('', BoardApplicantIntake::canonicalSourceLabel('unknown', 'NESP Ad: Unknown'));
         $this->assertArrayHasKey(41001, BoardApplicantIntake::allowedJobOrders());
+        $this->assertSame('Staff Photographer', BoardApplicantIntake::allowedJobOrders()[41002]);
+    }
+
+    public function testCsvPreviewAllowsStaffPhotographerJobOrder()
+    {
+        $result = BoardApplicantIntake::parseCsv(
+            "external_id,first_name,last_name,email\nA-41002,Alex,Applicant,alex@example.test\n",
+            'indeed', 41002, 'NESP Ad: Indeed'
+        );
+
+        $this->assertSame(array(), $result['errors']);
+        $this->assertCount(1, $result['rows']);
+        $this->assertSame('valid', $result['rows'][0]['validation_status']);
     }
 
     public function testCsvPreviewRejectsUnsupportedJobOrder()
     {
         $result = BoardApplicantIntake::parseCsv(
-            "first_name,last_name,email\nAlex,Applicant,alex@example.test\n",
-            'indeed', 41002, 'NESP Ad: Indeed'
+            "external_id,first_name,last_name,email\nA-41003,Alex,Applicant,alex@example.test\n",
+            'indeed', 41003, 'NESP Ad: Indeed'
         );
 
         $this->assertStringContainsString('approved job order', strtolower(implode(' ', $result['errors'])));
+    }
+
+    public function testPublicAndBoardApplicantSourcesUseTheCentralWorkflowEnsureHelper()
+    {
+        $careers = file_get_contents(LEGACY_ROOT . '/modules/careers/CareersUI.php');
+        $intake = file_get_contents(LEGACY_ROOT . '/lib/BoardApplicantIntake.php');
+
+        $this->assertStringContainsString('ensureCandidateWorkflowRow', $careers);
+        $this->assertStringContainsString('ensureCandidateWorkflowRow', $intake);
     }
 
     public function testDuplicateReviewFlagsRepeatedEmailOrNameRows()

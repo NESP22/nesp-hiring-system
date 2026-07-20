@@ -302,10 +302,82 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('Indeed', NESPRecruitingAds::getSourceLabel('indeed'));
         $this->assertSame('NESP Ad: Facebook', NESPRecruitingAds::sourceFromRequest(array('utm_source' => 'facebook')));
         $this->assertSame('', NESPRecruitingAds::sourceFromRequest(array('nesp_source' => 'not a platform')));
+        $this->assertSame('MassHire', NESPRecruitingAds::getSourceLabel('masshire'));
+        $this->assertSame('NESP Ad: Handshake', NESPRecruitingAds::sourceFromRequest(array('nesp_source' => 'handshake')));
+        $this->assertStringContainsString('nesp_source=masshire', NESPRecruitingAds::trackedApplicationURL(41002, 'masshire'));
 
         $link = NESPRecruitingAds::trackedApplicationURL(41002, 'craigslist');
         $this->assertStringContainsString('ID=41002', $link);
         $this->assertStringContainsString('nesp_source=craigslist', $link);
+    }
+
+    public function testEnsureCandidateWorkflowRowIsIdempotentAndDoesNotOverwriteExistingStage()
+    {
+        $db = new class {
+            public $workflowRows = array();
+            public $queries = array();
+            private $nextID = 91;
+
+            public function makeQueryInteger($value)
+            {
+                return (string) (int) $value;
+            }
+
+            public function makeQueryString($value)
+            {
+                return "'" . addslashes((string) $value) . "'";
+            }
+
+            public function getAssoc($sql)
+            {
+                if (stripos($sql, 'SHOW COLUMNS') !== false)
+                {
+                    return array();
+                }
+                if (stripos($sql, 'FROM nesp_workflow_stage') !== false)
+                {
+                    return array('workflow_stage_id' => 1);
+                }
+                if (stripos($sql, 'FROM nesp_candidate_workflow') !== false)
+                {
+                    return $this->workflowRows;
+                }
+
+                return array();
+            }
+
+            public function query($sql, $ignoreErrors = false)
+            {
+                $this->queries[] = $sql;
+                if (stripos($sql, 'INSERT INTO nesp_candidate_workflow') !== false)
+                {
+                    $this->workflowRows = array('candidate_workflow_id' => $this->nextID++);
+                }
+
+                return true;
+            }
+
+            public function getLastInsertID()
+            {
+                return $this->workflowRows['candidate_workflow_id'];
+            }
+        };
+
+        $workflow = new NESPWorkflow($db);
+        $firstID = $workflow->ensureCandidateWorkflowRow(123, 41002, 7, 'NESP Ad: Indeed');
+        $secondID = $workflow->ensureCandidateWorkflowRow(123, 41002, 7, 'NESP Ad: Indeed');
+
+        $this->assertSame(91, $firstID);
+        $this->assertSame(91, $secondID);
+        $this->assertSame(1, count(array_filter($db->queries, function ($sql) {
+            return stripos($sql, 'INSERT INTO nesp_candidate_workflow') !== false;
+        })));
+        $this->assertSame(1, count(array_filter($db->queries, function ($sql) {
+            return stripos($sql, 'INSERT INTO nesp_audit_event') !== false;
+        })));
+        $this->assertSame(0, count(array_filter($db->queries, function ($sql) {
+            return stripos($sql, 'UPDATE nesp_candidate_workflow') !== false;
+        })));
     }
 
     public function testRecruitingAdTemplatesFlagMissingUnapprovedRoles()
