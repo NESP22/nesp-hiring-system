@@ -25,7 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-configure ldap \
     && docker-php-ext-install -j"$(nproc)" gd ldap mbstring mysqli soap zip \
-    && curl -fsSL -o /tmp/mcrypt-1.0.9.tgz https://pecl.php.net/get/mcrypt-1.0.9.tgz \
+    && curl --retry 6 --retry-all-errors --retry-delay 5 --connect-timeout 15 --max-time 120 -fsSL \
+         -o /tmp/mcrypt-1.0.9.tgz \
+         https://pecl.php.net/get/mcrypt-1.0.9.tgz \
     && pecl install /tmp/mcrypt-1.0.9.tgz \
     && docker-php-ext-enable mcrypt \
     && a2enmod headers rewrite \
