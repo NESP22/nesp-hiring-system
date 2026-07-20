@@ -157,6 +157,7 @@ class NESPWorkflow
             'resetInterviewerTempPassword',
             'disableInterviewerLogin',
             'createInterviewerRoleRule',
+            'deactivateInterviewerRoleRule',
             'createCandidateGrant',
             'assignInterviewer',
             'revokeCandidateGrant',
@@ -3081,6 +3082,48 @@ class NESPWorkflow
         );
 
         return $ruleID;
+    }
+
+    public function deactivateInterviewerRoleRule($ruleID, $actorUserID)
+    {
+        $ruleID = (int) $ruleID;
+        if ($ruleID <= 0)
+        {
+            return false;
+        }
+
+        $rule = $this->_db->getAssoc(sprintf(
+            'SELECT role_rule_id, interviewer_profile_id, joborder_id
+             FROM nesp_interviewer_role_rule
+             WHERE role_rule_id = %s
+               AND is_active = 1
+             LIMIT 1',
+            $this->_db->makeQueryInteger($ruleID)
+        ));
+        if (empty($rule))
+        {
+            return false;
+        }
+
+        $this->_db->query(sprintf(
+            'UPDATE nesp_interviewer_role_rule
+             SET is_active = 0,
+                 date_modified = NOW()
+             WHERE role_rule_id = %s
+               AND is_active = 1',
+            $this->_db->makeQueryInteger($ruleID)
+        ));
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            return false;
+        }
+
+        $this->logAuditEvent($actorUserID, 'interviewer_role_rule_deactivated', 'interviewer_role_rule', $ruleID, array(
+            'interviewer_profile_id' => (int) $rule['interviewer_profile_id'],
+            'joborder_id' => (int) $rule['joborder_id']
+        ));
+
+        return true;
     }
 
     public function createCandidateGrant($interviewerProfileID, $candidateID, $jobOrderID, $actorUserID)

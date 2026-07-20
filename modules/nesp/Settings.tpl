@@ -699,6 +699,7 @@
                                 <th>Exact Job</th>
                                 <th>Mode</th>
                                 <th>Priority</th>
+                                <th>Action</th>
                             </tr>
                             <?php foreach ($this->assignmentRules as $rule): ?>
                             <tr>
@@ -707,11 +708,22 @@
                                 <td><?php $this->_($rule['job_title']); ?></td>
                                 <td><?php $this->_($rule['assignment_mode']); ?></td>
                                 <td><?php $this->_($rule['priority']); ?></td>
+                                <td>
+                                    <?php if ((int) $rule['is_active'] === 1): ?>
+                                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=deactivateInterviewerRoleRule">
+                                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                                        <input type="hidden" name="roleRuleID" value="<?php echo((int) $rule['role_rule_id']); ?>" />
+                                        <button type="submit" class="nesp-secondary-button">Remove Rule</button>
+                                    </form>
+                                    <?php else: ?>
+                                    <span class="nesp-muted">Removed</span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                             <?php if (!count($this->assignmentRules)): ?>
                             <tr>
-                                <td colspan="5">No routing rules have been created.</td>
+                                <td colspan="6">No routing rules have been created.</td>
                             </tr>
                             <?php endif; ?>
                         </table>
