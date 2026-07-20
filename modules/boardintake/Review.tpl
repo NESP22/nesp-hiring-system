@@ -37,6 +37,21 @@
                 <li><a href="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;batchID=<?php echo (int) $openBatch['batch_id']; ?>">Batch <?php echo (int) $openBatch['batch_id']; ?> - <?php $this->_($openBatch['platform_key']); ?> - <?php echo (int) $openBatch['row_count']; ?> rows</a></li>
             <?php endforeach; ?>
         </ul>
+        <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=importAllApproved" method="post" onsubmit="return confirm('Import every already approved, valid, non-duplicate review batch? No applicant will be contacted.');">
+            <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
+            <p>Imports only batches with a recorded preview and explicit row approval. Invalid, unapproved, and duplicate rows are skipped.</p>
+            <button type="submit">Import All Ready Applicants</button>
+        </form>
+        <?php endif; ?>
+
+        <?php if (!empty($this->bulkImportSummary)): ?>
+        <h3>Bulk import result</h3>
+        <p><?php echo (int) $this->bulkImportSummary['imported']; ?> imported, <?php echo (int) $this->bulkImportSummary['skipped']; ?> skipped, <?php echo (int) $this->bulkImportSummary['failed']; ?> stopped.</p>
+        <ul>
+            <?php foreach ($this->bulkImportSummary['batches'] as $result): ?>
+                <li>Batch <?php echo (int) $result['batch_id']; ?>: <?php $this->_($result['status']); ?> - <?php $this->_($result['message']); ?></li>
+            <?php endforeach; ?>
+        </ul>
         <?php endif; ?>
 
         <?php if (!empty($this->batch)): ?>
