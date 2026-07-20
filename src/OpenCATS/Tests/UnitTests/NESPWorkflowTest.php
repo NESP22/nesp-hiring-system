@@ -101,6 +101,41 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('unexpectedAction'));
     }
 
+    public function testAssignInterviewerUsesInterviewerPoolFeatureGate()
+    {
+        $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('assignInterviewer'));
+    }
+
+    public function testAssignInterviewerIsAdminCsrfProtectedAndUsesExistingGrantGuard()
+    {
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/nesp/Dashboard.tpl');
+
+        $this->assertStringContainsString("case 'assignInterviewer':", $ui);
+        $this->assertStringContainsString('$this->adminOnly();', $ui);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $ui);
+        $this->assertStringContainsString('$this->_workflow->createCandidateGrant($interviewerProfileID, $candidateID, $jobOrderID, $this->_userID)', $ui);
+        $this->assertStringContainsString("date_revoked IS NULL", $workflow);
+        $this->assertStringContainsString("interviewer_candidate_grant_duplicate", $workflow);
+        $this->assertStringContainsString('name="csrfToken"', $template);
+        $this->assertTrue(
+            strpos($template, 'name="interviewerProfileID"') !== false
+            && strpos($template, '>Assign Interviewer</button>') !== false
+        );
+    }
+
+    public function testEligibleInterviewerQueryRequiresActiveOpenRoleApprovedProfiles()
+    {
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $this->assertStringContainsString('public function getEligibleInterviewersForAssignment($jobOrderID)', $workflow);
+        $this->assertStringContainsString('ip.is_active = 1', $workflow);
+        $this->assertStringContainsString('ip.account_state_key = "active"', $workflow);
+        $this->assertStringContainsString('ip.availability_status_key = "open"', $workflow);
+        $this->assertStringContainsString('ijr.joborder_id = %s', $workflow);
+    }
+
     public function testGoogleCalendarFreeBusyDefaultsAreReadOnlyAndDisabled()
     {
         $this->assertSame('NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED', NESPGoogleCalendarFreeBusy::FEATURE_FLAG);
@@ -398,6 +433,8 @@ class NESPWorkflowTest extends TestCase
         $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('weekend_sports_photographer');
         $labels = strtolower(json_encode($questions));
 
+        $this->assertStringContainsString('photographer pre-interview', strtolower($intro));
+        $this->assertStringContainsString('staff or freelance', strtolower($intro));
         $this->assertStringContainsString('fall 2026 and spring 2027 pre-interview information and survey', strtolower($intro));
         $this->assertStringContainsString('massachusetts, new hampshire, rhode island, connecticut, and vermont', strtolower($intro));
         $this->assertStringContainsString('last 5 photography events', $labels);
@@ -409,6 +446,20 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('45-75 minutes', $labels);
         $this->assertStringContainsString('7:30 am', $labels);
         $this->assertStringContainsString('youth sports team and portrait photographer', $labels);
+
+        $byKey = array();
+        foreach ($questions as $question)
+        {
+            $byKey[$question['key']] = $question;
+        }
+        $this->assertSame('single_choice', $byKey['position_for_zoom']['type']);
+        $this->assertSame(array('Photographer'), $byKey['position_for_zoom']['choices']);
+        $this->assertTrue($byKey['last_five_photography_events']['required']);
+        $this->assertSame('yes_no', $byKey['owns_flash']['type']);
+        $this->assertSame('yes_no', $byKey['indoor_lighting_experience']['type']);
+        $this->assertSame('multiple_choice', $byKey['travel_distance']['type']);
+        $this->assertCount(3, $byKey['travel_distance']['choices']);
+        $this->assertSame('single_choice', $byKey['early_weekend_mornings']['type']);
     }
 
     public function testFieldStaffQuestionnaireIsFirstAndUsesCraigPreInterviewWording()
@@ -424,6 +475,8 @@ class NESPWorkflowTest extends TestCase
         $questions = NESPWorkflow::getQuestionnaireQuestionsForSet('photography_assistant_poser');
         $labels = strtolower(json_encode($questions));
 
+        $this->assertStringContainsString('field staff first', strtolower($intro));
+        $this->assertStringContainsString('table/field assistant pre-interview', strtolower($intro));
         $this->assertStringContainsString('fall 2026 and spring 2027 pre-interview information and survey', strtolower($intro));
         $this->assertStringContainsString('massachusetts, new hampshire, rhode island, connecticut, and vermont', strtolower($intro));
         $this->assertStringContainsString('email address', $labels);
@@ -433,6 +486,18 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('45-60 minutes', $labels);
         $this->assertStringContainsString('kindergarten through high school', $labels);
         $this->assertStringContainsString('picture day events', $labels);
+
+        $byKey = array();
+        foreach ($questions as $question)
+        {
+            $byKey[$question['key']] = $question;
+        }
+        $this->assertSame('single_choice', $byKey['position_for_zoom']['type']);
+        $this->assertSame(array('Table Greeter / Field Assistant'), $byKey['position_for_zoom']['choices']);
+        $this->assertSame('single_choice', $byKey['driver_license_vehicle']['type']);
+        $this->assertSame(array('Yes', 'No', 'Other'), $byKey['driver_license_vehicle']['choices']);
+        $this->assertSame('multiple_choice', $byKey['travel_distance']['type']);
+        $this->assertCount(3, $byKey['travel_distance']['choices']);
     }
 
     public function testQuestionnaireAnswerValidationRequiresCurrentServerQuestions()
@@ -549,8 +614,8 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame(array(41005), $byName['Brandon']['approved_joborder_ids']);
         $this->assertSame('email_needs_confirmation', $byName['Brandon']['account_state_key']);
         $this->assertStringContainsString('Please confirm', $byName['Brandon']['email_warning']);
-        $this->assertSame(array(41002, 41003, 41005), $byName['Nate']['approved_joborder_ids']);
-        $this->assertNotContains(41001, $byName['Nate']['approved_joborder_ids']);
+        $this->assertSame('profile_created', $byName['Nate']['account_state_key']);
+        $this->assertSame(array(), $byName['Nate']['approved_joborder_ids']);
     }
 
     public function testApprovedInterviewerJobRoleOptionsKeepCustomerServiceCraigOnly()
