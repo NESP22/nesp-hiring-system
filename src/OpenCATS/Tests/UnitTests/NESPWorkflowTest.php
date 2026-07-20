@@ -378,6 +378,17 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame(0, count(array_filter($db->queries, function ($sql) {
             return stripos($sql, 'UPDATE nesp_candidate_workflow') !== false;
         })));
+
+        $db->workflowRows = array();
+        $customID = $workflow->ensureCandidateWorkflowRow(
+            124,
+            41002,
+            7,
+            'NESP Ad: LinkedIn',
+            'Contact details required before any questionnaire or outreach.',
+            'Collect contact details'
+        );
+        $this->assertSame(92, $customID);
     }
 
     public function testRecruitingAdTemplatesFlagMissingUnapprovedRoles()

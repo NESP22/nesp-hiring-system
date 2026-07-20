@@ -113,6 +113,7 @@ class BoardApplicantIntake
      * Parse a deliberately narrow CSV shape without retaining raw rows.
      *
      * Accepted columns: external_id, first_name, last_name, email, phone.
+     * LinkedIn may omit email when external_id is present.
      * Resume and attachment URLs are rejected rather than silently stored.
      */
     public static function parseCsv($contents, $platform, $jobOrderID, $sourceLabel)
@@ -165,7 +166,12 @@ class BoardApplicantIntake
             );
         }
 
-        foreach (array('external_id', 'first_name', 'last_name', 'email') as $required)
+        $requiredFields = array('external_id', 'first_name', 'last_name');
+        if ($platform !== 'linkedin')
+        {
+            $requiredFields[] = 'email';
+        }
+        foreach ($requiredFields as $required)
         {
             if (!in_array($required, $headers, true))
             {
@@ -194,19 +200,26 @@ class BoardApplicantIntake
             }
 
             $rowErrors = array();
-            $email = strtolower(trim($mapped['email']));
+            $email = isset($mapped['email']) ? strtolower(trim($mapped['email'])) : '';
+            $externalID = isset($mapped['external_id']) && $mapped['external_id'] !== ''
+                ? $mapped['external_id']
+                : null;
             if ($mapped['first_name'] === '' || $mapped['last_name'] === '')
             {
                 $rowErrors[] = 'First and last name are required.';
             }
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL))
+            if ($email === '')
+            {
+                if ($platform !== 'linkedin' || empty($externalID))
+                {
+                    $rowErrors[] = 'A valid email is required.';
+                }
+            }
+            elseif (!filter_var($email, FILTER_VALIDATE_EMAIL))
             {
                 $rowErrors[] = 'A valid email is required.';
             }
 
-            $externalID = isset($mapped['external_id']) && $mapped['external_id'] !== ''
-                ? $mapped['external_id']
-                : null;
             if ($externalID === null)
             {
                 $rowErrors[] = 'external_id is required for exactly-once import.';
@@ -496,10 +509,16 @@ class BoardApplicantIntake
                 }
 
                 $candidates = new Candidates();
+                $candidateNotes = 'Board intake: ' . $batch['platform_key'];
+                $contactDetailsRequired = $batch['platform_key'] === 'linkedin' && trim($row['email']) === '';
+                if ($contactDetailsRequired)
+                {
+                    $candidateNotes .= '. Contact details required before any questionnaire or outreach.';
+                }
                 $candidateID = $candidates->add(
                     $row['first_name'], '', $row['last_name'], $row['email'], '',
                     $row['phone'], '', '', '', '', '', '', '', $batch['source_label'],
-                    '', null, '', false, '', '', 'Board intake: ' . $batch['platform_key'], '',
+                    '', null, '', false, '', '', $candidateNotes, '',
                     '', $actorUserID, $actorUserID
                 );
                 if ($candidateID <= 0)
@@ -527,7 +546,18 @@ class BoardApplicantIntake
                 }
 
                 $workflow = new NESPWorkflow($this->_db);
-                if (!$workflow->ensureCandidateWorkflowRow($candidateID, (int) $batch['joborder_id'], $actorUserID, $batch['source_label']))
+                $workflowSummary = $contactDetailsRequired
+                    ? 'Contact details required before any questionnaire or outreach. New LinkedIn application awaiting human review.'
+                    : null;
+                $workflowNextAction = $contactDetailsRequired ? 'Collect contact details' : null;
+                if (!$workflow->ensureCandidateWorkflowRow(
+                    $candidateID,
+                    (int) $batch['joborder_id'],
+                    $actorUserID,
+                    $batch['source_label'],
+                    $workflowSummary,
+                    $workflowNextAction
+                ))
                 {
                     throw new RuntimeException('Workflow routing failed.');
                 }
@@ -622,16 +652,22 @@ class BoardApplicantIntake
 
     private function findDuplicateCandidate($row)
     {
-        $email = $this->_db->makeQueryString(strtolower(trim($row['email'])));
+        $email = strtolower(trim($row['email']));
         $first = $this->_db->makeQueryString($row['first_name']);
         $last = $this->_db->makeQueryString($row['last_name']);
+        $emailClause = $email === ''
+            ? '1 = 0'
+            : sprintf(
+                'LOWER(TRIM(email1)) = LOWER(TRIM(%s)) OR LOWER(TRIM(email2)) = LOWER(TRIM(%s))',
+                $this->_db->makeQueryString($email),
+                $this->_db->makeQueryString($email)
+            );
         $sql = sprintf(
             'SELECT candidate_id FROM candidate
-             WHERE LOWER(TRIM(email1)) = LOWER(TRIM(%s))
-                OR LOWER(TRIM(email2)) = LOWER(TRIM(%s))
+             WHERE (%s)
                 OR (LOWER(TRIM(first_name)) = LOWER(TRIM(%s)) AND LOWER(TRIM(last_name)) = LOWER(TRIM(%s)))
              ORDER BY candidate_id ASC LIMIT 1',
-            $email, $email, $first, $last
+            $emailClause, $first, $last
         );
         return (int) $this->_db->getColumn($sql, 0, 0);
     }
