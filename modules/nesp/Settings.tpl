@@ -511,6 +511,17 @@
                             </form>
                         <?php endif; ?>
                     </div>
+                    <?php if (!empty($profile['can_archive'])): ?>
+                    <div class="nesp-confirm-box">
+                        This profile has no linked login, active role, routing rule, grant, interview, calendar connection, or assignment. Archiving keeps its audit history but hides it from normal settings.
+                        <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=archiveInertInterviewerProfile" class="nesp-action-row">
+                            <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $profile['interviewer_profile_id']); ?>" />
+                            <input type="text" name="archiveConfirmation" autocomplete="off" placeholder="Type ARCHIVE" />
+                            <button type="submit" class="nesp-secondary-button">Archive Inert Duplicate Profile</button>
+                        </form>
+                    </div>
+                    <?php endif; ?>
                 </div>
             <?php endforeach; ?>
 

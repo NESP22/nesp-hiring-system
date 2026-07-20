@@ -60,7 +60,7 @@ class NESPQuestionnaireTemplateTest extends TestCase
         $settings = file_get_contents('modules/nesp/Settings.tpl');
         $controller = file_get_contents('modules/nesp/NESPUI.php');
 
-        foreach (array('prepareInterviewerLogin', 'activateInterviewerLogin', 'suspendInterviewerLogin', 'reactivateInterviewerLogin', 'resetInterviewerTempPassword', 'disableInterviewerLogin', 'revokeCandidateGrant', 'deactivateInterviewerRoleRule') as $action)
+        foreach (array('prepareInterviewerLogin', 'activateInterviewerLogin', 'suspendInterviewerLogin', 'reactivateInterviewerLogin', 'resetInterviewerTempPassword', 'disableInterviewerLogin', 'revokeCandidateGrant', 'deactivateInterviewerRoleRule', 'archiveInertInterviewerProfile') as $action)
         {
             $this->assertStringContainsString('a=' . $action, $settings);
             $this->assertStringContainsString("case '" . $action . "'", $controller);
@@ -72,8 +72,26 @@ class NESPQuestionnaireTemplateTest extends TestCase
         $this->assertStringContainsString('data-label="Candidate"', $settings);
         $this->assertStringContainsString('name="roleRuleID"', $settings);
         $this->assertStringContainsString('Remove Rule', $settings);
+        $this->assertStringContainsString('Archive Inert Duplicate Profile', $settings);
+        $this->assertStringContainsString('name="archiveConfirmation"', $settings);
         $this->assertStringNotContainsString('name="linkedUserID"', $settings);
         $this->assertStringNotContainsString('name="isActive"', $settings);
+    }
+
+    public function testInertDuplicateArchiveRequiresServerSideGuards()
+    {
+        $workflow = file_get_contents('lib/NESPWorkflow.php');
+        $ui = file_get_contents('modules/nesp/NESPUI.php');
+
+        $this->assertStringContainsString('function archiveInertInterviewerProfile', $workflow);
+        $this->assertStringContainsString("trim((string) \$confirmation) !== 'ARCHIVE'", $workflow);
+        $this->assertStringContainsString('getInertInterviewerProfileArchiveBlockers', $workflow);
+        $this->assertStringContainsString('getActiveDuplicateInterviewerProfileID', $workflow);
+        $this->assertStringContainsString('interviewer_inert_duplicate_profile_archived', $workflow);
+        $this->assertStringContainsString('account_state_key <> "archived"', $workflow);
+        $this->assertStringContainsString("case 'archiveInertInterviewerProfile':", $ui);
+        $this->assertStringContainsString('$this->adminOnly();', $ui);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $ui);
     }
 
     public function testLegacyForgotPasswordBlocksNespInterviewerMailerPath()

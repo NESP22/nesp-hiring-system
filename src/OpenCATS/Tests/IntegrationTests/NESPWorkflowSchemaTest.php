@@ -351,6 +351,64 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         ));
     }
 
+    public function testOnlyAnInertDuplicateInterviewerProfileCanBeArchived()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $canonicalID = $this->insertInterviewerArchiveFixture('Canonical Suthir', 'archive-duplicate@example.test', null, 1, 'active');
+        $inertDuplicateID = $this->insertInterviewerArchiveFixture('Duplicate Suthir', 'archive-duplicate@example.test', null, 0, 'profile_created');
+        $this->mySQLQueryLocal(sprintf(
+            "INSERT INTO nesp_interviewer_job_role (interviewer_profile_id, joborder_id, role_key, is_active, date_created, date_modified)
+             VALUES (%d, 41002, 'staff_photographer', 0, NOW(), NOW())",
+            $inertDuplicateID
+        ));
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $this->assertFalse($workflow->archiveInertInterviewerProfile($inertDuplicateID, 'no', 1)['ok']);
+        $result = $workflow->archiveInertInterviewerProfile($inertDuplicateID, 'ARCHIVE', 1);
+        $this->assertTrue($result['ok']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_interviewer_profile',
+            sprintf("interviewer_profile_id = %d AND is_active = 0 AND account_state_key = 'archived'", $inertDuplicateID)
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_interviewer_job_role',
+            sprintf('interviewer_profile_id = %d AND is_active = 0', $inertDuplicateID)
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_audit_event',
+            sprintf("entity_id = %d AND event_type = 'interviewer_inert_duplicate_profile_archived'", $inertDuplicateID)
+        ));
+        $this->assertCount(1, $workflow->getInterviewerProfiles());
+        $this->assertCount(2, $workflow->getInterviewerProfiles(true));
+
+        $linkedUserID = $this->insertInterviewerArchiveFixture('Linked Duplicate', 'archive-duplicate@example.test', 1, 0, 'profile_created');
+        $activeRoleID = $this->insertInterviewerArchiveFixture('Role Duplicate', 'archive-duplicate@example.test', null, 0, 'profile_created');
+        $routingID = $this->insertInterviewerArchiveFixture('Routing Duplicate', 'archive-duplicate@example.test', null, 0, 'profile_created');
+        $grantID = $this->insertInterviewerArchiveFixture('Grant Duplicate', 'archive-duplicate@example.test', null, 0, 'profile_created');
+        $interviewID = $this->insertInterviewerArchiveFixture('Interview Duplicate', 'archive-duplicate@example.test', null, 0, 'profile_created');
+        $assignmentID = $this->insertInterviewerArchiveFixture('Assignment Duplicate', 'archive-duplicate@example.test', null, 0, 'profile_created');
+        $calendarID = $this->insertInterviewerArchiveFixture('Calendar Duplicate', 'archive-duplicate@example.test', null, 0, 'profile_created');
+
+        $this->mySQLQueryLocal(sprintf("INSERT INTO nesp_interviewer_job_role (interviewer_profile_id, joborder_id, role_key, is_active, date_created, date_modified) VALUES (%d, 41002, 'staff_photographer', 1, NOW(), NOW())", $activeRoleID));
+        $this->mySQLQueryLocal(sprintf("INSERT INTO nesp_interviewer_role_rule (interviewer_profile_id, role_match_text, assignment_mode, priority, is_active, date_created, date_modified) VALUES (%d, 'photographer', 'manual_review', 50, 0, NOW(), NOW())", $routingID));
+        $this->mySQLQueryLocal(sprintf("INSERT INTO nesp_interviewer_candidate_grant (interviewer_profile_id, candidate_id, joborder_id, access_level_key, date_granted, date_revoked) VALUES (%d, 9001, 41002, 'interview', NOW(), NOW())", $grantID));
+        $this->mySQLQueryLocal(sprintf("INSERT INTO nesp_interview (candidate_id, joborder_id, interviewer_profile_id, status_key, date_created, date_modified) VALUES (9002, 41002, %d, 'draft', NOW(), NOW())", $interviewID));
+        $this->mySQLQueryLocal(sprintf("INSERT INTO nesp_interview_slot (interviewer_profile_id, scheduled_start, scheduled_end, date_created, date_modified) VALUES (%d, NOW(), DATE_ADD(NOW(), INTERVAL 30 MINUTE), NOW(), NOW())", $assignmentID));
+        $this->mySQLQueryLocal(sprintf("INSERT INTO nesp_google_calendar_connection (interviewer_profile_id, status_key, date_created, date_modified) VALUES (%d, 'disconnected', NOW(), NOW())", $calendarID));
+
+        foreach (array($linkedUserID, $activeRoleID, $routingID, $grantID, $interviewID, $assignmentID, $calendarID) as $blockedProfileID)
+        {
+            $result = $workflow->archiveInertInterviewerProfile($blockedProfileID, 'ARCHIVE', 1);
+            $this->assertFalse($result['ok'], 'Profile with linked or assigned work must not archive.');
+            $this->assertSame(1, $this->countRowsWhere(
+                'nesp_interviewer_profile',
+                sprintf("interviewer_profile_id = %d AND account_state_key = 'profile_created'", $blockedProfileID)
+            ));
+        }
+    }
+
     public function testRequestedQuestionnaireContentPublishesAReplacementForExistingSets()
     {
         include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
@@ -779,6 +837,24 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->mySQLQueryLocal('DROP TABLE IF EXISTS nesp_screening_questionnaire_activity');
         $this->mySQLQueryLocal('DROP TABLE IF EXISTS nesp_screening_questionnaire_answer');
         $this->mySQLQueryLocal('DROP TABLE IF EXISTS nesp_screening_questionnaire');
+    }
+
+    private function insertInterviewerArchiveFixture($displayName, $email, $userID, $isActive, $accountState)
+    {
+        $this->mySQLQueryLocal(
+            sprintf(
+                "INSERT INTO nesp_interviewer_profile
+                    (user_id, display_name, email, role_key, is_active, account_state_key, availability_status_key, date_created, date_modified)
+                 VALUES (%s, '%s', '%s', 'interviewer', %d, '%s', 'closed', NOW(), NOW())",
+                $userID === null ? 'NULL' : (int) $userID,
+                $this->escape($displayName),
+                $this->escape($email),
+                (int) $isActive,
+                $this->escape($accountState)
+            )
+        );
+
+        return $this->lastInsertID();
     }
 
     private function insertFakeCandidate($firstName, $lastName)

@@ -158,6 +158,7 @@ class NESPWorkflow
             'disableInterviewerLogin',
             'createInterviewerRoleRule',
             'deactivateInterviewerRoleRule',
+            'archiveInertInterviewerProfile',
             'createCandidateGrant',
             'assignInterviewer',
             'revokeCandidateGrant',
@@ -811,7 +812,8 @@ class NESPWorkflow
             'active' => 'Active',
             'suspended' => 'Suspended',
             'deactivated' => 'Deactivated',
-            'permanently_disabled' => 'Permanently Disabled'
+            'permanently_disabled' => 'Permanently Disabled',
+            'archived' => 'Archived'
         );
     }
 
@@ -2908,7 +2910,7 @@ class NESPWorkflow
         return $rows;
     }
 
-    public function getInterviewerProfiles()
+    public function getInterviewerProfiles($includeArchived = false)
     {
         $profileSelect = array(
             'ip.interviewer_profile_id',
@@ -2959,6 +2961,9 @@ class NESPWorkflow
         $jobRoleJoin = $this->isTableInstalled('nesp_interviewer_job_role')
             ? 'LEFT JOIN nesp_interviewer_job_role ijr ON ijr.interviewer_profile_id = ip.interviewer_profile_id AND ijr.is_active = 1'
             : '';
+        $archiveFilter = (!$includeArchived && $this->isColumnInstalled('nesp_interviewer_profile', 'account_state_key'))
+            ? 'WHERE ip.account_state_key <> "archived"'
+            : '';
 
         $rows = $this->_db->getAllAssoc(
             'SELECT
@@ -2976,6 +2981,7 @@ class NESPWorkflow
                 ON cg.interviewer_profile_id = ip.interviewer_profile_id
                 AND cg.date_revoked IS NULL
              ' . $jobRoleJoin . '
+             ' . $archiveFilter . '
              GROUP BY
                 ip.interviewer_profile_id
              ORDER BY
@@ -2999,6 +3005,10 @@ class NESPWorkflow
             {
                 $rows[$index]['state_badge'] = 'Suspended/deactivated';
             }
+            else if ($state === 'archived')
+            {
+                $rows[$index]['state_badge'] = 'Archived';
+            }
             else
             {
                 $rows[$index]['state_badge'] = 'Profile only';
@@ -3010,6 +3020,8 @@ class NESPWorkflow
             $rows[$index]['can_reset_temp_password'] = (int) $row['user_id'] > 0 && $state !== 'permanently_disabled';
             $rows[$index]['can_disable_login'] = (int) $row['user_id'] > 0 && $state !== 'permanently_disabled';
             $rows[$index]['can_revoke_grants'] = (int) $row['active_grants'] > 0;
+            $rows[$index]['can_archive'] = $state !== 'archived'
+                && empty($this->getInertInterviewerProfileArchiveBlockers((int) $row['interviewer_profile_id'], $row));
         }
 
         return $rows;
@@ -3124,6 +3136,169 @@ class NESPWorkflow
         ));
 
         return true;
+    }
+
+    /**
+     * Archives only a duplicate profile that has never been used. This is a
+     * reversible visibility state, not a delete: the profile and audit trail
+     * stay in place for compliance and troubleshooting.
+     */
+    public function archiveInertInterviewerProfile($interviewerProfileID, $confirmation, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        if ($interviewerProfileID <= 0 || trim((string) $confirmation) !== 'ARCHIVE')
+        {
+            return array('ok' => false, 'error' => 'Type ARCHIVE to confirm this inert duplicate profile archive.');
+        }
+
+        $transactionStarted = $this->_db->beginTransaction();
+        $profile = $this->_db->getAssoc(sprintf(
+            'SELECT *
+             FROM nesp_interviewer_profile
+             WHERE interviewer_profile_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($interviewerProfileID)
+        ));
+        $blockers = $this->getInertInterviewerProfileArchiveBlockers($interviewerProfileID, $profile);
+        if (!empty($blockers))
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            return array('ok' => false, 'error' => 'This profile cannot be archived: ' . implode(', ', $blockers) . '.');
+        }
+
+        $canonicalProfileID = $this->getActiveDuplicateInterviewerProfileID($interviewerProfileID, $profile);
+
+        $this->_db->query(sprintf(
+            'UPDATE nesp_interviewer_profile
+             SET is_active = 0,
+                 account_state_key = "archived",
+                 availability_status_key = "closed",
+                 availability_closed_until = NULL,
+                 availability_close_reason = %s,
+                 date_modified = NOW()
+             WHERE interviewer_profile_id = %s
+               AND (user_id IS NULL OR user_id = 0)
+               AND is_active = 0
+               AND account_state_key <> "archived"',
+            $this->_db->makeQueryString('Archived inert duplicate profile.'),
+            $this->_db->makeQueryInteger($interviewerProfileID)
+        ));
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            return array('ok' => false, 'error' => 'The profile changed before it could be archived. Review it again.');
+        }
+
+        $this->logAuditEvent($actorUserID, 'interviewer_inert_duplicate_profile_archived', 'interviewer_profile', $interviewerProfileID, array(
+            'canonical_duplicate_profile_id' => $canonicalProfileID,
+            'preserved_history' => true
+        ));
+        if ($transactionStarted && !$this->_db->commitTransaction())
+        {
+            return array('ok' => false, 'error' => 'Unable to commit the archive audit record.');
+        }
+
+        return array('ok' => true);
+    }
+
+    private function getInertInterviewerProfileArchiveBlockers($interviewerProfileID, $profile = array())
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        if ($interviewerProfileID <= 0 || empty($profile))
+        {
+            return array('profile was not found');
+        }
+
+        $blockers = array();
+        if ((int) $profile['user_id'] > 0)
+        {
+            $blockers[] = 'a linked OpenCATS user';
+        }
+        if ((int) $profile['is_active'] === 1)
+        {
+            $blockers[] = 'an active interviewer state';
+        }
+        if (!isset($profile['account_state_key']) || $profile['account_state_key'] !== 'profile_created')
+        {
+            $blockers[] = 'a non-profile-only account state';
+        }
+        if (isset($profile['account_state_key']) && $profile['account_state_key'] === 'archived')
+        {
+            $blockers[] = 'an already archived state';
+        }
+        if ($this->getActiveDuplicateInterviewerProfileID($interviewerProfileID, $profile) <= 0)
+        {
+            $blockers[] = 'no active same-email duplicate';
+        }
+
+        $profileIDSQL = $this->_db->makeQueryInteger($interviewerProfileID);
+        $tableChecks = array(
+            array('nesp_interviewer_job_role', 'interviewer_profile_id', 'is_active = 1', 'an active job role'),
+            array('nesp_interviewer_role_rule', 'interviewer_profile_id', '', 'a routing rule'),
+            array('nesp_interviewer_candidate_grant', 'interviewer_profile_id', '', 'a candidate grant'),
+            array('nesp_interview', 'interviewer_profile_id', '', 'an interview'),
+            array('nesp_interview_slot', 'interviewer_profile_id', '', 'an interview slot'),
+            array('nesp_scorecard_response', 'interviewer_profile_id', '', 'a scorecard assignment'),
+            array('nesp_interviewer_availability', 'interviewer_profile_id', '', 'an availability record'),
+            array('nesp_interviewer_availability_override', 'interviewer_profile_id', '', 'an availability override'),
+            array('nesp_interviewer_blackout', 'interviewer_profile_id', '', 'a blackout record'),
+            array('nesp_google_calendar_connection', 'interviewer_profile_id', '', 'a Google Calendar connection')
+        );
+
+        foreach ($tableChecks as $check)
+        {
+            if (!$this->isTableInstalled($check[0]) || !$this->isColumnInstalled($check[0], $check[1]))
+            {
+                continue;
+            }
+            $where = $check[1] . ' = ' . $profileIDSQL;
+            if ($check[2] !== '')
+            {
+                $where .= ' AND ' . $check[2];
+            }
+            if ($this->countRows('SELECT COUNT(*) AS total FROM ' . $check[0] . ' WHERE ' . $where) > 0)
+            {
+                $blockers[] = $check[3];
+            }
+        }
+
+        if ($this->isTableInstalled('nesp_screening_questionnaire')
+            && $this->isColumnInstalled('nesp_screening_questionnaire', 'reviewer_profile_id')
+            && $this->countRows('SELECT COUNT(*) AS total FROM nesp_screening_questionnaire WHERE reviewer_profile_id = ' . $profileIDSQL) > 0)
+        {
+            $blockers[] = 'a questionnaire review assignment';
+        }
+
+        return $blockers;
+    }
+
+    private function getActiveDuplicateInterviewerProfileID($interviewerProfileID, $profile)
+    {
+        if (empty($profile) || trim((string) $profile['email']) === '')
+        {
+            return 0;
+        }
+
+        $duplicate = $this->_db->getAssoc(sprintf(
+            'SELECT interviewer_profile_id
+             FROM nesp_interviewer_profile
+             WHERE interviewer_profile_id <> %s
+               AND LOWER(TRIM(email)) = LOWER(TRIM(%s))
+               AND is_active = 1
+               AND account_state_key = "active"
+             ORDER BY interviewer_profile_id ASC
+             LIMIT 1',
+            $this->_db->makeQueryInteger((int) $interviewerProfileID),
+            $this->_db->makeQueryString(trim((string) $profile['email']))
+        ));
+
+        return empty($duplicate) ? 0 : (int) $duplicate['interviewer_profile_id'];
     }
 
     public function createCandidateGrant($interviewerProfileID, $candidateID, $jobOrderID, $actorUserID)
