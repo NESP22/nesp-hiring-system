@@ -2144,7 +2144,10 @@ class CareersUI extends UserInterface
         NESPApplicationQuestions::logCandidateAnswers($jobOrderID, $candidateID, $_POST);
 
         $workflow = new NESPWorkflow();
-        if (!$workflow->ensureCandidateWorkflowRow($candidateID, $jobOrderID, $automatedUser['userID'], $source))
+        // This creates a role-specific questionnaire link for Craig to review,
+        // but never sends it or advances the applicant without a human action.
+        if (!$workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, $automatedUser['userID'], $newApplication)
+            && !$workflow->ensureCandidateWorkflowRow($candidateID, $jobOrderID, $automatedUser['userID'], $source))
         {
             CommonErrors::fatal(COMMONERROR_RECORDERROR, $this, 'Failed to route application for human review.');
             return;
