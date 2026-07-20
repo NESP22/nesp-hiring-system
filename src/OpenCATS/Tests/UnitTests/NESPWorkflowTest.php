@@ -614,8 +614,8 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame(array(41005), $byName['Brandon']['approved_joborder_ids']);
         $this->assertSame('email_needs_confirmation', $byName['Brandon']['account_state_key']);
         $this->assertStringContainsString('Please confirm', $byName['Brandon']['email_warning']);
-        $this->assertSame(array(41002, 41003, 41005), $byName['Nate']['approved_joborder_ids']);
-        $this->assertNotContains(41001, $byName['Nate']['approved_joborder_ids']);
+        $this->assertSame('profile_created', $byName['Nate']['account_state_key']);
+        $this->assertSame(array(), $byName['Nate']['approved_joborder_ids']);
     }
 
     public function testApprovedInterviewerJobRoleOptionsKeepCustomerServiceCraigOnly()

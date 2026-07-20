@@ -399,6 +399,15 @@ class NESPWorkflow
         return hash('sha256', (string) $token);
     }
 
+    /**
+     * This is intentionally a one-way value: it is the unique database lock
+     * for one active questionnaire per candidate/job pair.
+     */
+    public static function questionnaireActiveCandidateJobKey($candidateID, $jobOrderID)
+    {
+        return hash('sha256', 'nesp-questionnaire-active:' . (int) $candidateID . ':' . (int) $jobOrderID);
+    }
+
     public static function getQuestionnaireLink($token)
     {
         $baseURLValue = getenv('NESP_PUBLIC_BASE_URL');
@@ -829,10 +838,10 @@ class NESPWorkflow
             array(
                 'display_name' => 'Nate',
                 'email' => 'nate@nesportsphoto.com',
-                'role_group' => 'All field roles except Customer Service',
-                'account_state_key' => 'ready_for_account_creation',
+                'role_group' => 'Profile only until Craig assigns approved job roles',
+                'account_state_key' => 'profile_created',
                 'is_active' => 0,
-                'approved_joborder_ids' => array(41002, 41003, 41005),
+                'approved_joborder_ids' => array(),
                 'email_warning' => ''
             )
         );
@@ -3085,6 +3094,18 @@ class NESPWorkflow
             return false;
         }
 
+        if ($jobOrderID === 41001)
+        {
+            $this->logAuditEvent(
+                $actorUserID,
+                'interviewer_candidate_grant_rejected',
+                'interviewer_profile',
+                $interviewerProfileID,
+                array('candidate_id' => $candidateID, 'joborder_id' => $jobOrderID, 'reason' => 'customer_service_craig_manual_only')
+            );
+            return false;
+        }
+
         $candidateJobOrder = $this->_db->getAssoc(
             sprintf(
                 'SELECT cjo.candidate_joborder_id
@@ -3171,7 +3192,7 @@ class NESPWorkflow
     public function getEligibleInterviewersForAssignment($jobOrderID)
     {
         $jobOrderID = (int) $jobOrderID;
-        if ($jobOrderID <= 0 || !$this->isTableInstalled('nesp_interviewer_job_role'))
+        if ($jobOrderID <= 0 || $jobOrderID === 41001 || !$this->isTableInstalled('nesp_interviewer_job_role'))
         {
             return array();
         }
@@ -5691,9 +5712,159 @@ class NESPWorkflow
                 }
                 $priority += 10;
             }
+
+            $this->reconcileRequestedQuestionnaireSetRelease($setKey, $set, $questionSetID, $actorUserID);
         }
 
         return true;
+    }
+
+    /**
+     * The two applicant-facing pre-interview sets are managed releases.  This
+     * upgrades existing installations by publishing an immutable next version,
+     * never changing a snapshot already issued to an applicant.
+     */
+    private function reconcileRequestedQuestionnaireSetRelease($setKey, $set, $questionSetID, $actorUserID)
+    {
+        if (!in_array($setKey, array('photography_assistant_poser', 'weekend_sports_photographer'), true)
+            || !$this->isTableInstalled('nesp_question_set_builtin_release'))
+        {
+            return;
+        }
+
+        $questions = self::normalizeQuestionnaireSnapshotQuestions(self::getQuestionnaireQuestionsForSet($setKey));
+        $roleMatches = array();
+        $priority = 10;
+        foreach ((array) $set['match'] as $matchText)
+        {
+            $roleMatches[] = array('match_text' => trim((string) $matchText), 'joborder_id' => null, 'priority' => $priority, 'is_active' => 1);
+            $priority += 10;
+        }
+        $releaseHash = self::questionnaireSetReleaseHash($set['label'], isset($set['intro']) ? $set['intro'] : '', $questions, $roleMatches);
+        $release = $this->_db->getAssoc(sprintf(
+            'SELECT release_hash, question_set_version_id
+             FROM nesp_question_set_builtin_release
+             WHERE set_key = %s
+             LIMIT 1',
+            $this->_db->makeQueryString($setKey)
+        ));
+        $current = $this->_db->getAssoc(sprintf(
+            'SELECT current_version_id
+             FROM nesp_question_set
+             WHERE question_set_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($questionSetID)
+        ));
+        $currentVersionID = empty($current) ? 0 : (int) $current['current_version_id'];
+        $currentDetail = $currentVersionID > 0 ? $this->getQuestionSetVersionDetail($currentVersionID) : array();
+        $currentHash = empty($currentDetail)
+            ? ''
+            : self::questionnaireSetReleaseHash(
+                (string) $currentDetail['display_name'],
+                isset($currentDetail['description']) ? (string) $currentDetail['description'] : '',
+                $currentDetail['questions'],
+                $currentDetail['role_matches']
+            );
+        if (!empty($release)
+            && hash_equals((string) $release['release_hash'], $releaseHash)
+            && (int) $release['question_set_version_id'] === $currentVersionID
+            && $currentHash === $releaseHash)
+        {
+            return;
+        }
+        if ($currentHash === $releaseHash)
+        {
+            $this->_db->query(sprintf(
+                'INSERT INTO nesp_question_set_builtin_release
+                    (set_key, release_hash, question_set_version_id, published_by_user_id, date_created, date_modified)
+                 VALUES (%s, %s, %s, %s, NOW(), NOW())
+                 ON DUPLICATE KEY UPDATE
+                    release_hash = VALUES(release_hash),
+                    question_set_version_id = VALUES(question_set_version_id),
+                    published_by_user_id = VALUES(published_by_user_id),
+                    date_modified = NOW()',
+                $this->_db->makeQueryString($setKey),
+                $this->_db->makeQueryString($releaseHash),
+                $this->_db->makeQueryInteger($currentVersionID),
+                $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+            ));
+            return;
+        }
+
+        $nextVersionRow = $this->_db->getColumn(sprintf(
+            'SELECT COALESCE(MAX(version_number), 0) + 1
+             FROM nesp_question_set_version
+             WHERE question_set_id = %s',
+            $this->_db->makeQueryInteger($questionSetID)
+        ), 0, 0);
+        $nextVersion = is_array($nextVersionRow) && isset($nextVersionRow[0])
+            ? (int) $nextVersionRow[0]
+            : 1;
+        $this->_db->query(sprintf(
+            'INSERT INTO nesp_question_set_version
+                (question_set_id, version_number, status_key, display_name, description, role_match_snapshot_json, snapshot_json, created_by_user_id, published_by_user_id, published_at, date_created, date_modified)
+             VALUES
+                (%s, %s, "published", %s, %s, %s, %s, %s, %s, UTC_TIMESTAMP(), NOW(), NOW())',
+            $this->_db->makeQueryInteger($questionSetID),
+            $this->_db->makeQueryInteger($nextVersion),
+            $this->_db->makeQueryString($set['label']),
+            $this->_db->makeQueryString(isset($set['intro']) ? $set['intro'] : ''),
+            $this->_db->makeQueryString(json_encode($roleMatches)),
+            $this->_db->makeQueryString(json_encode($questions)),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+        ));
+        $versionID = (int) $this->_db->getLastInsertID();
+        if ($versionID <= 0)
+        {
+            return;
+        }
+        $this->replaceQuestionSetVersionQuestions($versionID, $questions);
+        $this->replaceQuestionSetRoleMatches($questionSetID, $roleMatches);
+        $this->_db->query(sprintf(
+            'UPDATE nesp_question_set
+             SET display_name = %s,
+                 description = %s,
+                 current_version_id = %s,
+                 status_key = "active",
+                 date_modified = NOW()
+             WHERE question_set_id = %s',
+            $this->_db->makeQueryString($set['label']),
+            $this->_db->makeQueryString(isset($set['intro']) ? $set['intro'] : ''),
+            $this->_db->makeQueryInteger($versionID),
+            $this->_db->makeQueryInteger($questionSetID)
+        ));
+        $this->_db->query(sprintf(
+            'INSERT INTO nesp_question_set_builtin_release
+                (set_key, release_hash, question_set_version_id, published_by_user_id, date_created, date_modified)
+             VALUES (%s, %s, %s, %s, NOW(), NOW())
+             ON DUPLICATE KEY UPDATE
+                release_hash = VALUES(release_hash),
+                question_set_version_id = VALUES(question_set_version_id),
+                published_by_user_id = VALUES(published_by_user_id),
+                date_modified = NOW()',
+            $this->_db->makeQueryString($setKey),
+            $this->_db->makeQueryString($releaseHash),
+            $this->_db->makeQueryInteger($versionID),
+            $actorUserID === null ? 'NULL' : $this->_db->makeQueryInteger($actorUserID)
+        ));
+        $this->logAuditEvent(
+            $actorUserID,
+            'question_set_builtin_content_published',
+            'question_set_version',
+            $versionID,
+            array('set_key' => $setKey, 'release_hash' => $releaseHash, 'previous_version_id' => $currentVersionID)
+        );
+    }
+
+    private static function questionnaireSetReleaseHash($displayName, $description, $questions, $roleMatches)
+    {
+        return hash('sha256', json_encode(array(
+            'display_name' => trim((string) $displayName),
+            'description' => trim((string) $description),
+            'questions' => self::normalizeQuestionnaireSnapshotQuestions($questions),
+            'role_matches' => $roleMatches
+        )));
     }
 
     public function getQuestionSetAdminRows()
@@ -6199,24 +6370,46 @@ class NESPWorkflow
             return false;
         }
 
-        $existing = $this->_db->getAssoc(
-            sprintf(
-                'SELECT screening_questionnaire_id
-                 FROM nesp_screening_questionnaire
-                 WHERE candidate_id = %s
-                   AND joborder_id = %s
-                   AND status_key IN ("link_ready", "waiting", "in_progress", "human_follow_up_requested")
-                   AND (%s = 0 OR question_set_version_id = %s)
-                 ORDER BY screening_questionnaire_id DESC
-                 LIMIT 1',
-                $this->_db->makeQueryInteger($candidateID),
-                $this->_db->makeQueryInteger($jobOrderID),
-                $this->_db->makeQueryInteger((int) $preview['question_set_version_id']),
-                $this->_db->makeQueryInteger((int) $preview['question_set_version_id'])
-            )
-        );
+        $activeCandidateJobKey = self::questionnaireActiveCandidateJobKey($candidateID, $jobOrderID);
+        $hasActiveCandidateJobKey = $this->isColumnInstalled('nesp_screening_questionnaire', 'active_candidate_job_key');
+        $transactionStarted = $this->_db->beginTransaction();
+
+        // Expired links are terminal. Reapplications receive one fresh link;
+        // all other active states reuse their existing questionnaire snapshot.
+        if ($hasActiveCandidateJobKey)
+        {
+            $this->_db->query(sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET status_key = "expired",
+                     active_candidate_job_key = NULL,
+                     date_modified = NOW()
+                 WHERE active_candidate_job_key = %s
+                   AND status_key IN ("link_ready", "waiting", "in_progress")
+                   AND token_expires_at IS NOT NULL
+                   AND token_expires_at < UTC_TIMESTAMP()',
+                $this->_db->makeQueryString($activeCandidateJobKey)
+            ));
+        }
+
+        $existing = $this->_db->getAssoc(sprintf(
+            'SELECT screening_questionnaire_id
+             FROM nesp_screening_questionnaire
+             WHERE %s
+             ORDER BY screening_questionnaire_id DESC
+             LIMIT 1%s',
+            $hasActiveCandidateJobKey
+                ? 'active_candidate_job_key = ' . $this->_db->makeQueryString($activeCandidateJobKey)
+                : 'candidate_id = ' . $this->_db->makeQueryInteger($candidateID)
+                    . ' AND joborder_id = ' . $this->_db->makeQueryInteger($jobOrderID)
+                    . ' AND status_key IN ("link_ready", "waiting", "in_progress", "human_follow_up_requested")',
+            $transactionStarted ? ' FOR UPDATE' : ''
+        ));
         if (!empty($existing))
         {
+            if ($transactionStarted)
+            {
+                $this->_db->commitTransaction();
+            }
             return array(
                 'questionnaire_id' => (int) $existing['screening_questionnaire_id'],
                 'one_time_invitation_copy' => '',
@@ -6237,6 +6430,11 @@ class NESPWorkflow
             $this->_db->makeQueryString($preview['question_set_key']),
             $this->_db->makeQueryInteger((int) $preview['question_set_version'])
         );
+        if ($hasActiveCandidateJobKey)
+        {
+            $columns[] = 'active_candidate_job_key';
+            $values[] = $this->_db->makeQueryString($activeCandidateJobKey);
+        }
         if ($this->isColumnInstalled('nesp_screening_questionnaire', 'question_set_version_id'))
         {
             $columns[] = 'question_set_version_id';
@@ -6262,12 +6460,55 @@ class NESPWorkflow
             'INSERT INTO nesp_screening_questionnaire
                 (%s)
              VALUES
-                (%s)',
+                (%s)
+             ON DUPLICATE KEY UPDATE
+                screening_questionnaire_id = LAST_INSERT_ID(screening_questionnaire_id),
+                date_modified = date_modified',
             implode(', ', $columns),
             implode(', ', $values)
         ));
 
         $questionnaireID = (int) $this->_db->getLastInsertID();
+        $created = !empty($this->_db->getAssoc(sprintf(
+            'SELECT screening_questionnaire_id
+             FROM nesp_screening_questionnaire
+             WHERE screening_questionnaire_id = %s
+               AND token_hash = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($questionnaireID),
+            $this->_db->makeQueryString($tokenHash)
+        )));
+        if (!$created && $hasActiveCandidateJobKey)
+        {
+            $existing = $this->_db->getAssoc(sprintf(
+                'SELECT screening_questionnaire_id
+                 FROM nesp_screening_questionnaire
+                 WHERE active_candidate_job_key = %s
+                 LIMIT 1',
+                $this->_db->makeQueryString($activeCandidateJobKey)
+            ));
+            $questionnaireID = empty($existing) ? 0 : (int) $existing['screening_questionnaire_id'];
+        }
+        if ($questionnaireID <= 0)
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            return false;
+        }
+        if ($transactionStarted)
+        {
+            $this->_db->commitTransaction();
+        }
+        if (!$created)
+        {
+            return array(
+                'questionnaire_id' => $questionnaireID,
+                'one_time_invitation_copy' => '',
+                'link_generated' => false
+            );
+        }
         $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'link_created', array('expires_at_hours' => self::getQuestionnaireDefaultExpirationHours()));
         $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_created', 'screening_questionnaire', $questionnaireID, array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID, 'question_set_key' => $preview['question_set_key'], 'question_set_version_id' => (int) $preview['question_set_version_id']));
 
@@ -6426,6 +6667,7 @@ class NESPWorkflow
                 'UPDATE nesp_screening_questionnaire
                  SET status_key = "revoked",
                      token_revoked_at = UTC_TIMESTAMP(),
+                     active_candidate_job_key = NULL,
                      date_modified = NOW()
                  WHERE screening_questionnaire_id = %s
                    AND status_key IN ("link_ready", "waiting", "in_progress")',
@@ -6559,6 +6801,7 @@ class NESPWorkflow
                  SET status_key = "completed",
                      submitted_at = UTC_TIMESTAMP(),
                      token_used_at = UTC_TIMESTAMP(),
+                     active_candidate_job_key = NULL,
                      date_modified = NOW()
                  WHERE screening_questionnaire_id = %s
                    AND token_hash = %s
@@ -8415,6 +8658,10 @@ class NESPWorkflow
         $interviewerProfileID = (int) $interviewerProfileID;
         $jobOrderID = (int) $jobOrderID;
         if ($interviewerProfileID <= 0 || $jobOrderID <= 0)
+        {
+            return false;
+        }
+        if ($jobOrderID === 41001)
         {
             return false;
         }

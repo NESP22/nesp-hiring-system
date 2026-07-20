@@ -33,6 +33,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'nesp_question_set_version',
             'nesp_question_set_question',
             'nesp_question_set_role_match',
+            'nesp_question_set_builtin_release',
             'nesp_screening_questionnaire',
             'nesp_screening_questionnaire_answer',
             'nesp_screening_questionnaire_activity',
@@ -153,10 +154,12 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_set_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_set_version_id'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_snapshot_json'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'active_candidate_job_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'reviewer_profile_id'));
         $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'link_url'));
         $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'invitation_copy_text'));
         $this->assertSame(1, $this->countUniqueIndexes('nesp_screening_questionnaire', 'IDX_questionnaire_token_hash'));
+        $this->assertSame(1, $this->countUniqueIndexes('nesp_screening_questionnaire', 'IDX_questionnaire_active_candidate_job'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire_answer', 'answer_text'));
         $this->assertSame(1, $this->countUniqueIndexes('nesp_screening_questionnaire_answer', 'IDX_questionnaire_answer_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire_activity', 'activity_key'));
@@ -264,6 +267,129 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingTables('nesp_screening_questionnaire_activity'));
         $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'link_url'));
         $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'invitation_copy_text'));
+    }
+
+    public function testQuestionnaireActiveLockPreventsConcurrentDuplicateAndReusesAcrossVersionChanges()
+    {
+        global $mySQLConnection;
+
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Concurrent', 'Fixture');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Table Greeter / Field Assistant - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+
+        $first = $workflow->requestQuestionnaire($candidateID, $jobOrderID, 1);
+        $this->assertTrue($first['link_generated']);
+        $this->mySQLQueryLocal(sprintf(
+            'UPDATE nesp_screening_questionnaire
+             SET question_set_version_id = question_set_version_id + 100,
+                 question_set_version = question_set_version + 100
+             WHERE screening_questionnaire_id = %d',
+            (int) $first['questionnaire_id']
+        ));
+        $reapplication = $workflow->requestQuestionnaire($candidateID, $jobOrderID, 1);
+        $this->assertFalse($reapplication['link_generated']);
+        $this->assertSame((int) $first['questionnaire_id'], (int) $reapplication['questionnaire_id']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d AND status_key IN ("link_ready", "waiting", "in_progress", "human_follow_up_requested")', $candidateID, $jobOrderID)
+        ));
+
+        $activeKey = \NESPWorkflow::questionnaireActiveCandidateJobKey($candidateID, $jobOrderID);
+        $duplicateRejected = false;
+        try
+        {
+            mysqli_query($mySQLConnection, sprintf(
+                "INSERT INTO nesp_screening_questionnaire
+                    (candidate_id, joborder_id, active_candidate_job_key, status_key, question_set_key, question_set_version, token_hash, date_created, date_modified)
+                 VALUES (%d, %d, '%s', 'link_ready', 'race_fixture', 1, '%s', NOW(), NOW())",
+                $candidateID,
+                $jobOrderID,
+                mysqli_real_escape_string($mySQLConnection, $activeKey),
+                mysqli_real_escape_string($mySQLConnection, hash('sha256', 'concurrent-fixture-token'))
+            ));
+        }
+        catch (\mysqli_sql_exception $exception)
+        {
+            $duplicateRejected = true;
+        }
+        $this->assertTrue($duplicateRejected, 'The unique active questionnaire lock must reject a competing route.');
+    }
+
+    public function testCustomerServiceAndProfileOnlyInterviewerCannotReceiveDirectGrant()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Grant', 'Fixture');
+        $jobOrderID = $this->insertFakeJobOrder('Fixture Photographer');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->mySQLQueryLocal(
+            "INSERT INTO nesp_interviewer_profile
+                (display_name, email, role_key, is_active, account_state_key, availability_status_key, date_created, date_modified)
+             VALUES ('Profile Only Fixture', 'profile-only@example.test', 'interviewer', 1, 'profile_created', 'open', NOW(), NOW())"
+        );
+        $profileID = $this->lastInsertID();
+        $this->mySQLQueryLocal(sprintf(
+            "INSERT INTO nesp_interviewer_job_role
+                (interviewer_profile_id, joborder_id, role_key, is_active, date_created, date_modified)
+             VALUES (%d, %d, 'staff_photographer', 1, NOW(), NOW())",
+            $profileID,
+            $jobOrderID
+        ));
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $this->assertFalse($workflow->interviewerCanReceiveAssignment($profileID, $jobOrderID));
+        $this->assertFalse($workflow->createCandidateGrant($profileID, $candidateID, $jobOrderID, 1));
+        $this->assertFalse($workflow->createCandidateGrant($profileID, $candidateID, 41001, 1));
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_interviewer_candidate_grant',
+            sprintf('interviewer_profile_id = %d AND candidate_id = %d', $profileID, $candidateID)
+        ));
+    }
+
+    public function testRequestedQuestionnaireContentPublishesAReplacementForExistingSets()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $workflow->ensureDefaultQuestionSetsSeeded(1);
+        $existing = \DatabaseConnection::getInstance()->getAssoc(
+            "SELECT question_set_id, current_version_id
+             FROM nesp_question_set
+             WHERE set_key = 'photography_assistant_poser'
+             LIMIT 1"
+        );
+        $this->assertNotEmpty($existing);
+        $oldVersionID = (int) $existing['current_version_id'];
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_question_set_version
+             SET display_name = 'Legacy Field Questionnaire',
+                 description = 'Legacy fixture content.',
+                 snapshot_json = '[]'
+             WHERE question_set_version_id = %d",
+            $oldVersionID
+        ));
+
+        $workflow->ensureDefaultQuestionSetsSeeded(1);
+        $published = \DatabaseConnection::getInstance()->getAssoc(
+            "SELECT qs.current_version_id, qsv.display_name, qsv.description
+             FROM nesp_question_set qs
+             INNER JOIN nesp_question_set_version qsv ON qsv.question_set_version_id = qs.current_version_id
+             WHERE qs.set_key = 'photography_assistant_poser'
+             LIMIT 1"
+        );
+        $this->assertGreaterThan($oldVersionID, (int) $published['current_version_id']);
+        $this->assertSame('Field Staff Pre-Interview', $published['display_name']);
+        $this->assertStringContainsString('Field Staff First', $published['description']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_question_set_builtin_release',
+            "set_key = 'photography_assistant_poser'"
+        ));
     }
 
     public function testQuestionnaireIssuedLinksUseStoredSnapshot()
@@ -548,6 +674,20 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countMatchingTables('nesp_question_set_role_match'));
         $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'question_snapshot_json'));
         $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_question_set_admin_additive.sql'), ";\n");
+    }
+
+    public function testHiringWorkflowQAHardeningMigrationAndRollbackAreRehearsed()
+    {
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_hiring_workflow_qa_hardening_additive.sql'), ";\n");
+        $this->assertSame(1, $this->countMatchingColumns('nesp_screening_questionnaire', 'active_candidate_job_key'));
+        $this->assertSame(1, $this->countUniqueIndexes('nesp_screening_questionnaire', 'IDX_questionnaire_active_candidate_job'));
+        $this->assertSame(1, $this->countMatchingTables('nesp_question_set_builtin_release'));
+
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_hiring_workflow_qa_hardening_rollback.sql'), ";\n");
+        $this->assertSame(0, $this->countMatchingColumns('nesp_screening_questionnaire', 'active_candidate_job_key'));
+        $this->assertSame(0, $this->countMatchingTables('nesp_question_set_builtin_release'));
+
+        $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_hiring_workflow_qa_hardening_additive.sql'), ";\n");
     }
 
     private function countMatchingTables($table)
