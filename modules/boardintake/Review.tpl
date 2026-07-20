@@ -7,6 +7,7 @@
         <h2>Board Applicant Intake Review</h2>
         <p>Admin-only staging. Nothing is public and no applicant is contacted.</p>
         <?php if (isset($this->errorMessage)): ?><p class="warning"><?php $this->_($this->errorMessage); ?></p><?php endif; ?>
+        <?php if (!empty($this->resumeUploaded)): ?><p>Resume attached to the confirmed candidate.</p><?php endif; ?>
 
         <h3>1. Upload a review batch</h3>
         <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=upload" method="post" enctype="multipart/form-data">
@@ -44,6 +45,15 @@
         </form>
         <?php endif; ?>
 
+        <?php if (count($this->importedBatches)): ?>
+        <h3>Recent imported batches</h3>
+        <ul>
+            <?php foreach ($this->importedBatches as $importedBatch): ?>
+                <li><a href="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;batchID=<?php echo (int) $importedBatch['batch_id']; ?>">Batch <?php echo (int) $importedBatch['batch_id']; ?> - <?php $this->_($importedBatch['platform_key']); ?> - <?php echo (int) $importedBatch['imported_count']; ?> imported</a></li>
+            <?php endforeach; ?>
+        </ul>
+        <?php endif; ?>
+
         <?php if (!empty($this->bulkImportSummary)): ?>
         <h3>Bulk import result</h3>
         <p><?php echo (int) $this->bulkImportSummary['imported']; ?> imported, <?php echo (int) $this->bulkImportSummary['skipped']; ?> skipped, <?php echo (int) $this->bulkImportSummary['failed']; ?> stopped.</p>
@@ -55,25 +65,27 @@
         <?php endif; ?>
 
         <?php if (!empty($this->batch)): ?>
-        <h3>2. Review rows</h3>
-        <?php if (empty($this->batch['previewed_at'])): ?>
+        <h3>2. <?php echo $this->batch['status_key'] === 'imported' ? 'Imported rows' : 'Review rows'; ?></h3>
+        <?php if ($this->batch['status_key'] === 'review' && empty($this->batch['previewed_at'])): ?>
             <p>Review the rows below, then record that you completed the preview. Approval stays locked until the server records that step.</p>
             <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=recordPreview" method="post">
                 <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
                 <input type="hidden" name="batchID" value="<?php echo (int) $this->batch['batch_id']; ?>" />
                 <button type="submit">Record Preview Complete</button>
             </form>
-        <?php else: ?>
+        <?php elseif ($this->batch['status_key'] === 'review'): ?>
             <p>Preview recorded. Only valid, keyed rows with duplicate status <strong>none</strong> may be approved.</p>
         <?php endif; ?>
+        <?php if ($this->batch['status_key'] === 'review'): ?>
         <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=approve" method="post">
             <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
             <input type="hidden" name="batchID" value="<?php echo (int) $this->batch['batch_id']; ?>" />
+        <?php endif; ?>
             <table class="searchTable" width="100%">
                 <tr><th>Approve</th><th>Row</th><th>Name</th><th>Email</th><th>External ID</th><th>Validation</th><th>Duplicate</th><th>Status</th></tr>
                 <?php foreach ($this->rows as $row): ?>
                 <tr>
-                    <td><?php if (!empty($this->batch['previewed_at']) && $row['validation_status'] === 'valid' && $row['duplicate_status'] === 'none' && !empty($row['external_id'])): ?><input type="checkbox" name="approvedRows[]" value="<?php echo (int) $row['intake_row_id']; ?>" <?php if ($row['review_status'] === 'approved'): ?>checked<?php endif; ?> /><?php endif; ?></td>
+                    <td><?php if ($this->batch['status_key'] === 'review' && !empty($this->batch['previewed_at']) && $row['validation_status'] === 'valid' && $row['duplicate_status'] === 'none' && !empty($row['external_id'])): ?><input type="checkbox" name="approvedRows[]" value="<?php echo (int) $row['intake_row_id']; ?>" <?php if ($row['review_status'] === 'approved'): ?>checked<?php endif; ?> /><?php endif; ?></td>
                     <td><?php echo (int) $row['source_row_number']; ?></td>
                     <td><?php $this->_($row['first_name'] . ' ' . $row['last_name']); ?></td>
                     <td><?php $this->_($row['email']); ?></td>
@@ -84,16 +96,38 @@
                 </tr>
                 <?php endforeach; ?>
             </table>
+        <?php if ($this->batch['status_key'] === 'review'): ?>
             <button type="submit">Save Explicit Row Approvals</button>
         </form>
+        <?php endif; ?>
 
-        <h3>3. Import approved rows</h3>
-        <p>This is the only action that creates candidates and attaches them to job order <?php echo (int) $this->batch['joborder_id']; ?>. The server requires a recorded preview and approval, keyed external IDs, and a transaction. Imported staging PII is redacted after success.</p>
-        <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=importApproved" method="post" onsubmit="return confirm('Import only the approved rows and attach each candidate once?');">
-            <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
-            <input type="hidden" name="batchID" value="<?php echo (int) $this->batch['batch_id']; ?>" />
-            <button type="submit">Import Approved Rows</button>
-        </form>
+        <?php if ($this->batch['status_key'] === 'review'): ?>
+            <h3>3. Import approved rows</h3>
+            <p>This is the only action that creates candidates and attaches them to job order <?php echo (int) $this->batch['joborder_id']; ?>. The server requires a recorded preview and approval, keyed external IDs, and a transaction. Imported staging PII is redacted after success.</p>
+            <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=importApproved" method="post" onsubmit="return confirm('Import only the approved rows and attach each candidate once?');">
+                <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
+                <input type="hidden" name="batchID" value="<?php echo (int) $this->batch['batch_id']; ?>" />
+                <button type="submit">Import Approved Rows</button>
+            </form>
+        <?php elseif ($this->batch['status_key'] === 'imported'): ?>
+            <h3>4. Attach a local resume</h3>
+            <p>The server reconfirms the imported board identity, candidate, and job order <?php echo (int) $this->batch['joborder_id']; ?> before attaching a resume. Candidate contact fields are not changed.</p>
+            <?php foreach ($this->rows as $row): ?>
+                <?php if ($row['review_status'] === 'imported' && (int) $row['candidate_id'] > 0): ?>
+                <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=uploadResume" method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
+                    <input type="hidden" name="batchID" value="<?php echo (int) $this->batch['batch_id']; ?>" />
+                    <input type="hidden" name="intakeRowID" value="<?php echo (int) $row['intake_row_id']; ?>" />
+                    <input type="hidden" name="MAX_FILE_SIZE" value="<?php echo (int) BoardApplicantIntake::MAX_RESUME_BYTES; ?>" />
+                    <label>Candidate <?php echo (int) $row['candidate_id']; ?> resume
+                        <input type="file" name="resume" accept=".pdf,.doc,.docx,.rtf,.odt" required />
+                    </label>
+                    <button type="submit">Attach Resume</button>
+                </form>
+                <?php endif; ?>
+            <?php endforeach; ?>
+            <p>Local PDF, DOC, DOCX, RTF, or ODT files only, up to 10 MB. Resume URLs and board retrieval are not supported.</p>
+        <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>
