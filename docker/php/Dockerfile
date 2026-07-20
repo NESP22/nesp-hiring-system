@@ -35,9 +35,9 @@ RUN cd /tmp && \
   make && \
   make install
 
-# PHP extensions expected by OpenCATS. Install the pinned archive directly so
-# builds do not depend on PECL's occasionally unavailable REST metadata.
-RUN wget -O /tmp/mcrypt-1.0.9.tgz https://pecl.php.net/get/mcrypt-1.0.9.tgz \
+# PHP extensions expected by OpenCATS. Fetch the pinned PECL package with
+# retries because the mirror can occasionally return a transient gateway error.
+RUN wget --tries=6 --waitretry=5 --timeout=30 -O /tmp/mcrypt-1.0.9.tgz https://pecl.php.net/get/mcrypt-1.0.9.tgz \
     && pecl install /tmp/mcrypt-1.0.9.tgz \
     && docker-php-ext-enable mcrypt \
     && rm -f /tmp/mcrypt-1.0.9.tgz
