@@ -7975,7 +7975,7 @@ class NESPWorkflow
      * Existing rows are deliberately left unchanged so this is safe to call
      * from both public applications and approved board imports.
      */
-    public function ensureCandidateWorkflowRow($candidateID, $jobOrderID, $actorUserID = null, $sourceLabel = '')
+    public function ensureCandidateWorkflowRow($candidateID, $jobOrderID, $actorUserID = null, $sourceLabel = '', $summary = null, $nextActionLabel = null)
     {
         $candidateID = (int) $candidateID;
         $jobOrderID = (int) $jobOrderID;
@@ -8015,8 +8015,12 @@ class NESPWorkflow
         }
 
         $waitingOn = 'Craig';
-        $summary = 'New application awaiting human review.';
-        $nextActionLabel = 'Review application';
+        $summary = ($summary === null || trim((string) $summary) === '')
+            ? 'New application awaiting human review.'
+            : trim((string) $summary);
+        $nextActionLabel = ($nextActionLabel === null || trim((string) $nextActionLabel) === '')
+            ? 'Review application'
+            : trim((string) $nextActionLabel);
         $inserted = false;
         if ($this->isColumnInstalled('nesp_candidate_workflow', 'priority'))
         {

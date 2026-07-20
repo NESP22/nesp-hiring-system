@@ -42,6 +42,42 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertStringContainsString('external_id', strtolower(implode(' ', $result['errors'])));
     }
 
+    public function testNonLinkedInPreviewStillRequiresEmail()
+    {
+        $result = BoardApplicantIntake::parseCsv(
+            "external_id,first_name,last_name\nA-2,Alex,Applicant\n",
+            'indeed', 41001, 'NESP Ad: Indeed'
+        );
+
+        $this->assertSame(array(), $result['rows']);
+        $this->assertStringContainsString('email', strtolower(implode(' ', $result['errors'])));
+    }
+
+    public function testLinkedInPreviewAllowsMissingEmailWithExternalID()
+    {
+        $result = BoardApplicantIntake::parseCsv(
+            "external_id,first_name,last_name\nLI-100,Alex,Applicant\n",
+            'linkedin', 41002, 'NESP Ad: LinkedIn'
+        );
+
+        $this->assertSame(array(), $result['errors']);
+        $this->assertCount(1, $result['rows']);
+        $this->assertSame('', $result['rows'][0]['email']);
+        $this->assertSame('linkedin:LI-100', $result['rows'][0]['idempotency_key']);
+        $this->assertSame('valid', $result['rows'][0]['validation_status']);
+    }
+
+    public function testLinkedInPreviewStillRequiresExternalIDWhenEmailIsMissing()
+    {
+        $result = BoardApplicantIntake::parseCsv(
+            "first_name,last_name\nAlex,Applicant\n",
+            'linkedin', 41002, 'NESP Ad: LinkedIn'
+        );
+
+        $this->assertSame(array(), $result['rows']);
+        $this->assertStringContainsString('external_id', strtolower(implode(' ', $result['errors'])));
+    }
+
     public function testCsvPreviewRejectsMissingIdentityAndInvalidEmail()
     {
         $result = BoardApplicantIntake::parseCsv(
@@ -92,6 +128,7 @@ class BoardApplicantIntakeTest extends TestCase
 
         $this->assertStringContainsString('ensureCandidateWorkflowRow', $careers);
         $this->assertStringContainsString('ensureCandidateWorkflowRow', $intake);
+        $this->assertStringContainsString('Contact details required before any questionnaire or outreach.', $intake);
     }
 
     public function testDuplicateReviewFlagsRepeatedEmailOrNameRows()
