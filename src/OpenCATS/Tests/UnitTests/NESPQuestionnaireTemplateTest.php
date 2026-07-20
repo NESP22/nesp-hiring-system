@@ -60,7 +60,7 @@ class NESPQuestionnaireTemplateTest extends TestCase
         $settings = file_get_contents('modules/nesp/Settings.tpl');
         $controller = file_get_contents('modules/nesp/NESPUI.php');
 
-        foreach (array('prepareInterviewerLogin', 'activateInterviewerLogin', 'suspendInterviewerLogin', 'reactivateInterviewerLogin', 'resetInterviewerTempPassword', 'disableInterviewerLogin', 'revokeCandidateGrant') as $action)
+        foreach (array('prepareInterviewerLogin', 'activateInterviewerLogin', 'suspendInterviewerLogin', 'reactivateInterviewerLogin', 'resetInterviewerTempPassword', 'disableInterviewerLogin', 'revokeCandidateGrant', 'deactivateInterviewerRoleRule') as $action)
         {
             $this->assertStringContainsString('a=' . $action, $settings);
             $this->assertStringContainsString("case '" . $action . "'", $controller);
@@ -70,6 +70,8 @@ class NESPQuestionnaireTemplateTest extends TestCase
         $this->assertStringContainsString('Copy Login Details', $settings);
         $this->assertStringContainsString('data-label="Name"', $settings);
         $this->assertStringContainsString('data-label="Candidate"', $settings);
+        $this->assertStringContainsString('name="roleRuleID"', $settings);
+        $this->assertStringContainsString('Remove Rule', $settings);
         $this->assertStringNotContainsString('name="linkedUserID"', $settings);
         $this->assertStringNotContainsString('name="isActive"', $settings);
     }
