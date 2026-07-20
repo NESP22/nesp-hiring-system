@@ -133,6 +133,20 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertStringContainsString('Contact details required before any questionnaire or outreach.', $intake);
     }
 
+    public function testBulkImportKeepsReviewAndDuplicateSafeguards()
+    {
+        $intake = file_get_contents(LEGACY_ROOT . '/lib/BoardApplicantIntake.php');
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/boardintake/BoardIntakeUI.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/boardintake/Review.tpl');
+
+        $this->assertStringContainsString('importAllApprovedRows', $intake);
+        $this->assertStringContainsString('applyDuplicateChecks($batchID)', $intake);
+        $this->assertStringContainsString('importApprovedRows($actorUserID, $batchID)', $intake);
+        $this->assertStringContainsString("case 'importAllApproved'", $ui);
+        $this->assertStringContainsString('Import All Ready Applicants', $template);
+        $this->assertStringContainsString('explicit row approval', $template);
+    }
+
     public function testDuplicateReviewFlagsRepeatedEmailOrNameRows()
     {
         $rows = array(

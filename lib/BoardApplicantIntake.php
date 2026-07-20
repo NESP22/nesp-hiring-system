@@ -622,6 +622,83 @@ class BoardApplicantIntake
         return array('imported' => $imported, 'skipped' => 0, 'failed' => 0);
     }
 
+    /**
+     * Imports every already-reviewed batch one batch at a time. Each batch keeps
+     * its own transaction so a duplicate or failure cannot undo another batch.
+     */
+    public function importAllApprovedRows($actorUserID)
+    {
+        $summary = array(
+            'imported' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+            'batches' => array()
+        );
+
+        foreach ($this->getOpenBatches() as $batch)
+        {
+            $batchID = (int) $batch['batch_id'];
+            if (empty($batch['previewed_at']) || empty($batch['approved_at']) ||
+                empty($batch['previewed_by_user_id']) || empty($batch['approved_by_user_id']))
+            {
+                $summary['batches'][] = array(
+                    'batch_id' => $batchID,
+                    'status' => 'skipped',
+                    'message' => 'Preview and explicit approval are still required.'
+                );
+                continue;
+            }
+
+            // Recheck immediately before import so an earlier batch cannot create a duplicate.
+            $this->applyDuplicateChecks($batchID);
+            $rows = $this->getRows($batchID, 'approved');
+            $eligible = 0;
+            foreach ($rows as $row)
+            {
+                if ($row['validation_status'] === 'valid' && $row['duplicate_status'] === 'none' &&
+                    !empty($row['external_id']) && !empty($row['idempotency_key']))
+                {
+                    $eligible++;
+                }
+            }
+
+            if ($eligible === 0)
+            {
+                $summary['skipped'] += count($rows);
+                $summary['batches'][] = array(
+                    'batch_id' => $batchID,
+                    'status' => 'skipped',
+                    'message' => 'No currently importable approved rows remain after duplicate checks.'
+                );
+                continue;
+            }
+
+            try
+            {
+                $result = $this->importApprovedRows($actorUserID, $batchID);
+                $summary['imported'] += (int) $result['imported'];
+                $summary['skipped'] += (int) $result['skipped'];
+                $summary['failed'] += (int) $result['failed'];
+                $summary['batches'][] = array(
+                    'batch_id' => $batchID,
+                    'status' => 'imported',
+                    'message' => (int) $result['imported'] . ' applicant(s) imported.'
+                );
+            }
+            catch (Throwable $e)
+            {
+                $summary['failed'] += $eligible;
+                $summary['batches'][] = array(
+                    'batch_id' => $batchID,
+                    'status' => 'stopped',
+                    'message' => 'Import stopped safely: ' . $e->getMessage()
+                );
+            }
+        }
+
+        return $summary;
+    }
+
     public function getBatch($batchID)
     {
         $this->purgeExpiredStaging();

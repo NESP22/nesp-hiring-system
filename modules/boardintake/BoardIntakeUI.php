@@ -106,6 +106,10 @@ class BoardIntakeUI extends UserInterface
                 $this->requirePostCSRF();
                 $this->importApproved();
                 break;
+            case 'importAllApproved':
+                $this->requirePostCSRF();
+                $this->importAllApproved();
+                break;
             default:
                 $this->review();
                 break;
@@ -214,7 +218,22 @@ class BoardIntakeUI extends UserInterface
         CATSUtility::transferRelativeURI('m=boardintake&batchID=' . $batchID);
     }
 
-    private function assignView($batch, $rows)
+    private function importAllApproved()
+    {
+        try
+        {
+            $summary = $this->_intake->importAllApprovedRows($this->_userID);
+        }
+        catch (Throwable $e)
+        {
+            $this->showError('Bulk import stopped safely: ' . $e->getMessage());
+            return;
+        }
+
+        $this->assignView(array(), array(), $summary);
+    }
+
+    private function assignView($batch, $rows, $bulkImportSummary = null)
     {
         $this->_template->assign('active', $this);
         $this->_template->assign('batch', $batch);
@@ -222,6 +241,7 @@ class BoardIntakeUI extends UserInterface
         $this->_template->assign('batches', $this->_intake->getOpenBatches());
         $this->_template->assign('platforms', BoardApplicantIntake::allowedPlatforms());
         $this->_template->assign('jobOrders', BoardApplicantIntake::allowedJobOrders());
+        $this->_template->assign('bulkImportSummary', $bulkImportSummary);
         $this->_template->display('./modules/boardintake/Review.tpl');
     }
 
