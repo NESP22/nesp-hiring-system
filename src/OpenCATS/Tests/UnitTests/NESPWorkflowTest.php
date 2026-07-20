@@ -101,6 +101,41 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('NESP_WORKFLOW_ENABLED', NESPWorkflow::getFeatureFlagForAction('unexpectedAction'));
     }
 
+    public function testAssignInterviewerUsesInterviewerPoolFeatureGate()
+    {
+        $this->assertSame('NESP_INTERVIEWER_POOL_ENABLED', NESPWorkflow::getFeatureFlagForAction('assignInterviewer'));
+    }
+
+    public function testAssignInterviewerIsAdminCsrfProtectedAndUsesExistingGrantGuard()
+    {
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/nesp/Dashboard.tpl');
+
+        $this->assertStringContainsString("case 'assignInterviewer':", $ui);
+        $this->assertStringContainsString('$this->adminOnly();', $ui);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $ui);
+        $this->assertStringContainsString('$this->_workflow->createCandidateGrant($interviewerProfileID, $candidateID, $jobOrderID, $this->_userID)', $ui);
+        $this->assertStringContainsString("date_revoked IS NULL", $workflow);
+        $this->assertStringContainsString("interviewer_candidate_grant_duplicate", $workflow);
+        $this->assertStringContainsString('name="csrfToken"', $template);
+        $this->assertTrue(
+            strpos($template, 'name="interviewerProfileID"') !== false
+            && strpos($template, '>Assign Interviewer</button>') !== false
+        );
+    }
+
+    public function testEligibleInterviewerQueryRequiresActiveOpenRoleApprovedProfiles()
+    {
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $this->assertStringContainsString('public function getEligibleInterviewersForAssignment($jobOrderID)', $workflow);
+        $this->assertStringContainsString('ip.is_active = 1', $workflow);
+        $this->assertStringContainsString('ip.account_state_key = "active"', $workflow);
+        $this->assertStringContainsString('ip.availability_status_key = "open"', $workflow);
+        $this->assertStringContainsString('ijr.joborder_id = %s', $workflow);
+    }
+
     public function testGoogleCalendarFreeBusyDefaultsAreReadOnlyAndDisabled()
     {
         $this->assertSame('NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED', NESPGoogleCalendarFreeBusy::FEATURE_FLAG);

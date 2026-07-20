@@ -123,6 +123,12 @@ class NESPUI extends UserInterface
                 $this->createCandidateGrant();
                 break;
 
+            case 'assignInterviewer':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->assignInterviewer();
+                break;
+
             case 'revokeCandidateGrant':
                 $this->adminOnly();
                 $this->requirePostCSRF();
@@ -456,6 +462,10 @@ class NESPUI extends UserInterface
         $this->_template->assign('workflowStages', $this->_workflow->getWorkflowStages());
         $this->_template->assign('assignmentSuggestions', $this->_workflow->getAssignmentSuggestions(50));
         $this->_template->assign('interviewerAccountability', $this->_workflow->getInterviewerAccountability());
+        $this->_template->assign('canAssignInterviewers', $this->_workflow->isFeatureFlagEnabled('NESP_INTERVIEWER_POOL_ENABLED'));
+        $assignmentMessage = isset($_SESSION['NESP_ASSIGNMENT_MESSAGE']) ? $_SESSION['NESP_ASSIGNMENT_MESSAGE'] : '';
+        unset($_SESSION['NESP_ASSIGNMENT_MESSAGE']);
+        $this->_template->assign('assignmentMessage', $assignmentMessage);
         $this->_template->display('./modules/nesp/Dashboard.tpl');
     }
 
@@ -805,6 +815,21 @@ class NESPUI extends UserInterface
         }
 
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
+    private function assignInterviewer()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
+        $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+
+        if ($this->_workflow->createCandidateGrant($interviewerProfileID, $candidateID, $jobOrderID, $this->_userID) === false)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an active interviewer approved for this role and an eligible candidate.');
+        }
+
+        $_SESSION['NESP_ASSIGNMENT_MESSAGE'] = 'Interviewer assignment saved. The interviewer can now see the assigned candidate.';
+        CATSUtility::transferRelativeURI('m=nesp');
     }
 
     private function revokeCandidateGrant()

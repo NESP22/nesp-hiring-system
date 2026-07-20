@@ -158,6 +158,7 @@ class NESPWorkflow
             'disableInterviewerLogin',
             'createInterviewerRoleRule',
             'createCandidateGrant',
+            'assignInterviewer',
             'revokeCandidateGrant',
             'updateInterviewerZoomLink'
         )))
@@ -2734,6 +2735,18 @@ class NESPWorkflow
         foreach ($rows as $row)
         {
             $card = $this->normalizeDashboardCard($row);
+            $card['assignable_interviewers'] = array();
+            $card['assignment_block_reason'] = '';
+            if (in_array($row['stage_key'], array('new', 'interview_requested', 'needs_review', 'phone_screen_complete'), true))
+            {
+                $card['assignable_interviewers'] = $this->getEligibleInterviewersForAssignment((int) $row['joborder_id']);
+                if (empty($card['assignable_interviewers']))
+                {
+                    $card['assignment_block_reason'] = ((int) $row['joborder_id'] === 41001)
+                        ? 'Customer Service stays with Craig in Needs Craig.'
+                        : 'No active interviewer is approved and open for this role yet.';
+                }
+            }
             $cardKey = $row['candidate_workflow_id'];
             foreach (array('needsCraig', 'waitingApplicant', 'waitingInterviewer', 'recentlyCompleted') as $queueKey)
             {
@@ -3121,6 +3134,13 @@ class NESPWorkflow
         );
         if (!empty($existing))
         {
+            $this->logAuditEvent(
+                $actorUserID,
+                'interviewer_candidate_grant_duplicate',
+                'interviewer_candidate_grant',
+                (int) $existing['grant_id'],
+                array('interviewer_profile_id' => $interviewerProfileID, 'candidate_id' => $candidateID, 'joborder_id' => $jobOrderID)
+            );
             return (int) $existing['grant_id'];
         }
 
@@ -3146,6 +3166,42 @@ class NESPWorkflow
         );
 
         return $grantID;
+    }
+
+    public function getEligibleInterviewersForAssignment($jobOrderID)
+    {
+        $jobOrderID = (int) $jobOrderID;
+        if ($jobOrderID <= 0 || !$this->isTableInstalled('nesp_interviewer_job_role'))
+        {
+            return array();
+        }
+
+        $availabilityColumn = $this->isColumnInstalled('nesp_interviewer_profile', 'availability_status_key')
+            ? 'AND ip.availability_status_key = "open"'
+            : '';
+        $accountStateColumn = $this->isColumnInstalled('nesp_interviewer_profile', 'account_state_key')
+            ? 'AND ip.account_state_key = "active"'
+            : '';
+
+        return $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT DISTINCT
+                    ip.interviewer_profile_id,
+                    ip.display_name,
+                    ip.email,
+                    ip.role_key
+                 FROM nesp_interviewer_profile ip
+                 INNER JOIN nesp_interviewer_job_role ijr
+                    ON ijr.interviewer_profile_id = ip.interviewer_profile_id
+                    AND ijr.joborder_id = %s
+                    AND ijr.is_active = 1
+                 WHERE ip.is_active = 1
+                   ' . $availabilityColumn . '
+                   ' . $accountStateColumn . '
+                 ORDER BY ip.display_name ASC',
+                $this->_db->makeQueryInteger($jobOrderID)
+            )
+        );
     }
 
     public function getActiveCandidateGrants()
@@ -8335,6 +8391,9 @@ class NESPWorkflow
         $availabilityColumn = $this->isColumnInstalled('nesp_interviewer_profile', 'availability_status_key')
             ? "AND ip.availability_status_key = 'open'"
             : '';
+        $accountStateColumn = $this->isColumnInstalled('nesp_interviewer_profile', 'account_state_key')
+            ? "AND ip.account_state_key = 'active'"
+            : '';
 
         if (!$this->isTableInstalled('nesp_interviewer_job_role'))
         {
@@ -8352,6 +8411,7 @@ class NESPWorkflow
                  WHERE ip.interviewer_profile_id = %s
                    AND ip.is_active = 1
                    ' . $availabilityColumn . '
+                   ' . $accountStateColumn . '
                  LIMIT 1',
                 $this->_db->makeQueryInteger($jobOrderID),
                 $this->_db->makeQueryInteger($interviewerProfileID)
