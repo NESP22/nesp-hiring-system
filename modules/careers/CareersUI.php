@@ -42,6 +42,7 @@ include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 include_once(LEGACY_ROOT . '/lib/Questionnaire.php');
 include_once(LEGACY_ROOT . '/lib/NESPApplicationQuestions.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
+include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/DocumentToText.php');
 include_once(LEGACY_ROOT . '/lib/FileUtility.php');
 include_once(LEGACY_ROOT . '/lib/ParseUtility.php');
@@ -2141,6 +2142,13 @@ class CareersUI extends UserInterface
         }
 
         NESPApplicationQuestions::logCandidateAnswers($jobOrderID, $candidateID, $_POST);
+
+        $workflow = new NESPWorkflow();
+        if (!$workflow->ensureCandidateWorkflowRow($candidateID, $jobOrderID, $automatedUser['userID'], $source))
+        {
+            CommonErrors::fatal(COMMONERROR_RECORDERROR, $this, 'Failed to route application for human review.');
+            return;
+        }
 
         /* Build activity note. */
         if (!$newApplication)

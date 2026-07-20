@@ -7970,6 +7970,134 @@ class NESPWorkflow
         return $row;
     }
 
+    /**
+     * Ensure a candidate/job-order pair has one safe initial workflow row.
+     * Existing rows are deliberately left unchanged so this is safe to call
+     * from both public applications and approved board imports.
+     */
+    public function ensureCandidateWorkflowRow($candidateID, $jobOrderID, $actorUserID = null, $sourceLabel = '')
+    {
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        if ($candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return false;
+        }
+
+        $existing = $this->_db->getAssoc(
+            sprintf(
+                'SELECT candidate_workflow_id
+                 FROM nesp_candidate_workflow
+                 WHERE candidate_id = %s
+                   AND joborder_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID)
+            )
+        );
+        if (!empty($existing))
+        {
+            return (int) $existing['candidate_workflow_id'];
+        }
+
+        $stage = $this->_db->getAssoc(
+            sprintf(
+                'SELECT workflow_stage_id
+                 FROM nesp_workflow_stage
+                 WHERE stage_key = %s
+                 LIMIT 1',
+                $this->_db->makeQueryString('new')
+            )
+        );
+        if (empty($stage))
+        {
+            return false;
+        }
+
+        $waitingOn = 'Craig';
+        $summary = 'New application awaiting human review.';
+        $nextActionLabel = 'Review application';
+        $inserted = false;
+        if ($this->isColumnInstalled('nesp_candidate_workflow', 'priority'))
+        {
+            $inserted = $this->_db->query(
+                sprintf(
+                    'INSERT INTO nesp_candidate_workflow
+                        (candidate_id, joborder_id, workflow_stage_id, priority, waiting_on_key, summary, next_action_label, date_created, date_modified)
+                     VALUES
+                        (%s, %s, %s, 1, %s, %s, %s, NOW(), NOW())',
+                    $this->_db->makeQueryInteger($candidateID),
+                    $this->_db->makeQueryInteger($jobOrderID),
+                    $this->_db->makeQueryInteger($stage['workflow_stage_id']),
+                    $this->_db->makeQueryString($waitingOn),
+                    $this->_db->makeQueryString($summary),
+                    $this->_db->makeQueryString($nextActionLabel)
+                )
+            );
+        }
+        else
+        {
+            $inserted = $this->_db->query(
+                sprintf(
+                    'INSERT INTO nesp_candidate_workflow
+                        (candidate_id, joborder_id, workflow_stage_id, waiting_on_key, summary, next_action_label, date_created, date_modified)
+                     VALUES
+                        (%s, %s, %s, %s, %s, %s, NOW(), NOW())',
+                    $this->_db->makeQueryInteger($candidateID),
+                    $this->_db->makeQueryInteger($jobOrderID),
+                    $this->_db->makeQueryInteger($stage['workflow_stage_id']),
+                    $this->_db->makeQueryString($waitingOn),
+                    $this->_db->makeQueryString($summary),
+                    $this->_db->makeQueryString($nextActionLabel)
+                )
+            );
+        }
+
+        if (!$inserted)
+        {
+            // The unique candidate/job-order key makes a concurrent ensure safe.
+            $existing = $this->_db->getAssoc(
+                sprintf(
+                    'SELECT candidate_workflow_id
+                     FROM nesp_candidate_workflow
+                     WHERE candidate_id = %s
+                       AND joborder_id = %s
+                     LIMIT 1',
+                    $this->_db->makeQueryInteger($candidateID),
+                    $this->_db->makeQueryInteger($jobOrderID)
+                )
+            );
+            return !empty($existing) ? (int) $existing['candidate_workflow_id'] : false;
+        }
+
+        $workflowID = (int) $this->_db->getLastInsertID();
+        if ($workflowID <= 0)
+        {
+            $existing = $this->_db->getAssoc(
+                sprintf(
+                    'SELECT candidate_workflow_id
+                     FROM nesp_candidate_workflow
+                     WHERE candidate_id = %s
+                       AND joborder_id = %s
+                     LIMIT 1',
+                    $this->_db->makeQueryInteger($candidateID),
+                    $this->_db->makeQueryInteger($jobOrderID)
+                )
+            );
+            return !empty($existing) ? (int) $existing['candidate_workflow_id'] : false;
+        }
+
+        $sourceLabel = trim((string) $sourceLabel);
+        $this->logAuditEvent($actorUserID, 'candidate_workflow_created', 'candidate_workflow', $workflowID, array(
+            'candidate_id' => $candidateID,
+            'joborder_id' => $jobOrderID,
+            'stage_key' => 'new',
+            'source_label' => $sourceLabel
+        ));
+
+        return $workflowID;
+    }
+
     private function setCandidateWorkflowStage($candidateID, $jobOrderID, $stageKey, $waitingOn, $summary, $nextActionLabel, $actorUserID)
     {
         $stage = $this->_db->getAssoc(
