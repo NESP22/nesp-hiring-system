@@ -1098,6 +1098,7 @@ INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0, 1, NOW(), NOW());
+INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_APPLICANT_EMAIL_ENABLED', 'Applicant Questionnaire Email', 'Sends one secure role-specific questionnaire email only after a new applicant has a valid email and linked job.', 0, 1, NOW(), NOW());
 INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED', 'Google Calendar Free/Busy', 'Optional interviewer availability lookup using only Google Calendar free/busy scope. No event details are read and no events are created.', 0, 1, NOW(), NOW());
 
 /* Table structure for table `nesp_workflow_stage` */
@@ -1655,6 +1656,9 @@ CREATE TABLE `nesp_screening_questionnaire` (
   `token_used_at` DATETIME,
   `link_created_at` DATETIME,
   `invitation_copied_at` DATETIME,
+  `auto_email_status_key` VARCHAR(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_attempted',
+  `auto_email_attempted_at` DATETIME,
+  `auto_email_sent_at` DATETIME,
   `started_at` DATETIME,
   `submitted_at` DATETIME,
   `requested_by_user_id` INT(11),
@@ -1671,6 +1675,7 @@ CREATE TABLE `nesp_screening_questionnaire` (
   UNIQUE KEY `IDX_questionnaire_active_candidate_job` (`active_candidate_job_key`),
   KEY `IDX_questionnaire_candidate_job` (`candidate_id`, `joborder_id`),
   KEY `IDX_questionnaire_status` (`status_key`),
+  KEY `IDX_questionnaire_auto_email_status` (`auto_email_status_key`),
   KEY `IDX_questionnaire_set_version` (`question_set_version_id`),
   KEY `IDX_questionnaire_reviewer` (`reviewer_profile_id`, `review_status_key`),
   KEY `IDX_questionnaire_submitted` (`submitted_at`)

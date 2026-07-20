@@ -58,7 +58,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
 
     public function testNESPWorkflowSeedDataIsSafeByDefault()
     {
-        $this->assertSame(11, $this->countRows('nesp_feature_flag'));
+        $this->assertSame(12, $this->countRows('nesp_feature_flag'));
         $this->assertSame(0, $this->countRowsWhere('nesp_feature_flag', 'is_enabled = 1'));
         $this->assertSame(17, $this->countRows('nesp_workflow_stage'));
         $this->assertSame(5, $this->countRowsWhere('nesp_integration_status', "status_key = 'disabled'"));
@@ -75,10 +75,11 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(0, $this->countRows('nesp_question_set'));
         $this->assertSame(0, $this->countRows('nesp_question_set_version'));
         $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
-        $this->assertSame(11, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
+        $this->assertSame(12, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_feature_flag', "flag_key = 'NESP_INTERVIEWER_AVAILABILITY_ENABLED' AND is_enabled = 0"));
         $this->assertSame(1, $this->countRowsWhere('nesp_feature_flag', "flag_key = 'NESP_INTERVIEWER_ZOOM_LINKS_ENABLED' AND is_enabled = 0"));
         $this->assertSame(1, $this->countRowsWhere('nesp_feature_flag', "flag_key = 'NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED' AND is_enabled = 0"));
+        $this->assertSame(1, $this->countRowsWhere('nesp_feature_flag', "flag_key = 'NESP_APPLICANT_EMAIL_ENABLED' AND is_enabled = 0"));
         $this->assertSame(1, $this->countRowsWhere('nesp_integration_status', "integration_key = 'google_calendar_freebusy' AND status_key = 'disabled'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'timezone' AND setting_value = 'America/New_York'"));
         $this->assertSame(1, $this->countRowsWhere('nesp_vapi_phone_screen_setting', "setting_key = 'slot_minutes' AND setting_value = '15'"));
