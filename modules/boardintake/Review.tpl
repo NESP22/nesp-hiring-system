@@ -36,12 +36,12 @@
             <label>Or paste CSV text
                 <textarea name="csvText" rows="4" cols="80" placeholder="external_id,first_name,last_name,email"><?php if (isset($_POST['csvText'])) $this->_($_POST['csvText']); ?></textarea>
             </label>
-            <p>Required columns: external_id, first_name, last_name, email. LinkedIn rows may omit email when external_id is present. Optional: phone. Resume and attachment URLs are not accepted.</p>
+            <p>Required columns: external_id, first_name, last_name. Add email when the board provides it; otherwise the applicant is added to Needs Craig without any questionnaire or outreach. Optional: phone. Resume and attachment URLs are not accepted.</p>
             <button type="submit">Continue to Review</button>
         </form>
 
         <h3>Or stage one native-board inbox notification</h3>
-        <p>For a board that forces its own application or email notification, paste the notification text below. Include labeled lines for <code>External ID</code>, <code>First Name</code>, <code>Last Name</code>, and <code>Email</code>. This creates a review batch only. It does not read your mailbox, contact the applicant, fetch a resume, or create a candidate until you finish the normal review and approval steps.</p>
+        <p>For a board that forces its own application or email notification, paste the notification text below. Include labeled lines for <code>External ID</code>, <code>First Name</code>, and <code>Last Name</code>; add <code>Email</code> when available. This creates a review batch only. It does not read your mailbox, contact the applicant, fetch a resume, or create a candidate until you finish the normal review and approval steps.</p>
         <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=uploadInboxNotification" method="post">
             <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
             <label>Board

@@ -47,15 +47,18 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertStringContainsString('external_id', strtolower(implode(' ', $result['errors'])));
     }
 
-    public function testNonLinkedInPreviewStillRequiresEmail()
+    public function testBoardPreviewAllowsMissingEmailWithStableExternalID()
     {
         $result = BoardApplicantIntake::parseCsv(
             "external_id,first_name,last_name\nA-2,Alex,Applicant\n",
             'indeed', 41001, 'NESP Ad: Indeed'
         );
 
-        $this->assertSame(array(), $result['rows']);
-        $this->assertStringContainsString('email', strtolower(implode(' ', $result['errors'])));
+        $this->assertSame(array(), $result['errors']);
+        $this->assertCount(1, $result['rows']);
+        $this->assertSame('', $result['rows'][0]['email']);
+        $this->assertSame('indeed:A-2', $result['rows'][0]['idempotency_key']);
+        $this->assertSame('valid', $result['rows'][0]['validation_status']);
     }
 
     public function testLinkedInPreviewAllowsMissingEmailWithExternalID()
@@ -81,6 +84,19 @@ class BoardApplicantIntakeTest extends TestCase
 
         $this->assertSame(array(), $result['rows']);
         $this->assertStringContainsString('external_id', strtolower(implode(' ', $result['errors'])));
+    }
+
+    public function testNativeBoardNotificationAllowsMissingEmailWithStableExternalID()
+    {
+        $result = BoardApplicantIntake::parseInboxNotification(
+            "External ID: MH-100\nFirst Name: Alex\nLast Name: Applicant",
+            'masshire', 41002, 'NESP Ad: MassHire'
+        );
+
+        $this->assertSame(array(), $result['errors']);
+        $this->assertCount(1, $result['rows']);
+        $this->assertSame('', $result['rows'][0]['email']);
+        $this->assertSame('valid', $result['rows'][0]['validation_status']);
     }
 
     public function testCsvPreviewRejectsMissingIdentityAndInvalidEmail()
@@ -225,6 +241,16 @@ class BoardApplicantIntakeTest extends TestCase
         );
 
         $this->assertSame(array(1, 2), BoardApplicantIntake::batchDuplicateRowIDs($rows));
+    }
+
+    public function testBlankEmailsDoNotCauseUnrelatedBoardRowsToBeDuplicates()
+    {
+        $rows = array(
+            array('intake_row_id' => 1, 'validation_status' => 'valid', 'external_id' => 'board-1', 'email' => '', 'first_name' => 'Alex', 'last_name' => 'Applicant'),
+            array('intake_row_id' => 2, 'validation_status' => 'valid', 'external_id' => 'board-2', 'email' => '', 'first_name' => 'Jordan', 'last_name' => 'Candidate'),
+        );
+
+        $this->assertSame(array(), BoardApplicantIntake::batchDuplicateRowIDs($rows));
     }
 
     public function testExpiredStagingCleanupFailsClosedWhenDeletionFails()
