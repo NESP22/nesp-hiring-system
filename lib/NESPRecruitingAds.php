@@ -239,7 +239,7 @@ class NESPRecruitingAds
                 'source_key' => $sourceKey,
                 'platform' => $label,
                 'tracking_link' => self::trackedApplicationURL($jobID, $sourceKey),
-                'copy' => $headline . '. Apply through this NESP link: ' . self::trackedApplicationURL($jobID, $sourceKey)
+                'copy' => $headline . ".\n\nIMPORTANT: To make sure our hiring team receives your application, apply through the NESP application portal below. Applications submitted only through a job board may not enter our hiring queue.\n\nApply through NESP: " . self::trackedApplicationURL($jobID, $sourceKey)
             );
         }
 
