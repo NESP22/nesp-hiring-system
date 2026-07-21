@@ -2902,6 +2902,15 @@ class NESPWorkflow
                     i.invitation_status_key,
                     i.outcome_key,
                     ip.display_name AS interviewer_name,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT assigned_ip.display_name ORDER BY assigned_ip.display_name SEPARATOR ", ")
+                        FROM nesp_interviewer_candidate_grant assigned_grant
+                        INNER JOIN nesp_interviewer_profile assigned_ip
+                            ON assigned_ip.interviewer_profile_id = assigned_grant.interviewer_profile_id
+                        WHERE assigned_grant.candidate_id = cw.candidate_id
+                          AND assigned_grant.joborder_id = cw.joborder_id
+                          AND assigned_grant.date_revoked IS NULL
+                    ) AS assigned_interviewer_names,
                     sr.status_key AS scorecard_status_key,
                     sr.overall_recommendation
                 FROM
@@ -8976,6 +8985,7 @@ class NESPWorkflow
             'scheduled_start' => $row['scheduled_start'],
             'scheduled_end' => $row['scheduled_end'],
             'interviewer_name' => $row['interviewer_name'],
+            'assigned_interviewer_names' => isset($row['assigned_interviewer_names']) ? trim($row['assigned_interviewer_names']) : '',
             'interview_status_key' => $row['interview_status_key'],
             'interview_status_label' => isset($statusLabels[$row['interview_status_key']]) ? $statusLabels[$row['interview_status_key']] : $row['interview_status_key'],
             'invitation_status_key' => isset($row['invitation_status_key']) ? $row['invitation_status_key'] : '',
