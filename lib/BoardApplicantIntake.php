@@ -193,7 +193,11 @@ class BoardApplicantIntake
             {
                 continue;
             }
-            $emailRows[strtolower(trim($row['email']))][] = (int) $row['intake_row_id'];
+            $emailKey = strtolower(trim((string) $row['email']));
+            if ($emailKey !== '')
+            {
+                $emailRows[$emailKey][] = (int) $row['intake_row_id'];
+            }
             $nameKey = strtolower(trim($row['first_name'])) . "\0" . strtolower(trim($row['last_name']));
             $nameRows[$nameKey][] = (int) $row['intake_row_id'];
             if (!empty($row['external_id']))
@@ -212,7 +216,7 @@ class BoardApplicantIntake
             $emailKey = strtolower(trim($row['email']));
             $nameKey = strtolower(trim($row['first_name'])) . "\0" . strtolower(trim($row['last_name']));
             $externalKey = strtolower(trim((string) ($row['external_id'] ?? '')));
-            if (count($emailRows[$emailKey]) > 1 || count($nameRows[$nameKey]) > 1 || ($externalKey !== '' && count($externalRows[$externalKey]) > 1))
+            if (($emailKey !== '' && count($emailRows[$emailKey]) > 1) || count($nameRows[$nameKey]) > 1 || ($externalKey !== '' && count($externalRows[$externalKey]) > 1))
             {
                 $duplicateIDs[] = (int) $row['intake_row_id'];
             }
@@ -225,7 +229,8 @@ class BoardApplicantIntake
      * Parse a deliberately narrow CSV shape without retaining raw rows.
      *
      * Accepted columns: external_id, first_name, last_name, email, phone.
-     * LinkedIn may omit email when external_id is present.
+     * A board may omit email when external_id is present. Such rows remain
+     * human-review only until contact details are supplied.
      * Resume and attachment URLs are rejected rather than silently stored.
      */
     public static function parseCsv($contents, $platform, $jobOrderID, $sourceLabel)
@@ -279,10 +284,6 @@ class BoardApplicantIntake
         }
 
         $requiredFields = array('external_id', 'first_name', 'last_name');
-        if ($platform !== 'linkedin')
-        {
-            $requiredFields[] = 'email';
-        }
         foreach ($requiredFields as $required)
         {
             if (!in_array($required, $headers, true))
@@ -322,7 +323,7 @@ class BoardApplicantIntake
             }
             if ($email === '')
             {
-                if ($platform !== 'linkedin' || empty($externalID))
+                if (empty($externalID))
                 {
                     $rowErrors[] = 'A valid email is required.';
                 }
@@ -622,7 +623,7 @@ class BoardApplicantIntake
 
                 $candidates = new Candidates();
                 $candidateNotes = 'Board intake: ' . $batch['platform_key'];
-                $contactDetailsRequired = $batch['platform_key'] === 'linkedin' && trim($row['email']) === '';
+                $contactDetailsRequired = trim($row['email']) === '';
                 if ($contactDetailsRequired)
                 {
                     $candidateNotes .= '. Contact details required before any questionnaire or outreach.';
@@ -659,7 +660,7 @@ class BoardApplicantIntake
 
                 $workflow = new NESPWorkflow($this->_db);
                 $workflowSummary = $contactDetailsRequired
-                    ? 'Contact details required before any questionnaire or outreach. New LinkedIn application awaiting human review.'
+                    ? 'Contact details required before any questionnaire or outreach. New board application awaiting human review.'
                     : null;
                 $workflowNextAction = $contactDetailsRequired ? 'Collect contact details' : null;
                 if (!$workflow->ensureCandidateWorkflowRow(
