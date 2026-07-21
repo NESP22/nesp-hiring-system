@@ -1206,6 +1206,7 @@ class NESPUI extends UserInterface
         $this->_template->assign('campaignControls', $this->_workflow->getRecruitingCampaignControls());
         $this->_template->assign('sourceReport', $this->_workflow->getRecruitingSourceReport());
         $this->_template->assign('adTemplates', $this->_workflow->getRecruitingAdTemplates());
+        $this->_template->assign('centralApplicationDestinations', $this->_workflow->getCentralApplicationDestinations());
         $this->_template->display('./modules/nesp/JobAds.tpl');
     }
 

@@ -139,6 +139,31 @@ class BoardApplicantIntakeTest extends TestCase
         }
     }
 
+    public function testInboxNotificationCreatesReviewOnlyRowWithRequiredIdentity()
+    {
+        $result = BoardApplicantIntake::parseInboxNotification(
+            "External ID: IN-123\nFirst Name: Alex\nLast Name: Applicant\nEmail: alex@example.test\nPhone: 555-0100",
+            'indeed', 41002, 'NESP Ad: Indeed'
+        );
+
+        $this->assertSame(array(), $result['errors']);
+        $this->assertCount(1, $result['rows']);
+        $this->assertSame('indeed:IN-123', $result['rows'][0]['idempotency_key']);
+        $this->assertSame('valid', $result['rows'][0]['validation_status']);
+    }
+
+    public function testInboxNotificationRejectsUnidentifiedApplicant()
+    {
+        $result = BoardApplicantIntake::parseInboxNotification(
+            "Applicant: Alex Applicant\nEmail: alex@example.test",
+            'indeed', 41002, 'NESP Ad: Indeed'
+        );
+
+        $this->assertCount(1, $result['rows']);
+        $this->assertSame('invalid', $result['rows'][0]['validation_status']);
+        $this->assertStringContainsString('external_id', strtolower(implode(' ', $result['rows'][0]['validation_errors'])));
+    }
+
     public function testCsvPreviewRejectsUnsupportedJobOrder()
     {
         $result = BoardApplicantIntake::parseCsv(
@@ -171,7 +196,10 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertStringContainsString('applyDuplicateChecks($batchID)', $intake);
         $this->assertStringContainsString('importApprovedRows($actorUserID, $batchID)', $intake);
         $this->assertStringContainsString("case 'importAllApproved'", $ui);
+        $this->assertStringContainsString("case 'uploadInboxNotification'", $ui);
+        $this->assertStringContainsString('parseInboxNotification', $intake);
         $this->assertStringContainsString('Three simple steps:', $template);
+        $this->assertStringContainsString('Create Inbox Review Batch', $template);
         $this->assertStringContainsString('Import All Reviewed Applicants', $template);
         $this->assertStringContainsString('Import Approved Applicants to Needs Craig', $template);
         $this->assertStringContainsString('reviewed and approved', $template);

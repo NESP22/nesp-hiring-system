@@ -13,6 +13,27 @@
                 Stop before publishing, paid promotion, billing, account creation, identity verification, accepting terms, or applicant messaging unless Craig explicitly approves that exact action.
             </div>
 
+            <div class="nesp-panel">
+                <h3>Where applicants should apply</h3>
+                <p class="nesp-help-text">For a board that accepts an external application URL, copy the exact tracked OpenCATS link below. Applicants using that link enter OpenCATS and the NESP <strong>Needs Craig</strong> queue automatically. Indeed and LinkedIn may force native applications; use the Board Applicant Intake review page for those notifications or exports. It never contacts applicants or imports them without review.</p>
+                <table class="nesp-table">
+                    <tr>
+                        <th>Job</th>
+                        <th>Board</th>
+                        <th>Application destination</th>
+                        <th>Use this way</th>
+                    </tr>
+                    <?php foreach ($this->centralApplicationDestinations as $destination): ?>
+                    <tr>
+                        <td><?php $this->_($destination['job_title']); ?></td>
+                        <td><?php $this->_($destination['platform']); ?></td>
+                        <td><input type="text" readonly="readonly" value="<?php echo(htmlspecialchars($destination['tracked_link'], ENT_QUOTES, 'UTF-8')); ?>" /></td>
+                        <td><?php $this->_($destination['instructions']); ?><?php if ($destination['native_review_only']): ?><br /><a href="<?php echo(CATSUtility::getIndexName()); ?>?m=boardintake">Open Inbox Review Intake</a><?php endif; ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </table>
+            </div>
+
             <div class="nesp-dashboard-nav">
                 <?php foreach ($this->dashboardNavigation as $navItem): ?>
                     <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>

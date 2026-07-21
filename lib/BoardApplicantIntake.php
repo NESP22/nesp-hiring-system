@@ -115,6 +115,73 @@ class BoardApplicantIntake
         return $platform . ':' . $externalID;
     }
 
+    /**
+     * Turn a forwarded board-notification email into the same review-only
+     * shape as a CSV export. The caller must still record preview, choose rows,
+     * and explicitly import them. No mailbox is polled and no applicant is
+     * contacted from this path.
+     */
+    public static function parseInboxNotification($contents, $platform, $jobOrderID, $sourceLabel)
+    {
+        $contents = trim((string) $contents);
+        if ($contents === '')
+        {
+            return array('rows' => array(), 'errors' => array('Paste the board notification text first.'));
+        }
+        if (strlen($contents) > self::MAX_CSV_BYTES)
+        {
+            return array('rows' => array(), 'errors' => array('Inbox notification exceeds the 2 MB review limit.'));
+        }
+
+        $values = array();
+        $labels = array(
+            'external_id' => array('external id', 'applicant id', 'application id', 'candidate id'),
+            'first_name' => array('first name', 'given name'),
+            'last_name' => array('last name', 'family name', 'surname'),
+            'email' => array('email', 'email address'),
+            'phone' => array('phone', 'phone number', 'mobile')
+        );
+
+        foreach ($labels as $field => $fieldLabels)
+        {
+            foreach ($fieldLabels as $label)
+            {
+                $pattern = '/^\\s*' . preg_quote($label, '/') . '\\s*[:\\-]\\s*(.+?)\\s*$/im';
+                if (preg_match($pattern, $contents, $matches))
+                {
+                    $values[$field] = trim($matches[1]);
+                    break;
+                }
+            }
+        }
+
+        if ((!isset($values['first_name']) || !isset($values['last_name'])) && preg_match('/^\\s*(?:applicant|candidate|name)\\s*[:\\-]\\s*(.+?)\\s*$/im', $contents, $matches))
+        {
+            $parts = preg_split('/\\s+/', trim($matches[1]), 2);
+            if (count($parts) === 2)
+            {
+                $values['first_name'] = isset($values['first_name']) ? $values['first_name'] : $parts[0];
+                $values['last_name'] = isset($values['last_name']) ? $values['last_name'] : $parts[1];
+            }
+        }
+
+        $row = array(
+            isset($values['external_id']) ? $values['external_id'] : '',
+            isset($values['first_name']) ? $values['first_name'] : '',
+            isset($values['last_name']) ? $values['last_name'] : '',
+            isset($values['email']) ? $values['email'] : '',
+            isset($values['phone']) ? $values['phone'] : ''
+        );
+        $handle = fopen('php://temp', 'r+');
+        fputcsv($handle, array('external_id', 'first_name', 'last_name', 'email', 'phone'));
+        fputcsv($handle, $row);
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        return self::parseCsv($csv, $platform, $jobOrderID, $sourceLabel);
+    }
+
     public static function batchDuplicateRowIDs($rows)
     {
         $emailRows = array();

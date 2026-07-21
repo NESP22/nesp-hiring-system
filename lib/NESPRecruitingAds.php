@@ -92,6 +92,51 @@ class NESPRecruitingAds
         return self::CAREERS_BASE_URL . (int) $jobID . '&nesp_source=' . rawurlencode($sourceKey);
     }
 
+    /**
+     * The single approved destination for boards that permit an external
+     * application URL. Native board applications remain review-only intake
+     * records until an administrator explicitly imports them.
+     */
+    public static function getCentralApplicationDestinations()
+    {
+        $jobs = array(
+            41001 => 'Part-Time Customer Service Representative',
+            41002 => 'Staff Photographer',
+            41003 => 'Freelance/Contract Youth Sports Photographer',
+            41005 => 'Weekend Table Greeter / Field Assistant'
+        );
+        $routes = array(
+            'craigslist' => array('Craigslist', 'Use the tracked OpenCATS link in the post body.'),
+            'masshire' => array('MassHire', 'Use the external application URL when the form permits it.'),
+            'handshake' => array('Handshake', 'Use the external application URL when the form permits it.'),
+            'facebook' => array('Facebook', 'Use the tracked link in the post or call-to-action.'),
+            'instagram' => array('Instagram', 'Use the tracked link where Instagram permits a clickable link.'),
+            'college_board' => array('College boards', 'Use the external application URL when the board permits it.'),
+            'other' => array('Other community boards', 'Use the tracked OpenCATS link when the board permits it.'),
+            'indeed' => array('Indeed', 'Use the OpenCATS link only if Indeed offers an external application setting; otherwise use Inbox Review Intake.'),
+            'linkedin' => array('LinkedIn', 'Use the OpenCATS link only if LinkedIn offers an external application setting; otherwise use Inbox Review Intake.')
+        );
+
+        $destinations = array();
+        foreach ($jobs as $jobID => $jobTitle)
+        {
+            foreach ($routes as $sourceKey => $route)
+            {
+                $destinations[] = array(
+                    'joborder_id' => $jobID,
+                    'job_title' => $jobTitle,
+                    'platform_key' => $sourceKey,
+                    'platform' => $route[0],
+                    'instructions' => $route[1],
+                    'tracked_link' => self::trackedApplicationURL($jobID, $sourceKey),
+                    'native_review_only' => in_array($sourceKey, array('indeed', 'linkedin'), true)
+                );
+            }
+        }
+
+        return $destinations;
+    }
+
     public static function getPlatformMatrix()
     {
         return array(

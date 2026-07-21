@@ -40,6 +40,27 @@
             <button type="submit">Continue to Review</button>
         </form>
 
+        <h3>Or stage one native-board inbox notification</h3>
+        <p>For a board that forces its own application or email notification, paste the notification text below. Include labeled lines for <code>External ID</code>, <code>First Name</code>, <code>Last Name</code>, and <code>Email</code>. This creates a review batch only. It does not read your mailbox, contact the applicant, fetch a resume, or create a candidate until you finish the normal review and approval steps.</p>
+        <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=uploadInboxNotification" method="post">
+            <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
+            <label>Board
+                <select name="platform">
+                    <?php foreach ($this->platforms as $platform): ?><option value="<?php $this->_($platform); ?>"><?php $this->_(ucfirst($platform)); ?></option><?php endforeach; ?>
+                </select>
+            </label>
+            <label>Job order
+                <select name="jobOrderID">
+                    <?php foreach ($this->jobOrders as $jobOrderID => $title): ?><option value="<?php echo (int) $jobOrderID; ?>"><?php echo (int) $jobOrderID; ?> - <?php $this->_($title); ?></option><?php endforeach; ?>
+                </select>
+            </label>
+            <label>Source label <input name="sourceLabel" value="NESP Ad: Indeed" required /></label>
+            <label>Notification text
+                <textarea name="notificationText" rows="7" cols="80" placeholder="External ID: board-123&#10;First Name: Alex&#10;Last Name: Applicant&#10;Email: alex@example.com&#10;Phone: 555-0100"></textarea>
+            </label>
+            <button type="submit">Create Inbox Review Batch</button>
+        </form>
+
         <?php if (count($this->batches)): ?>
         <h3>2. Open a batch to review</h3>
         <ul>
