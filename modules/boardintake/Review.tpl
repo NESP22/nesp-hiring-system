@@ -140,7 +140,17 @@
             <button type="submit">Import Approved Applicants to Needs Craig</button>
             </form>
         <?php elseif ($this->batch['status_key'] === 'imported'): ?>
-            <h3>5. Attach a downloaded resume</h3>
+            <?php if (isset($_GET['jobOrderLinksVerified'])): ?>
+                <p>Verified <?php echo (int) $_GET['jobOrderLinksVerified']; ?> imported candidate/job-order links; repaired <?php echo (int) $_GET['jobOrderLinksRepaired']; ?> missing link(s).</p>
+            <?php endif; ?>
+            <h3>5. Verify imported job-order links</h3>
+            <p>This verifies that every imported applicant in this batch appears under the approved OpenCATS job order. It repairs missing links only; it never creates candidates, changes contact details, or sends a questionnaire.</p>
+            <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=repairImportedJobOrderLinks" method="post" onsubmit="return confirm('Verify the imported candidates are attached once to this batch job order?');">
+                <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
+                <input type="hidden" name="batchID" value="<?php echo (int) $this->batch['batch_id']; ?>" />
+                <button type="submit">Verify and Repair Job-Order Links</button>
+            </form>
+            <h3>6. Attach a downloaded resume</h3>
             <p>The server reconfirms the imported board identity, candidate, and job order <?php echo (int) $this->batch['joborder_id']; ?> before attaching a resume. Candidate contact fields are not changed.</p>
             <?php foreach ($this->rows as $row): ?>
                 <?php if ($row['review_status'] === 'imported' && (int) $row['candidate_id'] > 0): ?>

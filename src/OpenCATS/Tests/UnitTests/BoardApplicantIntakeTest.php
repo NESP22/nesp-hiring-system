@@ -221,6 +221,36 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertStringContainsString('reviewed and approved', $template);
     }
 
+    public function testImportsVerifyTheCandidateJobOrderLinkBeforeWorkflowRouting()
+    {
+        $intake = file_get_contents(LEGACY_ROOT . '/lib/BoardApplicantIntake.php');
+
+        $this->assertStringContainsString('ensureCandidateJobOrderLink(', $intake);
+        $this->assertStringContainsString('Candidate job-order attachment could not be verified.', $intake);
+        $this->assertStringContainsString('FROM candidate_joborder', $intake);
+        $this->assertStringContainsString('More than one candidate/job-order link was found.', $intake);
+        $this->assertStringContainsString('ensureCandidateWorkflowRow(', $intake);
+        $this->assertLessThan(
+            strpos($intake, 'ensureCandidateWorkflowRow('),
+            strpos($intake, 'ensureCandidateJobOrderLink(')
+        );
+    }
+
+    public function testImportedBatchRepairIsBoundedIdempotentAndDoesNotContactApplicants()
+    {
+        $intake = file_get_contents(LEGACY_ROOT . '/lib/BoardApplicantIntake.php');
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/boardintake/BoardIntakeUI.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/boardintake/Review.tpl');
+
+        $this->assertStringContainsString('repairImportedCandidateJobOrderLinks', $intake);
+        $this->assertStringContainsString('intake_row.review_status = "imported"', $intake);
+        $this->assertStringContainsString('intake_identity.candidate_id = intake_row.candidate_id', $intake);
+        $this->assertStringContainsString("case 'repairImportedJobOrderLinks'", $ui);
+        $this->assertStringContainsString('requirePostCSRF()', $ui);
+        $this->assertStringContainsString('Verify and Repair Job-Order Links', $template);
+        $this->assertStringContainsString('never creates candidates, changes contact details, or sends a questionnaire', $template);
+    }
+
     public function testDuplicateReviewFlagsRepeatedEmailOrNameRows()
     {
         $rows = array(

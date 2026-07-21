@@ -652,11 +652,11 @@ class BoardApplicantIntake
                     }
                 }
 
-                $pipelines = new Pipelines();
-                if (!$pipelines->add($candidateID, (int) $batch['joborder_id'], $actorUserID))
-                {
-                    throw new RuntimeException('Pipeline attachment failed or already exists.');
-                }
+                $this->ensureCandidateJobOrderLink(
+                    $candidateID,
+                    (int) $batch['joborder_id'],
+                    $actorUserID
+                );
 
                 $workflow = new NESPWorkflow($this->_db);
                 $workflowSummary = $contactDetailsRequired
@@ -733,6 +733,145 @@ class BoardApplicantIntake
         }
 
         return array('imported' => $imported, 'skipped' => 0, 'failed' => 0);
+    }
+
+    /**
+     * Ensures that an imported candidate can be read back through the same
+     * candidate_joborder relation that Candidate Details renders. A successful
+     * insert alone is not enough: a missing job order or an unreadable link
+     * must stop the import before it is marked complete.
+     */
+    private function ensureCandidateJobOrderLink($candidateID, $jobOrderID, $actorUserID)
+    {
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        if ($candidateID <= 0 || $jobOrderID <= 0)
+        {
+            throw new RuntimeException('A valid candidate and approved job order are required.');
+        }
+
+        $candidate = $this->_db->getAssoc(sprintf(
+            'SELECT candidate_id FROM candidate WHERE candidate_id = %s LIMIT 1',
+            $this->_db->makeQueryInteger($candidateID)
+        ));
+        $jobOrder = $this->_db->getAssoc(sprintf(
+            'SELECT joborder_id FROM joborder WHERE joborder_id = %s LIMIT 1',
+            $this->_db->makeQueryInteger($jobOrderID)
+        ));
+        if (empty($candidate) || empty($jobOrder))
+        {
+            throw new RuntimeException('The approved candidate or job order could not be verified.');
+        }
+
+        $link = $this->_db->getAssoc(sprintf(
+            'SELECT COUNT(*) AS link_count, MIN(candidate_joborder_id) AS candidate_joborder_id
+             FROM candidate_joborder
+             WHERE candidate_id = %s AND joborder_id = %s',
+            $this->_db->makeQueryInteger($candidateID),
+            $this->_db->makeQueryInteger($jobOrderID)
+        ));
+        $linkCount = isset($link['link_count']) ? (int) $link['link_count'] : 0;
+        if ($linkCount > 1)
+        {
+            throw new RuntimeException('More than one candidate/job-order link was found. Repair stopped safely.');
+        }
+        if ($linkCount === 0)
+        {
+            $pipelines = new Pipelines();
+            if (!$pipelines->add($candidateID, $jobOrderID, $actorUserID))
+            {
+                throw new RuntimeException('Candidate job-order attachment failed.');
+            }
+
+            $link = $this->_db->getAssoc(sprintf(
+                'SELECT COUNT(*) AS link_count, MIN(candidate_joborder_id) AS candidate_joborder_id
+                 FROM candidate_joborder
+                 WHERE candidate_id = %s AND joborder_id = %s',
+                $this->_db->makeQueryInteger($candidateID),
+                $this->_db->makeQueryInteger($jobOrderID)
+            ));
+            $linkCount = isset($link['link_count']) ? (int) $link['link_count'] : 0;
+        }
+
+        if ($linkCount !== 1 || empty($link['candidate_joborder_id']))
+        {
+            throw new RuntimeException('Candidate job-order attachment could not be verified.');
+        }
+
+        return (int) $link['candidate_joborder_id'];
+    }
+
+    /**
+     * Repairs only missing candidate/job-order links for an already imported
+     * batch. It never creates candidates, changes contact data, or sends a
+     * questionnaire. The existing identity and imported-row checks keep this
+     * idempotent and confined to the approved batch.
+     */
+    public function repairImportedCandidateJobOrderLinks($actorUserID, $batchID)
+    {
+        $batch = $this->getBatch($batchID);
+        if (empty($batch) || $batch['status_key'] !== 'imported')
+        {
+            throw new RuntimeException('Choose an imported intake batch to repair.');
+        }
+
+        $rows = $this->_db->getAllAssoc(sprintf(
+            'SELECT intake_row.intake_row_id, intake_row.candidate_id, intake_batch.joborder_id
+             FROM nesp_board_intake_row AS intake_row
+             INNER JOIN nesp_board_intake_batch AS intake_batch
+                ON intake_batch.batch_id = intake_row.batch_id
+             INNER JOIN nesp_board_intake_identity AS intake_identity
+                ON intake_identity.intake_row_id = intake_row.intake_row_id
+               AND intake_identity.candidate_id = intake_row.candidate_id
+             WHERE intake_row.batch_id = %s
+               AND intake_row.review_status = "imported"
+               AND intake_row.candidate_id IS NOT NULL',
+            $this->_db->makeQueryInteger($batchID)
+        ));
+        if (!$rows)
+        {
+            return array('verified' => 0, 'repaired' => 0);
+        }
+
+        $transactionStarted = $this->_db->beginTransaction();
+        $verified = 0;
+        $repaired = 0;
+        try
+        {
+            foreach ($rows as $row)
+            {
+                $before = $this->_db->getAssoc(sprintf(
+                    'SELECT COUNT(*) AS link_count FROM candidate_joborder
+                     WHERE candidate_id = %s AND joborder_id = %s',
+                    $this->_db->makeQueryInteger($row['candidate_id']),
+                    $this->_db->makeQueryInteger($row['joborder_id'])
+                ));
+                $this->ensureCandidateJobOrderLink(
+                    (int) $row['candidate_id'],
+                    (int) $row['joborder_id'],
+                    $actorUserID
+                );
+                $verified++;
+                if (empty($before) || (int) $before['link_count'] === 0)
+                {
+                    $repaired++;
+                }
+            }
+            if ($transactionStarted)
+            {
+                $this->_db->commitTransaction();
+            }
+        }
+        catch (Throwable $e)
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            throw $e;
+        }
+
+        return array('verified' => $verified, 'repaired' => $repaired);
     }
 
     /**
