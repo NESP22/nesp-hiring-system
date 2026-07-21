@@ -69,7 +69,8 @@ function nesp_questionnaire_render($title, $body)
     exit;
 }
 
-$token = isset($_GET['t']) ? trim($_GET['t']) : (isset($_POST['token']) ? trim($_POST['token']) : '');
+$token = isset($_GET['t']) ? $_GET['t'] : (isset($_POST['token']) ? $_POST['token'] : '');
+$token = NESPWorkflow::normalizeQuestionnaireToken($token);
 $workflow = new NESPWorkflow();
 $errors = array();
 
