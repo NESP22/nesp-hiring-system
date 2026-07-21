@@ -69,7 +69,10 @@ services:
       - key: INSTALL_ACCESS_PASSWORD
         sync: false
       - key: OPENCATS_MAIL_ENABLED
-        value: 0
+        # Disabled unless an administrator explicitly sets this protected
+        # Render value. A static Blueprint value would overwrite that choice
+        # on every deploy.
+        sync: false
       # Mail is deliberately disabled by default. If Craig separately enables
       # it in Render, every value below must be set as a Render secret.
       - key: OPENCATS_MAIL_MAILER
