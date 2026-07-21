@@ -126,7 +126,9 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('$this->_workflow->createCandidateGrant($interviewerProfileID, $candidateID, $jobOrderID, $this->_userID)', $ui);
         $this->assertStringContainsString("date_revoked IS NULL", $workflow);
         $this->assertStringContainsString("interviewer_candidate_grant_duplicate", $workflow);
+        $this->assertStringContainsString('assigned_interviewer_names', $workflow);
         $this->assertStringContainsString('name="csrfToken"', $template);
+        $this->assertStringContainsString('Assigned to:', $template);
         $this->assertTrue(
             strpos($template, 'name="interviewerProfileID"') !== false
             && strpos($template, '>Assign Interviewer</button>') !== false

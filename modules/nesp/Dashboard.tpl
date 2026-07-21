@@ -207,9 +207,14 @@
                                         <a class="nesp-primary-action" href="<?php echo($card['primary_action_url']); ?>"><?php $this->_($card['next_action_label']); ?></a>
                                         <?php if ($sectionKey === 'needsCraig' && !empty($this->canAssignInterviewers) && (!empty($card['assignable_interviewers']) || !empty($card['assignment_block_reason']))): ?>
                                             <div class="nesp-assignment-panel">
-                                                <strong>Assign Interviewer</strong>
+                                                <strong>Interviewer Access</strong>
                                                 <?php if (!empty($card['assignable_interviewers'])): ?>
-                                                    <p class="nesp-muted">Choose an active interviewer approved for this role.</p>
+                                                    <?php if (!empty($card['assigned_interviewer_names'])): ?>
+                                                        <p><strong>Assigned to:</strong> <?php $this->_($card['assigned_interviewer_names']); ?></p>
+                                                        <p class="nesp-muted">This candidate is already visible to the assigned interviewer. Add another only when you intentionally want shared access.</p>
+                                                    <?php else: ?>
+                                                        <p class="nesp-muted">Choose an active interviewer approved for this role.</p>
+                                                    <?php endif; ?>
                                                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignInterviewer" class="nesp-assignment-form">
                                                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                                                         <input type="hidden" name="candidateID" value="<?php echo((int) $card['candidate_id']); ?>" />
