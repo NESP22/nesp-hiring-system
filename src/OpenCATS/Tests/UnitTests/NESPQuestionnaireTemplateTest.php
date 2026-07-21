@@ -55,6 +55,20 @@ class NESPQuestionnaireTemplateTest extends TestCase
         $this->assertStringNotContainsString('invitation_copy_text', $confirm . $review . $public);
     }
 
+    public function testQuestionnaireTokensIgnoreOnlyEscapedTrailingLineEndings()
+    {
+        include_once('lib/NESPWorkflow.php');
+
+        $token = 'NESP-token_ABC123';
+        $hash = NESPWorkflow::questionnaireTokenHash($token);
+
+        $this->assertSame($token, NESPWorkflow::normalizeQuestionnaireToken($token));
+        $this->assertSame($token, NESPWorkflow::normalizeQuestionnaireToken($token . '\\n'));
+        $this->assertSame($token, NESPWorkflow::normalizeQuestionnaireToken($token . '\\r\\n'));
+        $this->assertSame($hash, NESPWorkflow::questionnaireTokenHash($token . '\\n'));
+        $this->assertSame($hash, NESPWorkflow::questionnaireTokenHash($token . '\\r\\n'));
+    }
+
     public function testInterviewerSettingsUsesStateGatedLifecycleActions()
     {
         $settings = file_get_contents('modules/nesp/Settings.tpl');

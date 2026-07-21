@@ -409,7 +409,23 @@ class NESPWorkflow
 
     public static function questionnaireTokenHash($token)
     {
-        return hash('sha256', (string) $token);
+        return hash('sha256', self::normalizeQuestionnaireToken($token));
+    }
+
+    /**
+     * Some mail clients preserve an escaped terminal newline when opening a
+     * plain-text link. The opaque token format never contains backslashes, so
+     * removing only those terminal escape sequences is safe and idempotent.
+     */
+    public static function normalizeQuestionnaireToken($token)
+    {
+        $token = trim((string) $token);
+        while (substr($token, -2) === '\\n' || substr($token, -2) === '\\r')
+        {
+            $token = substr($token, 0, -2);
+        }
+
+        return trim($token);
     }
 
     /**

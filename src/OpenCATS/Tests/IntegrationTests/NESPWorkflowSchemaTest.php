@@ -409,6 +409,8 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $token = $this->extractQuestionnaireToken($result['one_time_invitation_copy']);
         $page = $workflow->getQuestionnairePageByToken($token);
         $this->assertTrue($page['ok']);
+        $escapedLineEndingPage = $workflow->getQuestionnairePageByToken($token . '\\n');
+        $this->assertTrue($escapedLineEndingPage['ok']);
         $originalLabel = $page['questionnaire']['questions'][0]['label'];
         $originalSetLabel = $page['questionnaire']['question_set_label'];
         $originalIntro = $page['questionnaire']['question_set_intro'];
