@@ -110,8 +110,12 @@ jobs:
               env = {item.get('key'): item for item in web.get('envVars', []) if item.get('key')}
               if env.get('INSTALL_ACCESS_PASSWORD', {}).get('sync') is not False:
                   errors.append('Installer access password must be entered in Render, not committed.')
-              if str(env.get('OPENCATS_MAIL_ENABLED', {}).get('value')) != '0':
-                  errors.append('Outbound OpenCATS mail must remain disabled for initial testing.')
+              mail_enabled = env.get('OPENCATS_MAIL_ENABLED', {})
+              if not (
+                  str(mail_enabled.get('value')) == '0'
+                  or mail_enabled.get('sync') is False
+              ):
+                  errors.append('Outbound OpenCATS mail must default to disabled or be a Render-only approval setting.')
               required_mail_placeholders = (
                   'OPENCATS_MAIL_MAILER',
                   'OPENCATS_MAIL_SMTP_HOST',
