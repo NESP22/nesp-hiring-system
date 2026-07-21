@@ -2583,6 +2583,11 @@ class NESPWorkflow
         return NESPRecruitingAds::getRequestedRoleAdTemplates();
     }
 
+    public function getCentralApplicationDestinations()
+    {
+        return NESPRecruitingAds::getCentralApplicationDestinations();
+    }
+
     public function getRecruitingCampaignControls()
     {
         $controls = array();

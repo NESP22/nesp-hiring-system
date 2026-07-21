@@ -94,6 +94,10 @@ class BoardIntakeUI extends UserInterface
                 $this->requirePostCSRF();
                 $this->upload();
                 break;
+            case 'uploadInboxNotification':
+                $this->requirePostCSRF();
+                $this->uploadInboxNotification();
+                break;
             case 'approve':
                 $this->requirePostCSRF();
                 $this->approve();
@@ -189,6 +193,36 @@ class BoardIntakeUI extends UserInterface
             $this->showError('Approval stopped safely: ' . $e->getMessage());
             return;
         }
+        CATSUtility::transferRelativeURI('m=boardintake&batchID=' . $batchID);
+    }
+
+    private function uploadInboxNotification()
+    {
+        $platform = isset($_POST['platform']) ? strtolower(trim($_POST['platform'])) : '';
+        $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+        $sourceLabel = isset($_POST['sourceLabel']) ? trim($_POST['sourceLabel']) : '';
+        $contents = isset($_POST['notificationText']) ? trim($_POST['notificationText']) : '';
+        $parsed = BoardApplicantIntake::parseInboxNotification($contents, $platform, $jobOrderID, $sourceLabel);
+        if ($parsed['errors'])
+        {
+            $this->showError(implode(' ', $parsed['errors']));
+            return;
+        }
+
+        $batchID = $this->_intake->createBatch(
+            $this->_userID,
+            $platform,
+            $jobOrderID,
+            BoardApplicantIntake::canonicalSourceLabel($platform, $sourceLabel),
+            $parsed['rows'],
+            hash('sha256', 'inbox-notification|' . $contents)
+        );
+        if ($batchID <= 0)
+        {
+            $this->showError('The inbox review batch could not be created.');
+            return;
+        }
+        $this->_intake->applyDuplicateChecks($batchID);
         CATSUtility::transferRelativeURI('m=boardintake&batchID=' . $batchID);
     }
 
