@@ -70,6 +70,24 @@ services:
         sync: false
       - key: OPENCATS_MAIL_ENABLED
         value: 0
+      # Mail is deliberately disabled by default. If Craig separately enables
+      # it in Render, every value below must be set as a Render secret.
+      - key: OPENCATS_MAIL_MAILER
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_HOST
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_PORT
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_AUTH
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_USER
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_PASS
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_SECURE
+        sync: false
+      - key: OPENCATS_MAIL_FROM_ADDRESS
+        sync: false
     disk:
       name: nesp-hiring-files
       mountPath: /var/data

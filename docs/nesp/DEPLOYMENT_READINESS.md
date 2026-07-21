@@ -92,6 +92,33 @@ Must remain unset or disabled until explicitly approved:
 - Do not enable automatic rejection, selection, hiring, assignment, status
   changes, or email sending without human-reviewed workflow approval.
 
+### Render SMTP questionnaire sender
+
+The Render deployment defaults to `OPENCATS_MAIL_ENABLED=0`. When it is `0`,
+OpenCATS mail constants and persistent mailer settings are reset to disabled;
+the service will not send mail even if old SMTP secrets remain in Render.
+
+Only after a separately approved protected delivery test, set the following
+values in the Render service's secret environment settings and change
+`OPENCATS_MAIL_ENABLED` to `1`:
+
+- `OPENCATS_MAIL_MAILER=smtp`
+- `OPENCATS_MAIL_SMTP_HOST`
+- `OPENCATS_MAIL_SMTP_PORT` (a port from 1 through 65535)
+- `OPENCATS_MAIL_SMTP_AUTH=1`
+- `OPENCATS_MAIL_SMTP_USER`
+- `OPENCATS_MAIL_SMTP_PASS`
+- `OPENCATS_MAIL_SMTP_SECURE=tls` or `ssl`
+- `OPENCATS_MAIL_FROM_ADDRESS` (a valid sender address)
+
+The entrypoint accepts only authenticated SMTP protected by TLS or SSL. It
+does not write secrets to logs. If any setting is missing or invalid when mail
+is enabled, the deployment fails before Apache starts. The legacy OpenCATS
+mailer supports a sender address but not a configurable sender display name.
+To roll back, set `OPENCATS_MAIL_ENABLED=0` and redeploy. This clears the
+persisted SMTP constants and marks the legacy mailer unconfigured; it does not
+send a message.
+
 ## Suggested Future URL
 
 - Public applicant board: `careers.nesportsphoto.com`
