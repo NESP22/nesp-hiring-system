@@ -1117,7 +1117,10 @@ class NESPUI extends UserInterface
         $this->_template->assign('isAdmin', $isAdmin);
         $this->_template->assign('questionnaire', $detail);
         $this->_template->assign('oneTimeInvitationCopy', $oneTimeInvitationCopy);
-        $this->_template->assign('interviewerProfiles', $isAdmin ? $this->_workflow->getInterviewerProfiles() : array());
+        // The reviewer picker must use the same eligibility rules enforced on save.
+        $this->_template->assign('eligibleReviewerProfiles', $isAdmin
+            ? $this->_workflow->getEligibleInterviewersForAssignment((int) $detail['joborder_id'])
+            : array());
         $this->_template->display('./modules/nesp/QuestionnaireReview.tpl');
     }
 
@@ -1151,9 +1154,19 @@ class NESPUI extends UserInterface
     {
         $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
         $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+
+        $detail = $this->_workflow->getQuestionnaireDetail($questionnaireID);
+        if (empty($detail))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid questionnaire.');
+        }
+        if ((int) $detail['joborder_id'] === 41001)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Customer Service questionnaires stay with Craig and do not need an interviewer assignment.');
+        }
         if ($this->_workflow->assignQuestionnaireReviewer($questionnaireID, $interviewerProfileID, $this->_userID) === false)
         {
-            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid interviewer.');
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an active, open interviewer approved for this role.');
         }
         CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
     }
