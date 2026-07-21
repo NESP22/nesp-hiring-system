@@ -321,6 +321,12 @@ class NESPUI extends UserInterface
                 $this->markManualInterviewInvitationSent();
                 break;
 
+            case 'regenerateTrackedInterviewLink':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->regenerateTrackedInterviewLink();
+                break;
+
             case 'jobAds':
                 $this->adminOnly();
                 $this->jobAds();
@@ -1406,6 +1412,8 @@ class NESPUI extends UserInterface
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to save interview.');
         }
 
+        $this->storeOneTimeInterviewInvitationCopy((int) $result['interview_id'], isset($result['one_time_invitation_copy']) ? $result['one_time_invitation_copy'] : '');
+
         CATSUtility::transferRelativeURI('m=nesp&a=recordInterviewOutcome&interviewID=' . (int) $result['interview_id']);
     }
 
@@ -1453,6 +1461,7 @@ class NESPUI extends UserInterface
         $this->_template->assign('viewKey', 'interviews');
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('interview', $interview);
+        $this->_template->assign('invitationPreview', $this->getOneTimeInterviewInvitationCopy($interviewID, $interview['invitation_preview_text']));
         $this->_template->assign('outcomeLabels', NESPWorkflow::getManualInterviewOutcomeLabels());
         $this->_template->display('./modules/nesp/InterviewOutcome.tpl');
     }
@@ -1479,7 +1488,56 @@ class NESPUI extends UserInterface
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to mark the interview invitation sent.');
         }
 
+        $this->clearOneTimeInterviewInvitationCopy($interviewID);
+
         CATSUtility::transferRelativeURI('m=nesp&a=recordInterviewOutcome&interviewID=' . $interviewID);
+    }
+
+    private function regenerateTrackedInterviewLink()
+    {
+        $interviewID = isset($_POST['interviewID']) ? (int) $_POST['interviewID'] : 0;
+        $result = $this->_workflow->regenerateInterviewParticipantLink($interviewID, $this->_userID);
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to prepare a new tracked interview link.');
+        }
+
+        $this->storeOneTimeInterviewInvitationCopy($interviewID, isset($result['one_time_invitation_copy']) ? $result['one_time_invitation_copy'] : '');
+
+        CATSUtility::transferRelativeURI('m=nesp&a=recordInterviewOutcome&interviewID=' . $interviewID);
+    }
+
+    private function storeOneTimeInterviewInvitationCopy($interviewID, $copy)
+    {
+        $copy = trim((string) $copy);
+        if ($interviewID <= 0 || $copy === '')
+        {
+            return;
+        }
+        if (!isset($_SESSION['nesp_one_time_interview_invitation_copy']) || !is_array($_SESSION['nesp_one_time_interview_invitation_copy']))
+        {
+            $_SESSION['nesp_one_time_interview_invitation_copy'] = array();
+        }
+        $_SESSION['nesp_one_time_interview_invitation_copy'][(int) $interviewID] = $copy;
+    }
+
+    private function getOneTimeInterviewInvitationCopy($interviewID, $fallback)
+    {
+        if (isset($_SESSION['nesp_one_time_interview_invitation_copy'])
+            && is_array($_SESSION['nesp_one_time_interview_invitation_copy'])
+            && isset($_SESSION['nesp_one_time_interview_invitation_copy'][(int) $interviewID]))
+        {
+            return $_SESSION['nesp_one_time_interview_invitation_copy'][(int) $interviewID];
+        }
+        return (string) $fallback;
+    }
+
+    private function clearOneTimeInterviewInvitationCopy($interviewID)
+    {
+        if (isset($_SESSION['nesp_one_time_interview_invitation_copy']) && is_array($_SESSION['nesp_one_time_interview_invitation_copy']))
+        {
+            unset($_SESSION['nesp_one_time_interview_invitation_copy'][(int) $interviewID]);
+        }
     }
 
     private function createStaffingRecommendation()

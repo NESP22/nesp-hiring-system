@@ -25,6 +25,8 @@
                         <dd><?php $this->_(empty($this->interview['scheduled_start']) ? 'Not scheduled' : date('M j, Y g:i A', strtotime($this->interview['scheduled_start'])) . ' ' . $this->interview['timezone']); ?></dd>
                         <dt>Zoom link</dt>
                         <dd><?php $this->_($this->interview['zoom_join_url_masked']); ?></dd>
+                        <dt>Interview link tracking</dt>
+                        <dd><?php $this->_($this->interview['participant_link_tracking_label']); ?></dd>
                     </dl>
                     <div class="nesp-button-row">
                         <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=scheduleInterview&amp;interviewID=<?php echo((int) $this->interview['interview_id']); ?>">Reschedule</a>
@@ -34,8 +36,14 @@
 
                 <div class="nesp-panel">
                     <h3>Invitation Preview</h3>
-                    <textarea class="nesp-copy-box" rows="11" readonly><?php echo(htmlspecialchars($this->interview['invitation_preview_text'], ENT_QUOTES, 'UTF-8')); ?></textarea>
+                    <textarea class="nesp-copy-box" rows="11" readonly><?php echo(htmlspecialchars($this->invitationPreview, ENT_QUOTES, 'UTF-8')); ?></textarea>
                     <p class="nesp-help-text">No invitation has been sent from this screen. Review and copy manually only after Craig approves.</p>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=regenerateTrackedInterviewLink" class="nesp-inline-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <input type="hidden" name="interviewID" value="<?php echo((int) $this->interview['interview_id']); ?>" />
+                        <button type="submit" class="nesp-secondary-button">Generate New Tracked Interview Link</button>
+                    </form>
+                    <p class="nesp-help-text">This replaces the invitation preview with a new NESP tracking link. It does not send anything; the older tracked link stops working.</p>
                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=markManualInterviewInvitationSent" class="nesp-inline-form">
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                         <input type="hidden" name="interviewID" value="<?php echo((int) $this->interview['interview_id']); ?>" />

@@ -82,6 +82,44 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse($zak['ok']);
     }
 
+    public function testTrackedInterviewLinkUsesOpaqueTokenAndInvitationDoesNotExposeZoomURL()
+    {
+        $token = NESPWorkflow::generateQuestionnaireToken();
+        $link = NESPWorkflow::getInterviewParticipantLink($token);
+        $copy = NESPWorkflow::buildManualInterviewInvitationCopy(
+            'Alex',
+            'Photographer',
+            '2026-07-30 10:00:00',
+            30,
+            'America/New_York',
+            $link
+        );
+
+        $this->assertStringContainsString('interviewParticipantLink.php?t=', $link);
+        $this->assertSame(64, strlen(NESPWorkflow::interviewParticipantTokenHash($token)));
+        $this->assertStringContainsString($link, $copy);
+        $this->assertStringNotContainsString('zoom.us', $copy);
+        $storedCopy = NESPWorkflow::buildManualInterviewStoredInvitationCopy(
+            'Alex',
+            'Photographer',
+            '2026-07-30 10:00:00',
+            30,
+            'America/New_York'
+        );
+        $this->assertStringNotContainsString($token, $storedCopy);
+        $this->assertStringContainsString('Generate a fresh secure interview link', $storedCopy);
+    }
+
+    public function testTrackedInterviewLinkEndpointIsSessionlessAndProtectsTokenReferrers()
+    {
+        $endpoint = file_get_contents(LEGACY_ROOT . '/modules/nesp/interviewParticipantLink.php');
+
+        $this->assertStringContainsString('openInterviewParticipantLink($token)', $endpoint);
+        $this->assertStringContainsString("header('Referrer-Policy: no-referrer')", $endpoint);
+        $this->assertStringContainsString("header('Location: ' . \$result['destination_url'], true, 302)", $endpoint);
+        $this->assertStringNotContainsString('session_start()', $endpoint);
+    }
+
     public function testFeatureGateMappingKeepsSettingsOpen()
     {
         $this->assertSame('', NESPWorkflow::getFeatureFlagForAction('settings'));

@@ -118,6 +118,10 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_availability', 'slot_minutes'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interview_slot', 'zoom_status_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'manual_zoom_join_url'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'participant_link_token_hash'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'participant_link_opened_at'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'participant_link_last_opened_at'));
+        $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'participant_link_open_count'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'timezone'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'invitation_status_key'));
         $this->assertSame(1, $this->countMatchingColumns('nesp_interview', 'invitation_preview_text'));
@@ -650,6 +654,48 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
                 $candidateID,
                 $jobOrderID
             )
+        ));
+    }
+
+    public function testTrackedInterviewParticipantLinkRecordsOpenAndFailsClosedAfterCancellation()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Tracking', 'Fixture');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $token = \NESPWorkflow::generateQuestionnaireToken();
+        $tokenHash = \NESPWorkflow::interviewParticipantTokenHash($token);
+        $this->mySQLQueryLocal(sprintf(
+            "INSERT INTO nesp_interview
+                (candidate_id, joborder_id, scheduled_start, scheduled_end, status_key, manual_zoom_join_url, participant_link_token_hash, timezone, date_created, date_modified)
+             VALUES
+                (%d, %d, '2026-08-01 10:00:00', '2026-08-01 10:30:00', 'invitation_sent', 'https://nesp.zoom.us/j/123456789?pwd=fixture', '%s', 'America/New_York', NOW(), NOW())",
+            $candidateID,
+            $jobOrderID,
+            $this->escape($tokenHash)
+        ));
+        $interviewID = $this->lastInsertID();
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+
+        $opened = $workflow->openInterviewParticipantLink($token);
+        $this->assertTrue($opened['ok']);
+        $this->assertSame('https://nesp.zoom.us/j/123456789?pwd=fixture', $opened['destination_url']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_interview',
+            sprintf('interview_id = %d AND participant_link_open_count = 1 AND participant_link_opened_at IS NOT NULL', $interviewID)
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_audit_event',
+            sprintf("entity_type = 'nesp_interview' AND entity_id = %d AND event_type = 'manual_interview_participant_link_opened'", $interviewID)
+        ));
+
+        $this->assertTrue($workflow->cancelManualInterview($interviewID, 1, 'Fixture cancellation')['ok']);
+        $this->assertFalse($workflow->openInterviewParticipantLink($token)['ok']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_interview',
+            sprintf('interview_id = %d AND participant_link_revoked_at IS NOT NULL', $interviewID)
         ));
     }
 

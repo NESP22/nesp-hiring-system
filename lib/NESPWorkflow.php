@@ -393,8 +393,20 @@ class NESPWorkflow
             . 'Time: ' . $timeText . "\n"
             . 'Timezone: ' . $timezone . "\n"
             . 'Duration: ' . $durationMinutes . ' minutes' . "\n"
-            . 'Zoom link: ' . trim((string) $joinURL) . "\n\n"
+            . 'Interview link: ' . trim((string) $joinURL) . "\n\n"
             . 'If you need to reschedule, reply to this message and a member of the NESP team will help; no automated hiring decision will be made from this interview.';
+    }
+
+    public static function buildManualInterviewStoredInvitationCopy($firstName, $roleTitle, $scheduledStart, $durationMinutes, $timezone)
+    {
+        return self::buildManualInterviewInvitationCopy(
+            $firstName,
+            $roleTitle,
+            $scheduledStart,
+            $durationMinutes,
+            $timezone,
+            '[Generate a fresh secure interview link in the NESP dashboard before copying this invitation.]'
+        );
     }
 
     public static function generateQuestionnaireToken()
@@ -410,6 +422,22 @@ class NESPWorkflow
     public static function questionnaireTokenHash($token)
     {
         return hash('sha256', self::normalizeQuestionnaireToken($token));
+    }
+
+    public static function interviewParticipantTokenHash($token)
+    {
+        return hash('sha256', self::normalizeQuestionnaireToken($token));
+    }
+
+    public static function getInterviewParticipantLink($token)
+    {
+        $baseURL = defined('NESP_PUBLIC_BASE_URL') ? trim((string) NESP_PUBLIC_BASE_URL) : '';
+        if ($baseURL === '')
+        {
+            $baseURL = 'https://careers.nesportsphoto.com';
+        }
+
+        return rtrim($baseURL, '/') . '/modules/nesp/interviewParticipantLink.php?t=' . rawurlencode(self::normalizeQuestionnaireToken($token));
     }
 
     /**
@@ -3773,27 +3801,38 @@ class NESPWorkflow
             return $conflictResult;
         }
 
-        $invitationCopy = self::buildManualInterviewInvitationCopy(
+        $participantToken = self::generateQuestionnaireToken();
+        $participantTokenHash = self::interviewParticipantTokenHash($participantToken);
+        $participantLink = self::getInterviewParticipantLink($participantToken);
+        $oneTimeInvitationCopy = self::buildManualInterviewInvitationCopy(
             $normalized['candidate_first_name'],
             $normalized['role_title'],
             $normalized['scheduled_start'],
             $normalized['duration_minutes'],
             $normalized['timezone'],
-            $normalized['manual_zoom_join_url']
+            $participantLink
+        );
+        $invitationCopy = self::buildManualInterviewStoredInvitationCopy(
+            $normalized['candidate_first_name'],
+            $normalized['role_title'],
+            $normalized['scheduled_start'],
+            $normalized['duration_minutes'],
+            $normalized['timezone']
         );
 
         $this->_db->query(
             sprintf(
                 'INSERT INTO nesp_interview
-                    (candidate_id, joborder_id, interviewer_profile_id, workflow_stage_id, scheduled_start, scheduled_end, status_key, manual_zoom_join_url, timezone, invitation_status_key, invitation_preview_text, internal_notes, scheduled_by_user_id, date_created, date_modified)
+                    (candidate_id, joborder_id, interviewer_profile_id, workflow_stage_id, scheduled_start, scheduled_end, status_key, manual_zoom_join_url, participant_link_token_hash, timezone, invitation_status_key, invitation_preview_text, internal_notes, scheduled_by_user_id, date_created, date_modified)
                  VALUES
-                    (%s, %s, %s, NULL, %s, %s, "invitation_pending", %s, %s, "pending_human_review", %s, %s, %s, NOW(), NOW())',
+                    (%s, %s, %s, NULL, %s, %s, "invitation_pending", %s, %s, %s, "pending_human_review", %s, %s, %s, NOW(), NOW())',
                 $this->_db->makeQueryInteger($normalized['candidate_id']),
                 $this->_db->makeQueryInteger($normalized['joborder_id']),
                 $this->_db->makeQueryInteger($normalized['interviewer_profile_id']),
                 $this->_db->makeQueryString($normalized['scheduled_start']),
                 $this->_db->makeQueryString($normalized['scheduled_end']),
                 $this->_db->makeQueryString($normalized['manual_zoom_join_url']),
+                $this->_db->makeQueryString($participantTokenHash),
                 $this->_db->makeQueryString($normalized['timezone']),
                 $this->_db->makeQueryString($invitationCopy),
                 $this->_db->makeQueryString($normalized['internal_notes']),
@@ -3813,13 +3852,13 @@ class NESPWorkflow
             $this->logManualInterviewAvailabilityOverride($actorUserID, $interviewID, $normalized, $conflictResult);
         }
 
-        return array('ok' => true, 'interview_id' => $interviewID);
+        return array('ok' => true, 'interview_id' => $interviewID, 'one_time_invitation_copy' => $oneTimeInvitationCopy);
     }
 
     public function updateManualInterview($interviewID, $input, $actorUserID)
     {
         $interview = $this->getInterviewDetail($interviewID);
-        if (empty($interview) || $interview['status_key'] === 'cancelled')
+        if (empty($interview) || !in_array($interview['status_key'], array('requested', 'scheduled', 'invitation_pending', 'invitation_sent', 'confirmed', 'reschedule_needed'), true))
         {
             return array('ok' => false, 'error' => 'Choose an active interview to reschedule.');
         }
@@ -3844,13 +3883,23 @@ class NESPWorkflow
             return $conflictResult;
         }
 
-        $invitationCopy = self::buildManualInterviewInvitationCopy(
+        $participantToken = self::generateQuestionnaireToken();
+        $participantTokenHash = self::interviewParticipantTokenHash($participantToken);
+        $participantLink = self::getInterviewParticipantLink($participantToken);
+        $oneTimeInvitationCopy = self::buildManualInterviewInvitationCopy(
             $normalized['candidate_first_name'],
             $normalized['role_title'],
             $normalized['scheduled_start'],
             $normalized['duration_minutes'],
             $normalized['timezone'],
-            $normalized['manual_zoom_join_url']
+            $participantLink
+        );
+        $invitationCopy = self::buildManualInterviewStoredInvitationCopy(
+            $normalized['candidate_first_name'],
+            $normalized['role_title'],
+            $normalized['scheduled_start'],
+            $normalized['duration_minutes'],
+            $normalized['timezone']
         );
 
         $this->_db->query(
@@ -3861,6 +3910,11 @@ class NESPWorkflow
                      scheduled_end = %s,
                      status_key = "reschedule_needed",
                      manual_zoom_join_url = %s,
+                     participant_link_token_hash = %s,
+                     participant_link_opened_at = NULL,
+                     participant_link_last_opened_at = NULL,
+                     participant_link_open_count = 0,
+                     participant_link_revoked_at = NULL,
                      timezone = %s,
                      invitation_status_key = "pending_human_review",
                      invitation_preview_text = %s,
@@ -3872,6 +3926,7 @@ class NESPWorkflow
                 $this->_db->makeQueryString($normalized['scheduled_start']),
                 $this->_db->makeQueryString($normalized['scheduled_end']),
                 $this->_db->makeQueryString($normalized['manual_zoom_join_url']),
+                $this->_db->makeQueryString($participantTokenHash),
                 $this->_db->makeQueryString($normalized['timezone']),
                 $this->_db->makeQueryString($invitationCopy),
                 $this->_db->makeQueryString($normalized['internal_notes']),
@@ -3892,7 +3947,123 @@ class NESPWorkflow
             $this->logManualInterviewAvailabilityOverride($actorUserID, $interviewID, $normalized, $conflictResult);
         }
 
-        return array('ok' => true, 'interview_id' => (int) $interviewID);
+        return array('ok' => true, 'interview_id' => (int) $interviewID, 'one_time_invitation_copy' => $oneTimeInvitationCopy);
+    }
+
+    public function regenerateInterviewParticipantLink($interviewID, $actorUserID)
+    {
+        $interview = $this->getInterviewDetail($interviewID);
+        if (empty($interview) || !in_array($interview['status_key'], array('requested', 'scheduled', 'invitation_pending', 'invitation_sent', 'confirmed', 'reschedule_needed'), true))
+        {
+            return array('ok' => false, 'error' => 'Choose an active interview.');
+        }
+
+        $zoomValidation = self::validateZoomApplicantJoinURL($interview['manual_zoom_join_url']);
+        if (empty($zoomValidation['ok']))
+        {
+            return array('ok' => false, 'error' => 'This interview needs a valid applicant Zoom join link before a tracked link can be prepared.');
+        }
+
+        $durationMinutes = max(5, (int) round((strtotime($interview['scheduled_end']) - strtotime($interview['scheduled_start'])) / 60));
+        $token = self::generateQuestionnaireToken();
+        $tokenHash = self::interviewParticipantTokenHash($token);
+        $oneTimeInvitationCopy = self::buildManualInterviewInvitationCopy(
+            $interview['first_name'],
+            $interview['role_title'],
+            $interview['scheduled_start'],
+            $durationMinutes,
+            $interview['timezone'],
+            self::getInterviewParticipantLink($token)
+        );
+        $invitationCopy = self::buildManualInterviewStoredInvitationCopy(
+            $interview['first_name'],
+            $interview['role_title'],
+            $interview['scheduled_start'],
+            $durationMinutes,
+            $interview['timezone']
+        );
+
+        $this->_db->query(sprintf(
+            'UPDATE nesp_interview
+             SET participant_link_token_hash = %s,
+                 participant_link_opened_at = NULL,
+                 participant_link_last_opened_at = NULL,
+                 participant_link_open_count = 0,
+                 participant_link_revoked_at = NULL,
+                 invitation_status_key = "pending_human_review",
+                 invitation_preview_text = %s,
+                 date_modified = NOW()
+             WHERE interview_id = %s',
+            $this->_db->makeQueryString($tokenHash),
+            $this->_db->makeQueryString($invitationCopy),
+            $this->_db->makeQueryInteger($interviewID)
+        ));
+        $this->setCandidateWorkflowStage((int) $interview['candidate_id'], (int) $interview['joborder_id'], 'interview_confirmation_pending', 'Applicant', 'A refreshed interview invitation is ready for human review.', 'Review updated interview', $actorUserID);
+        $this->logAuditEvent($actorUserID, 'manual_interview_tracking_link_regenerated', 'nesp_interview', (int) $interviewID, array(
+            'candidate_id' => (int) $interview['candidate_id'],
+            'joborder_id' => (int) $interview['joborder_id']
+        ));
+
+        return array('ok' => true, 'interview_id' => (int) $interviewID, 'one_time_invitation_copy' => $oneTimeInvitationCopy);
+    }
+
+    public function openInterviewParticipantLink($token)
+    {
+        $token = self::normalizeQuestionnaireToken($token);
+        if ($token === '')
+        {
+            return array('ok' => false);
+        }
+
+        $tokenHash = self::interviewParticipantTokenHash($token);
+        $interview = $this->_db->getAssoc(sprintf(
+            'SELECT interview_id, candidate_id, joborder_id, status_key, manual_zoom_join_url,
+                    participant_link_opened_at, participant_link_revoked_at
+             FROM nesp_interview
+             WHERE participant_link_token_hash = %s
+             LIMIT 1',
+            $this->_db->makeQueryString($tokenHash)
+        ));
+        if (empty($interview)
+            || !empty($interview['participant_link_revoked_at'])
+            || !in_array($interview['status_key'], array('requested', 'scheduled', 'invitation_pending', 'invitation_sent', 'confirmed', 'reschedule_needed'), true))
+        {
+            return array('ok' => false);
+        }
+
+        $zoomValidation = self::validateZoomApplicantJoinURL($interview['manual_zoom_join_url']);
+        if (empty($zoomValidation['ok']))
+        {
+            return array('ok' => false);
+        }
+
+        $this->_db->query(sprintf(
+            'UPDATE nesp_interview
+             SET participant_link_open_count = participant_link_open_count + 1,
+                 participant_link_opened_at = COALESCE(participant_link_opened_at, UTC_TIMESTAMP()),
+                 participant_link_last_opened_at = UTC_TIMESTAMP(),
+                 date_modified = NOW()
+             WHERE interview_id = %s
+               AND participant_link_token_hash = %s
+               AND participant_link_revoked_at IS NULL
+               AND status_key IN ("requested", "scheduled", "invitation_pending", "invitation_sent", "confirmed", "reschedule_needed")',
+            $this->_db->makeQueryInteger($interview['interview_id']),
+            $this->_db->makeQueryString($tokenHash)
+        ));
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            return array('ok' => false);
+        }
+
+        if (empty($interview['participant_link_opened_at']))
+        {
+            $this->logAuditEvent(null, 'manual_interview_participant_link_opened', 'nesp_interview', (int) $interview['interview_id'], array(
+                'candidate_id' => (int) $interview['candidate_id'],
+                'joborder_id' => (int) $interview['joborder_id']
+            ));
+        }
+
+        return array('ok' => true, 'destination_url' => $zoomValidation['url']);
     }
 
     private function checkManualInterviewAvailabilityConflicts($normalized, $excludeInterviewID, $input, $actorUserID)
@@ -4065,6 +4236,7 @@ class NESPWorkflow
                 'UPDATE nesp_interview
                  SET status_key = "cancelled",
                      invitation_status_key = "cancellation_pending_human_review",
+                     participant_link_revoked_at = UTC_TIMESTAMP(),
                      outcome_key = "cancelled",
                      outcome_notes = %s,
                      cancelled_at = NOW(),
@@ -8196,6 +8368,19 @@ class NESPWorkflow
         $row['status_label'] = isset($statusLabels[$row['status_key']]) ? $statusLabels[$row['status_key']] : $row['status_key'];
         $row['outcome_label'] = isset($outcomeLabels[$row['outcome_key']]) ? $outcomeLabels[$row['outcome_key']] : $row['outcome_key'];
         $row['zoom_join_url_masked'] = self::maskZoomURLForAudit(isset($row['manual_zoom_join_url']) ? $row['manual_zoom_join_url'] : '');
+        $openCount = isset($row['participant_link_open_count']) ? (int) $row['participant_link_open_count'] : 0;
+        if ($openCount <= 0)
+        {
+            $row['participant_link_tracking_label'] = 'Not opened yet';
+        }
+        elseif ($openCount === 1)
+        {
+            $row['participant_link_tracking_label'] = 'Opened once' . (empty($row['participant_link_last_opened_at']) ? '' : ' at ' . date('M j, Y g:i A', strtotime($row['participant_link_last_opened_at'])));
+        }
+        else
+        {
+            $row['participant_link_tracking_label'] = 'Opened ' . $openCount . ' times' . (empty($row['participant_link_last_opened_at']) ? '' : '; last at ' . date('M j, Y g:i A', strtotime($row['participant_link_last_opened_at'])));
+        }
         return $row;
     }
 
