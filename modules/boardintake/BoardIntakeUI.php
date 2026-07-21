@@ -118,6 +118,10 @@ class BoardIntakeUI extends UserInterface
                 $this->requirePostCSRF();
                 $this->uploadResume();
                 break;
+            case 'repairImportedJobOrderLinks':
+                $this->requirePostCSRF();
+                $this->repairImportedJobOrderLinks();
+                break;
             default:
                 $this->review();
                 break;
@@ -287,6 +291,25 @@ class BoardIntakeUI extends UserInterface
 
         CATSUtility::transferRelativeURI(
             'm=boardintake&batchID=' . $batchID . '&resumeUploaded=1'
+        );
+    }
+
+    private function repairImportedJobOrderLinks()
+    {
+        $batchID = isset($_POST['batchID']) ? (int) $_POST['batchID'] : 0;
+        try
+        {
+            $result = $this->_intake->repairImportedCandidateJobOrderLinks($this->_userID, $batchID);
+        }
+        catch (Throwable $e)
+        {
+            $this->showError('Job-order repair stopped safely: ' . $e->getMessage());
+            return;
+        }
+        CATSUtility::transferRelativeURI(
+            'm=boardintake&batchID=' . $batchID .
+            '&jobOrderLinksVerified=' . (int) $result['verified'] .
+            '&jobOrderLinksRepaired=' . (int) $result['repaired']
         );
     }
 
