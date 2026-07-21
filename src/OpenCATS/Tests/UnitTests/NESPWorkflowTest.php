@@ -323,6 +323,10 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame(41001, $destinations[0]['joborder_id']);
         $this->assertStringContainsString('nesp_source=craigslist', $destinations[0]['tracked_link']);
         $this->assertTrue($destinations[7]['native_review_only']);
+
+        $templates = NESPRecruitingAds::getRequestedRoleAdTemplates();
+        $this->assertStringContainsString('IMPORTANT: To make sure our hiring team receives your application', $templates[0]['platform_versions'][0]['copy']);
+        $this->assertStringContainsString('Apply through NESP:', $templates[0]['platform_versions'][0]['copy']);
     }
 
     public function testEnsureCandidateWorkflowRowIsIdempotentAndDoesNotOverwriteExistingStage()

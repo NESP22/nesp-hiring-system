@@ -15,6 +15,7 @@
 
             <div class="nesp-panel">
                 <h3>Where applicants should apply</h3>
+                <p class="nesp-portal-required-notice"><strong>IMPORTANT - APPLY THROUGH THE NESP PORTAL:</strong> Use the tracked NESP link as the application destination wherever the job board allows it. Applications submitted only through a board's native form may not enter the NESP hiring queue until they are manually reviewed and imported.</p>
                 <p class="nesp-help-text">For a board that accepts an external application URL, copy the exact tracked OpenCATS link below. Applicants using that link enter OpenCATS and the NESP <strong>Needs Craig</strong> queue automatically. Indeed and LinkedIn may force native applications; use the Board Applicant Intake review page for those notifications or exports. It never contacts applicants or imports them without review.</p>
                 <table class="nesp-table">
                     <tr>

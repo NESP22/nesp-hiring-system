@@ -1000,6 +1000,21 @@
     gap: 8px;
 }
 
+.nesp-workflow .nesp-portal-required-notice {
+    background: #fff1f2;
+    border: 2px solid #b42318;
+    color: #8b1e17;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.5;
+    margin: 0 0 14px;
+    padding: 12px 14px;
+}
+
+.nesp-workflow .nesp-portal-required-notice strong {
+    color: #7a1712;
+}
+
 @media (max-width: 700px) {
     .nesp-workflow .nesp-interview-hero {
         display: grid;
