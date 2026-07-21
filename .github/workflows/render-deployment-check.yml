@@ -112,6 +112,19 @@ jobs:
                   errors.append('Installer access password must be entered in Render, not committed.')
               if str(env.get('OPENCATS_MAIL_ENABLED', {}).get('value')) != '0':
                   errors.append('Outbound OpenCATS mail must remain disabled for initial testing.')
+              required_mail_placeholders = (
+                  'OPENCATS_MAIL_MAILER',
+                  'OPENCATS_MAIL_SMTP_HOST',
+                  'OPENCATS_MAIL_SMTP_PORT',
+                  'OPENCATS_MAIL_SMTP_AUTH',
+                  'OPENCATS_MAIL_SMTP_USER',
+                  'OPENCATS_MAIL_SMTP_PASS',
+                  'OPENCATS_MAIL_SMTP_SECURE',
+                  'OPENCATS_MAIL_FROM_ADDRESS',
+              )
+              for key in required_mail_placeholders:
+                  if env.get(key, {}).get('sync') is not False:
+                      errors.append(f'{key} must be a Render-only secret placeholder.')
 
               db_host = env.get('DB_HOST', {}).get('fromService', {})
               if db_host.get('name') != 'nesp-hiring-db' or db_host.get('property') != 'host':
@@ -221,6 +234,99 @@ jobs:
             'until curl -fsS http://127.0.0.1:18080/render-health.txt | grep -q ok; do sleep 3; done'
           docker exec nesp-hiring-test-web test -f /var/data/state/persistence-marker
           docker exec nesp-hiring-test-web sh -c 'find /var/data/backups -name database.sql.gz -type f | grep -q .'
+
+      - name: Verify mail configuration fails closed and applies only complete secrets
+        run: |
+          docker rm -f nesp-hiring-test-web
+
+          docker exec nesp-hiring-test-db mariadb -u root -ptest-only-root-password cats -e '
+            CREATE TABLE settings (
+              settings_id INT NOT NULL AUTO_INCREMENT,
+              setting VARCHAR(255) NOT NULL,
+              value VARCHAR(255),
+              settings_type INT NOT NULL DEFAULT 0,
+              PRIMARY KEY (settings_id)
+            )
+          '
+
+          disabled_mail_output="$(docker run --rm \
+            --network nesp-hiring-test \
+            -v nesp-hiring-test-files:/var/data \
+            -e PORT=10000 \
+            -e DB_HOST=nesp-hiring-test-db \
+            -e DB_NAME=cats \
+            -e DB_USER=opencats \
+            -e DB_PASSWORD=test-only-password \
+            -e INSTALL_ACCESS_USER=nesp-admin \
+            -e INSTALL_ACCESS_PASSWORD=test-only-install-password \
+            -e OPENCATS_MAIL_ENABLED=1 \
+            -e OPENCATS_MAIL_MAILER=smtp \
+            -e OPENCATS_MAIL_SMTP_HOST=mail.example.test \
+            -e OPENCATS_MAIL_SMTP_PORT=587 \
+            -e OPENCATS_MAIL_SMTP_AUTH=1 \
+            -e OPENCATS_MAIL_SMTP_USER=mail-test-user \
+            -e OPENCATS_MAIL_FROM_ADDRESS=mailer@example.test \
+            nesp-hiring-render:test true 2>&1 || true)"
+          echo "$disabled_mail_output" | grep -F 'required configuration is incomplete or invalid'
+          ! echo "$disabled_mail_output" | grep -F 'mail-test-user'
+          ! echo "$disabled_mail_output" | grep -F 'mailer@example.test'
+
+          docker run -d \
+            --name nesp-hiring-test-web \
+            --network nesp-hiring-test \
+            -p 127.0.0.1:18080:10000 \
+            -v nesp-hiring-test-files:/var/data \
+            -e PORT=10000 \
+            -e DB_HOST=nesp-hiring-test-db \
+            -e DB_NAME=cats \
+            -e DB_USER=opencats \
+            -e DB_PASSWORD=test-only-password \
+            -e INSTALL_ACCESS_USER=nesp-admin \
+            -e INSTALL_ACCESS_PASSWORD=test-only-install-password \
+            -e OPENCATS_MAIL_ENABLED=1 \
+            -e OPENCATS_MAIL_MAILER=smtp \
+            -e OPENCATS_MAIL_SMTP_HOST=mail.example.test \
+            -e OPENCATS_MAIL_SMTP_PORT=587 \
+            -e OPENCATS_MAIL_SMTP_AUTH=1 \
+            -e OPENCATS_MAIL_SMTP_USER=mail-test-user \
+            -e OPENCATS_MAIL_SMTP_PASS=mail-test-password \
+            -e OPENCATS_MAIL_SMTP_SECURE=tls \
+            -e OPENCATS_MAIL_FROM_ADDRESS=mailer@example.test \
+            nesp-hiring-render:test
+
+          timeout 120s bash -c \
+            'until curl -fsS http://127.0.0.1:18080/render-health.txt | grep -q ok; do sleep 3; done'
+          docker exec nesp-hiring-test-web sh -c '
+            grep -Fq "define('"'"'MAIL_MAILER'"'"', 3);" /var/data/config.php
+            grep -Fq "define('"'"'MAIL_SMTP_HOST'"'"', '"'"'mail.example.test'"'"');" /var/data/config.php
+            grep -Fq "define('"'"'MAIL_SMTP_PASS'"'"', '"'"'mail-test-password'"'"');" /var/data/config.php
+            mariadb -h nesp-hiring-test-db -u opencats -ptest-only-password cats -Nse "SELECT value FROM settings WHERE setting = '\''fromAddress'\'' AND settings_type = 1" | grep -Fxq "mailer@example.test"
+            mariadb -h nesp-hiring-test-db -u opencats -ptest-only-password cats -Nse "SELECT value FROM settings WHERE setting = '\''configured'\'' AND settings_type = 1" | grep -Fxq 1
+          '
+
+          docker rm -f nesp-hiring-test-web
+          docker run -d \
+            --name nesp-hiring-test-web \
+            --network nesp-hiring-test \
+            -p 127.0.0.1:18080:10000 \
+            -v nesp-hiring-test-files:/var/data \
+            -e PORT=10000 \
+            -e DB_HOST=nesp-hiring-test-db \
+            -e DB_NAME=cats \
+            -e DB_USER=opencats \
+            -e DB_PASSWORD=test-only-password \
+            -e INSTALL_ACCESS_USER=nesp-admin \
+            -e INSTALL_ACCESS_PASSWORD=test-only-install-password \
+            -e OPENCATS_MAIL_ENABLED=0 \
+            nesp-hiring-render:test
+
+          timeout 120s bash -c \
+            'until curl -fsS http://127.0.0.1:18080/render-health.txt | grep -q ok; do sleep 3; done'
+          docker exec nesp-hiring-test-web sh -c '
+            grep -Fq "define('"'"'MAIL_MAILER'"'"', 0);" /var/data/config.php
+            grep -Fq "define('"'"'MAIL_SMTP_PASS'"'"', '"'"''"'"');" /var/data/config.php
+            mariadb -h nesp-hiring-test-db -u opencats -ptest-only-password cats -Nse "SELECT value FROM settings WHERE setting = '\''configured'\'' AND settings_type = 1" | grep -Fxq 0
+          '
 
       - name: Container diagnostics
         if: failure()

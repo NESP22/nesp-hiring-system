@@ -78,19 +78,153 @@ foreach ($values as $constant => $value) {
     $config = preg_replace($pattern, $replacement, $config, 1);
 }
 
-if ((getenv('OPENCATS_MAIL_ENABLED') ?: '0') !== '1') {
-    $config = preg_replace(
-        "/define\\(\\s*['\"]MAIL_MAILER['\"]\\s*,.*?\\);/",
-        "define('MAIL_MAILER', 0);",
-        $config,
-        1
+function updateDefine($config, $constant, $value)
+{
+    $replacement = "define('{$constant}', " . var_export($value, true) . ");";
+    $pattern = "/define\\(\\s*['\"]" . preg_quote($constant, '/') . "['\"]\\s*,.*?\\);/";
+    $updated = preg_replace($pattern, $replacement, $config, 1, $count);
+    if ($updated === null || $count !== 1) {
+        fwrite(STDERR, "Persistent OpenCATS mail configuration is incomplete.\n");
+        exit(1);
+    }
+
+    return $updated;
+}
+
+function mailEnv($name)
+{
+    $value = getenv($name);
+    return $value === false ? '' : trim((string) $value);
+}
+
+function failClosedMailConfiguration()
+{
+    // Do not include an environment value in startup output. Render logs are
+    // operational telemetry, not a secret store.
+    fwrite(STDERR, "OpenCATS mail is enabled but its required configuration is incomplete or invalid.\n");
+    exit(1);
+}
+
+function updateMailerSettings($enabled, $fromAddress)
+{
+    $host = getenv('DB_HOST') ?: 'localhost';
+    $user = getenv('DB_USER') ?: 'opencats';
+    $password = getenv('DB_PASSWORD') ?: '';
+    $database = getenv('DB_NAME') ?: 'cats';
+    $port = (int) (getenv('DB_PORT') ?: 3306);
+
+    mysqli_report(MYSQLI_REPORT_OFF);
+    $connection = @new mysqli($host, $user, $password, $database, $port);
+    if ($connection->connect_errno) {
+        if (!$enabled) {
+            return;
+        }
+        fwrite(STDERR, "Unable to apply the persistent OpenCATS mail safety settings.\n");
+        exit(1);
+    }
+
+    $table = $connection->query("SHOW TABLES LIKE 'settings'");
+    if ($table === false || $table->num_rows !== 1) {
+        $connection->close();
+        if (!$enabled) {
+            return;
+        }
+        fwrite(STDERR, "Unable to apply the persistent OpenCATS mail safety settings.\n");
+        exit(1);
+    }
+    $table->free();
+
+    if (!$connection->begin_transaction()) {
+        fwrite(STDERR, "Unable to start the persistent OpenCATS mail safety update.\n");
+        exit(1);
+    }
+
+    $configured = $enabled ? '1' : '0';
+    $fromAddress = $enabled ? $fromAddress : '';
+    $settings = array(
+        'fromAddress' => $fromAddress,
+        'configured' => $configured
     );
+    foreach ($settings as $setting => $value) {
+        $delete = $connection->prepare('DELETE FROM settings WHERE setting = ? AND settings_type = 1');
+        $insert = $connection->prepare('INSERT INTO settings (setting, value, settings_type) VALUES (?, ?, 1)');
+        if ($delete === false || $insert === false
+            || !$delete->bind_param('s', $setting)
+            || !$delete->execute()
+            || !$insert->bind_param('ss', $setting, $value)
+            || !$insert->execute()) {
+            $connection->rollback();
+            fwrite(STDERR, "Unable to apply the persistent OpenCATS mail safety settings.\n");
+            exit(1);
+        }
+        $delete->close();
+        $insert->close();
+    }
+
+    if (!$connection->commit()) {
+        $connection->rollback();
+        fwrite(STDERR, "Unable to apply the persistent OpenCATS mail safety settings.\n");
+        exit(1);
+    }
+
+    $connection->close();
+}
+
+$mailEnabled = mailEnv('OPENCATS_MAIL_ENABLED') === '1';
+$mailValues = array(
+    'MAIL_MAILER' => 0,
+    'MAIL_SMTP_HOST' => '',
+    'MAIL_SMTP_PORT' => 0,
+    'MAIL_SMTP_AUTH' => false,
+    'MAIL_SMTP_USER' => '',
+    'MAIL_SMTP_PASS' => '',
+    'MAIL_SMTP_SECURE' => ''
+);
+$fromAddress = '';
+
+if ($mailEnabled) {
+    $mailer = strtolower(mailEnv('OPENCATS_MAIL_MAILER'));
+    $smtpHost = mailEnv('OPENCATS_MAIL_SMTP_HOST');
+    $smtpPort = mailEnv('OPENCATS_MAIL_SMTP_PORT');
+    $smtpAuth = mailEnv('OPENCATS_MAIL_SMTP_AUTH');
+    $smtpUser = mailEnv('OPENCATS_MAIL_SMTP_USER');
+    $smtpPass = mailEnv('OPENCATS_MAIL_SMTP_PASS');
+    $smtpSecure = strtolower(mailEnv('OPENCATS_MAIL_SMTP_SECURE'));
+    $fromAddress = mailEnv('OPENCATS_MAIL_FROM_ADDRESS');
+
+    if ($mailer !== 'smtp'
+        || $smtpHost === '' || strlen($smtpHost) > 255 || preg_match('/\\s/', $smtpHost)
+        || !ctype_digit($smtpPort) || (int) $smtpPort < 1 || (int) $smtpPort > 65535
+        || $smtpAuth !== '1'
+        || $smtpUser === '' || $smtpPass === ''
+        || !in_array($smtpSecure, array('tls', 'ssl'), true)
+        || filter_var($fromAddress, FILTER_VALIDATE_EMAIL) === false) {
+        failClosedMailConfiguration();
+    }
+
+    $mailValues = array(
+        'MAIL_MAILER' => 3,
+        'MAIL_SMTP_HOST' => $smtpHost,
+        'MAIL_SMTP_PORT' => (int) $smtpPort,
+        'MAIL_SMTP_AUTH' => true,
+        'MAIL_SMTP_USER' => $smtpUser,
+        'MAIL_SMTP_PASS' => $smtpPass,
+        'MAIL_SMTP_SECURE' => $smtpSecure
+    );
+}
+
+foreach ($mailValues as $constant => $value) {
+    $config = updateDefine($config, $constant, $value);
 }
 
 if (file_put_contents($path, $config, LOCK_EX) === false) {
     fwrite(STDERR, "Unable to update persistent OpenCATS config.\n");
     exit(1);
 }
+
+// The legacy mailer reads its From address from the persistent settings table,
+// not config.php. There is no supported From-name field in this OpenCATS mailer.
+updateMailerSettings($mailEnabled, $fromAddress);
 PHP
 
 # Password-protect the full site during installation and private testing.
