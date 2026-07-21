@@ -5,8 +5,8 @@
         <?php TemplateUtility::printQuickSearch(); ?>
         <div id="contents">
             <div class="nesp-page-title">
-                <h2>My Assigned Candidates</h2>
-                <p>Your interview work in one place. Open an assignment to review the candidate, conduct the interview, and complete the scorecard.</p>
+                <h2><?php $this->_(!empty($this->isAdminAssignmentOverview) ? 'All Interviewer Assignments' : 'My Assigned Candidates'); ?></h2>
+                <p><?php $this->_(!empty($this->isAdminAssignmentOverview) ? 'Admin overview of every active interviewer assignment. Open a candidate record to manage the workflow.' : 'Your interview work in one place. Open an assignment to review the candidate, conduct the interview, and complete the scorecard.'); ?></p>
             </div>
 
             <div class="nesp-dashboard-nav">
@@ -15,7 +15,11 @@
             </div>
 
             <div class="nesp-safety-banner nesp-interviewer-note">
-                You only see candidates Craig assigned to you. Save a draft while you interview, then submit the scorecard when you are finished.
+                <?php if (!empty($this->isAdminAssignmentOverview)): ?>
+                    You are seeing every active assignment because you are an administrator. Interviewers continue to see only their own assignments.
+                <?php else: ?>
+                    You only see candidates Craig assigned to you. Save a draft while you interview, then submit the scorecard when you are finished.
+                <?php endif; ?>
             </div>
 
             <?php if (count($this->assignedCandidates)): ?>
@@ -27,6 +31,9 @@
                             <span><?php $this->_($candidate['stage_name']); ?></span>
                         </div>
                         <div class="nesp-task-role"><?php $this->_($candidate['role_title']); ?></div>
+                        <?php if (!empty($this->isAdminAssignmentOverview)): ?>
+                            <p><strong>Assigned interviewer:</strong> <?php $this->_($candidate['interviewer_name']); ?></p>
+                        <?php endif; ?>
                         <p><?php $this->_($candidate['summary']); ?></p>
                         <dl>
                             <dt>Interview</dt>
@@ -34,7 +41,11 @@
                             <dt>Scorecard</dt>
                             <dd><?php $this->_($candidate['scorecard_status_key'] ? $candidate['scorecard_status_key'] : 'Not started'); ?></dd>
                         </dl>
-                        <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignedCandidate&amp;candidateID=<?php echo((int) $candidate['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $candidate['joborder_id']); ?>">Open interview</a>
+                        <?php if (!empty($this->isAdminAssignmentOverview)): ?>
+                            <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=candidates&amp;a=show&amp;candidateID=<?php echo((int) $candidate['candidate_id']); ?>">Open candidate</a>
+                        <?php else: ?>
+                            <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignedCandidate&amp;candidateID=<?php echo((int) $candidate['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $candidate['joborder_id']); ?>">Open interview</a>
+                        <?php endif; ?>
                     </div>
                     <?php endforeach; ?>
                 </div>

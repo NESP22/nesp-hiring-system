@@ -197,6 +197,20 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringNotContainsString('interviewerProfiles as $profile', $template);
     }
 
+    public function testAdminsReceiveAnAllAssignmentsOverviewWithoutBroadeningInterviewerAccess()
+    {
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/nesp/AssignedCandidates.tpl');
+
+        $this->assertStringContainsString('getAllAssignedCandidatesForAdmin()', $ui);
+        $this->assertStringContainsString('getAssignedCandidatesForUser($this->_userID)', $ui);
+        $this->assertStringContainsString('public function getAllAssignedCandidatesForAdmin()', $workflow);
+        $this->assertStringContainsString('All Interviewer Assignments', $template);
+        $this->assertStringContainsString('Interviewers continue to see only their own assignments.', $template);
+        $this->assertStringContainsString('Open candidate', $template);
+    }
+
     public function testGoogleCalendarFreeBusyDefaultsAreReadOnlyAndDisabled()
     {
         $this->assertSame('NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED', NESPGoogleCalendarFreeBusy::FEATURE_FLAG);
