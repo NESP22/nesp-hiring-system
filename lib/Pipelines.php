@@ -464,7 +464,10 @@ class Pipelines
                 ON candidate_joborder.candidate_id = candidate.candidate_id
             INNER JOIN joborder
                 ON candidate_joborder.joborder_id = joborder.joborder_id
-            INNER JOIN company
+            /* Legacy job orders can legitimately use the internal posting
+             * placeholder instead of a persisted company record. Do not hide
+             * their valid candidate/job-order links on Candidate Details. */
+            LEFT JOIN company
                 ON company.company_id = joborder.company_id
             LEFT JOIN user AS owner_user
                 ON joborder.owner = owner_user.user_id
@@ -523,7 +526,9 @@ class Pipelines
                 ON candidate_joborder.candidate_id = candidate.candidate_id
             INNER JOIN joborder
                 ON candidate_joborder.joborder_id = joborder.joborder_id
-            INNER JOIN company
+            /* Keep valid pipeline rows visible for internal job postings
+             * whose company reference is absent or no longer present. */
+            LEFT JOIN company
                 ON company.company_id = joborder.company_id
             LEFT JOIN user AS owner_user
                 ON joborder.owner = owner_user.user_id
