@@ -5125,6 +5125,65 @@ class NESPWorkflow
         );
     }
 
+    public function getAllAssignedCandidatesForAdmin()
+    {
+        return $this->_db->getAllAssoc(
+            'SELECT
+                cg.grant_id,
+                cg.candidate_id,
+                cg.joborder_id,
+                ip.display_name AS interviewer_name,
+                CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                jo.title AS role_title,
+                ws.display_name AS stage_name,
+                cw.summary,
+                cw.waiting_on_key,
+                cw.date_modified AS last_activity,
+                i.interview_id,
+                i.scheduled_start,
+                i.scheduled_end,
+                i.status_key AS interview_status_key,
+                sr.status_key AS scorecard_status_key
+             FROM
+                nesp_interviewer_candidate_grant cg
+             INNER JOIN nesp_interviewer_profile ip
+                ON ip.interviewer_profile_id = cg.interviewer_profile_id
+             INNER JOIN candidate c
+                ON c.candidate_id = cg.candidate_id
+             INNER JOIN joborder jo
+                ON jo.joborder_id = cg.joborder_id
+             LEFT JOIN nesp_candidate_workflow cw
+                ON cw.candidate_id = cg.candidate_id
+                AND cw.joborder_id = cg.joborder_id
+             LEFT JOIN nesp_workflow_stage ws
+                ON ws.workflow_stage_id = cw.workflow_stage_id
+             LEFT JOIN nesp_interview i
+                ON i.interview_id = (
+                    SELECT MAX(i2.interview_id)
+                    FROM nesp_interview i2
+                    WHERE i2.candidate_id = cg.candidate_id
+                      AND i2.joborder_id = cg.joborder_id
+                      AND i2.interviewer_profile_id = ip.interviewer_profile_id
+                )
+             LEFT JOIN nesp_scorecard_response sr
+                ON sr.scorecard_response_id = (
+                    SELECT MAX(sr2.scorecard_response_id)
+                    FROM nesp_scorecard_response sr2
+                    WHERE sr2.candidate_id = cg.candidate_id
+                      AND sr2.joborder_id = cg.joborder_id
+                      AND sr2.interviewer_profile_id = ip.interviewer_profile_id
+                )
+             WHERE
+                cg.date_revoked IS NULL
+                AND ip.is_active = 1
+                AND c.is_active = 1
+             ORDER BY
+                ip.display_name ASC,
+                i.scheduled_start ASC,
+                cw.date_modified DESC'
+        );
+    }
+
     public function getAssignedCandidateDetail($userID, $candidateID, $jobOrderID)
     {
         if (!$this->userCanAccessCandidate($userID, $candidateID, $jobOrderID))
