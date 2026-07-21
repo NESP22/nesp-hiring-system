@@ -79,17 +79,24 @@
 
                 <div class="nesp-panel">
                     <h3>Assign Reviewer</h3>
-                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignQuestionnaireReviewer">
-                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
-                        <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />
-                        <label for="interviewerProfileID">Interviewer</label>
-                        <select id="interviewerProfileID" name="interviewerProfileID">
-                            <?php foreach ($this->interviewerProfiles as $profile): ?>
-                                <option value="<?php echo((int) $profile['interviewer_profile_id']); ?>"><?php $this->_($profile['display_name']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button class="nesp-primary-action" type="submit">Assign</button>
-                    </form>
+                    <?php if ((int) $this->questionnaire['joborder_id'] === 41001): ?>
+                        <p class="nesp-muted">Customer Service questionnaires stay with Craig. No interviewer assignment is needed.</p>
+                    <?php elseif (empty($this->eligibleReviewerProfiles)): ?>
+                        <p class="nesp-muted">No active, open interviewer is approved for this role yet. Update Interviewer Settings before assigning this questionnaire.</p>
+                    <?php else: ?>
+                        <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignQuestionnaireReviewer">
+                            <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />
+                            <label for="interviewerProfileID">Interviewer</label>
+                            <select id="interviewerProfileID" name="interviewerProfileID" required>
+                                <option value="">Choose interviewer</option>
+                                <?php foreach ($this->eligibleReviewerProfiles as $profile): ?>
+                                    <option value="<?php echo((int) $profile['interviewer_profile_id']); ?>"><?php $this->_($profile['display_name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button class="nesp-primary-action" type="submit">Assign</button>
+                        </form>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>

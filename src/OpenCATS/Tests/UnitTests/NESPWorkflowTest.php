@@ -184,6 +184,19 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('ijr.joborder_id = %s', $workflow);
     }
 
+    public function testQuestionnaireReviewerPickerUsesTheSameEligibilityRulesAsAssignment()
+    {
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireReview.tpl');
+
+        $this->assertStringContainsString('getEligibleInterviewersForAssignment((int) $detail[\'joborder_id\'])', $ui);
+        $this->assertStringContainsString('Customer Service questionnaires stay with Craig', $ui);
+        $this->assertStringContainsString('Choose an active, open interviewer approved for this role.', $ui);
+        $this->assertStringContainsString('eligibleReviewerProfiles', $template);
+        $this->assertStringContainsString('No active, open interviewer is approved for this role yet.', $template);
+        $this->assertStringNotContainsString('interviewerProfiles as $profile', $template);
+    }
+
     public function testGoogleCalendarFreeBusyDefaultsAreReadOnlyAndDisabled()
     {
         $this->assertSame('NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED', NESPGoogleCalendarFreeBusy::FEATURE_FLAG);
