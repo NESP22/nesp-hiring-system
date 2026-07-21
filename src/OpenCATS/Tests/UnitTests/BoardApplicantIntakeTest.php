@@ -171,8 +171,10 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertStringContainsString('applyDuplicateChecks($batchID)', $intake);
         $this->assertStringContainsString('importApprovedRows($actorUserID, $batchID)', $intake);
         $this->assertStringContainsString("case 'importAllApproved'", $ui);
-        $this->assertStringContainsString('Import All Ready Applicants', $template);
-        $this->assertStringContainsString('explicit row approval', $template);
+        $this->assertStringContainsString('Three simple steps:', $template);
+        $this->assertStringContainsString('Import All Reviewed Applicants', $template);
+        $this->assertStringContainsString('Import Approved Applicants to Needs Craig', $template);
+        $this->assertStringContainsString('reviewed and approved', $template);
     }
 
     public function testDuplicateReviewFlagsRepeatedEmailOrNameRows()
