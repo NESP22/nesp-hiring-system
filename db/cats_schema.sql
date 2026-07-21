@@ -1389,6 +1389,11 @@ CREATE TABLE `nesp_interview` (
   `status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `zoom_meeting_id` VARCHAR(128) COLLATE utf8mb4_unicode_ci,
   `manual_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `participant_link_token_hash` CHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `participant_link_opened_at` DATETIME,
+  `participant_link_last_opened_at` DATETIME,
+  `participant_link_open_count` INT(11) NOT NULL DEFAULT '0',
+  `participant_link_revoked_at` DATETIME,
   `timezone` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'America/New_York',
   `invitation_status_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'not_generated',
   `invitation_preview_text` TEXT COLLATE utf8mb4_unicode_ci,
@@ -1408,6 +1413,7 @@ CREATE TABLE `nesp_interview` (
   KEY `IDX_status_key` (`status_key`),
   KEY `IDX_nesp_interview_invitation_status` (`invitation_status_key`),
   KEY `IDX_nesp_interview_outcome` (`outcome_key`),
+  KEY `IDX_nesp_interview_participant_token` (`participant_link_token_hash`),
   KEY `IDX_nesp_interview_schedule` (`scheduled_start`, `status_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
