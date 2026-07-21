@@ -917,9 +917,13 @@ class NESPUI extends UserInterface
 
     private function assignedCandidates()
     {
+        $isAdmin = $this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA;
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Interviews');
-        $this->_template->assign('assignedCandidates', $this->_workflow->getAssignedCandidatesForUser($this->_userID));
+        $this->_template->assign('isAdminAssignmentOverview', $isAdmin);
+        $this->_template->assign('assignedCandidates', $isAdmin
+            ? $this->_workflow->getAllAssignedCandidatesForAdmin()
+            : $this->_workflow->getAssignedCandidatesForUser($this->_userID));
         $this->_template->display('./modules/nesp/AssignedCandidates.tpl');
     }
 
