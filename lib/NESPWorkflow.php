@@ -6144,7 +6144,7 @@ class NESPWorkflow
         return NESPVapiIntegration::getConfigurationStatus($this->isFeatureFlagEnabled('NESP_VAPI_ENABLED'));
     }
 
-    public function candidateCanPrepareQuestionnaire($candidateID, $jobOrderID)
+    public function candidateCanPrepareQuestionnaire($candidateID, $jobOrderID, $lockForUpdate = false)
     {
         $candidateID = (int) $candidateID;
         $jobOrderID = (int) $jobOrderID;
@@ -6167,10 +6167,11 @@ class NESPWorkflow
              WHERE cw.candidate_id = %s
                AND cw.joborder_id = %s
                AND ws.stage_key = %s
-             LIMIT 1',
+             LIMIT 1%s',
             $this->_db->makeQueryInteger($candidateID),
             $this->_db->makeQueryInteger($jobOrderID),
-            $this->_db->makeQueryString('new')
+            $this->_db->makeQueryString('new'),
+            $lockForUpdate ? ' FOR UPDATE' : ''
         ));
 
         return !empty($row) && self::validateApplicantContactEmail($row['email1'])['ok'];
@@ -7201,19 +7202,28 @@ class NESPWorkflow
 
     public function requestQuestionnaire($candidateID, $jobOrderID, $actorUserID, $requireEligibleWorkflow = false)
     {
-        if ($requireEligibleWorkflow && !$this->candidateCanPrepareQuestionnaire($candidateID, $jobOrderID))
+        $transactionStarted = $this->_db->beginTransaction();
+        if ($requireEligibleWorkflow && !$transactionStarted)
         {
+            return false;
+        }
+        if ($requireEligibleWorkflow && !$this->candidateCanPrepareQuestionnaire($candidateID, $jobOrderID, true))
+        {
+            $this->_db->rollbackTransaction();
             return false;
         }
         $preview = $this->getCandidateQuestionnairePreview($candidateID, $jobOrderID);
         if (empty($preview))
         {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
             return false;
         }
 
         $activeCandidateJobKey = self::questionnaireActiveCandidateJobKey($candidateID, $jobOrderID);
         $hasActiveCandidateJobKey = $this->isColumnInstalled('nesp_screening_questionnaire', 'active_candidate_job_key');
-        $transactionStarted = $this->_db->beginTransaction();
 
         // Expired links are terminal. Reapplications receive one fresh link;
         // all other active states reuse their existing questionnaire snapshot.

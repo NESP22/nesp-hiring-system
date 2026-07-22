@@ -791,6 +791,27 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         ));
         $this->assertSame(0, $this->countRows('nesp_screening_questionnaire'));
         $this->assertSame(array(), $workflow->getCandidateContactDetailsContext($workflowID, $candidateID, $jobOrderID));
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'hired' LIMIT 1)
+             WHERE candidate_workflow_id = %d",
+            $workflowID
+        ));
+        $this->assertFalse($workflow->requestQuestionnaire($candidateID, $jobOrderID, 1, true));
+        $this->assertSame(0, $this->countRows('nesp_screening_questionnaire'));
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'new' LIMIT 1)
+             WHERE candidate_workflow_id = %d",
+            $workflowID
+        ));
+        $this->assertNotFalse($workflow->requestQuestionnaire($candidateID, $jobOrderID, 1, true));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
     }
 
     public function testTrackedInterviewParticipantLinkRecordsOpenAndFailsClosedAfterCancellation()
