@@ -27,7 +27,6 @@
  * $Id: HomeUI.php 3810 2007-12-05 19:13:25Z brian $
  */
 
-include_once(LEGACY_ROOT . '/lib/NewVersionCheck.php');
 include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 include_once(LEGACY_ROOT . '/lib/Dashboard.php');
 
@@ -105,8 +104,6 @@ class HomeUI extends UserInterface
     private function home()
     {        
          if (!eval(Hooks::get('HOME'))) return;
-        
-        NewVersionCheck::getNews();
         
         $dashboard = new Dashboard();
         $placedRS = $dashboard->getPlacements();
