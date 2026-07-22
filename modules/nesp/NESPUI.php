@@ -266,6 +266,17 @@ class NESPUI extends UserInterface
                 $this->sendQuestionnaireEmail();
                 break;
 
+            case 'confirmBulkQuestionnaireEmails':
+                $this->adminOnly();
+                $this->confirmBulkQuestionnaireEmails();
+                break;
+
+            case 'sendBulkQuestionnaireEmails':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->sendBulkQuestionnaireEmails();
+                break;
+
             case 'reviewQuestionnaire':
                 $this->reviewQuestionnaire();
                 break;
@@ -492,6 +503,14 @@ class NESPUI extends UserInterface
         $this->_template->assign('assignmentSuggestions', $this->_workflow->getAssignmentSuggestions(50));
         $this->_template->assign('interviewerAccountability', $this->_workflow->getInterviewerAccountability());
         $this->_template->assign('canAssignInterviewers', $this->_workflow->isFeatureFlagEnabled('NESP_INTERVIEWER_POOL_ENABLED'));
+        $this->_template->assign('bulkQuestionnairePreview', $this->_workflow->getBulkQuestionnaireEmailPreview(200));
+        $bulkQuestionnaireMessage = isset($_SESSION['NESP_BULK_QUESTIONNAIRE_MESSAGE'])
+            ? $_SESSION['NESP_BULK_QUESTIONNAIRE_MESSAGE'] : '';
+        $bulkQuestionnaireItems = isset($_SESSION['NESP_BULK_QUESTIONNAIRE_ITEMS'])
+            ? $_SESSION['NESP_BULK_QUESTIONNAIRE_ITEMS'] : array();
+        unset($_SESSION['NESP_BULK_QUESTIONNAIRE_MESSAGE'], $_SESSION['NESP_BULK_QUESTIONNAIRE_ITEMS']);
+        $this->_template->assign('bulkQuestionnaireMessage', $bulkQuestionnaireMessage);
+        $this->_template->assign('bulkQuestionnaireItems', $bulkQuestionnaireItems);
         $assignmentMessage = isset($_SESSION['NESP_ASSIGNMENT_MESSAGE']) ? $_SESSION['NESP_ASSIGNMENT_MESSAGE'] : '';
         unset($_SESSION['NESP_ASSIGNMENT_MESSAGE']);
         $this->_template->assign('assignmentMessage', $assignmentMessage);
@@ -1234,6 +1253,67 @@ class NESPUI extends UserInterface
         $_SESSION['NESP_QUESTIONNAIRE_INVITATION_COPY'] = isset($delivery['one_time_invitation_copy'])
             ? $delivery['one_time_invitation_copy'] : '';
         CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
+    }
+
+    private function confirmBulkQuestionnaireEmails()
+    {
+        $preview = $this->_workflow->getBulkQuestionnaireEmailPreview(200);
+        $token = NESPWorkflow::generateQuestionnaireToken();
+        $snapshot = array();
+        foreach ($preview['ready'] as $row)
+        {
+            $snapshot[] = array(
+                'candidate_id' => (int) $row['candidate_id'],
+                'joborder_id' => (int) $row['joborder_id'],
+                'candidate_name' => (string) $row['candidate_name'],
+                'role_title' => (string) $row['role_title'],
+                'email_fingerprint' => (string) $row['email_fingerprint'],
+                'questionnaire_fingerprint' => (string) $row['questionnaire_fingerprint']
+            );
+        }
+        $_SESSION['NESP_BULK_QUESTIONNAIRE_SEND'] = array(
+            'token_hash' => hash('sha256', $token),
+            'created_at' => time(),
+            'rows' => $snapshot
+        );
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Needs Craig');
+        $this->_template->assign('preview', $preview);
+        $this->_template->assign('bulkToken', $token);
+        $this->_template->display('./modules/nesp/BulkQuestionnaireConfirm.tpl');
+    }
+
+    private function sendBulkQuestionnaireEmails()
+    {
+        $token = isset($_POST['bulkToken']) ? trim((string) $_POST['bulkToken']) : '';
+        $state = isset($_SESSION['NESP_BULK_QUESTIONNAIRE_SEND'])
+            ? $_SESSION['NESP_BULK_QUESTIONNAIRE_SEND'] : array();
+        unset($_SESSION['NESP_BULK_QUESTIONNAIRE_SEND']);
+
+        $valid = $token !== ''
+            && !empty($state['token_hash'])
+            && !empty($state['created_at'])
+            && (time() - (int) $state['created_at']) <= 900
+            && hash_equals((string) $state['token_hash'], hash('sha256', $token));
+        if (!$valid || !isset($_POST['confirmSend']) || $_POST['confirmSend'] !== 'confirm')
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Review and confirm the exact questionnaire batch before sending. No email was sent.');
+        }
+
+        $result = $this->_workflow->sendBulkQuestionnaireEmailsForReview(
+            isset($state['rows']) ? $state['rows'] : array(),
+            $this->_userID
+        );
+        $_SESSION['NESP_BULK_QUESTIONNAIRE_MESSAGE'] = sprintf(
+            'Questionnaire batch finished: %d sent, %d skipped, %d failed%s.',
+            (int) $result['sent'],
+            (int) $result['skipped'],
+            (int) $result['failed'],
+            (int) $result['warnings'] > 0 ? ', ' . (int) $result['warnings'] . ' need audit review' : ''
+        );
+        $_SESSION['NESP_BULK_QUESTIONNAIRE_ITEMS'] = isset($result['items']) ? $result['items'] : array();
+        CATSUtility::transferRelativeURI('m=nesp');
     }
 
     private function reviewQuestionnaire()

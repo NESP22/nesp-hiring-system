@@ -819,6 +819,146 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         ));
     }
 
+    public function testBulkQuestionnaireEmailUsesReviewedSnapshotAndSendsEachApplicantOnce()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $database = \DatabaseConnection::getInstance();
+        $workflow = new class($database) extends \NESPWorkflow {
+            public $deliveryCalls = array();
+
+            public function getApplicantEmailDeliveryStatus()
+            {
+                return array('status_key' => 'enabled', 'message' => 'Test sender ready.');
+            }
+
+            protected function deliverQuestionnaireEmailMessage($actorUserID, $email, $firstName, $subject, $body)
+            {
+                $this->deliveryCalls[] = array($actorUserID, $email, $firstName, $subject, $body);
+                return true;
+            }
+        };
+
+        $firstCandidateID = $this->insertFakeCandidate('Bulk', 'One');
+        $secondCandidateID = $this->insertFakeCandidate('Bulk', 'Two');
+        $firstJobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $secondJobOrderID = $this->insertFakeJobOrder('Weekend Table Greeter / Field Assistant - Youth Sports');
+        $this->insertFakeCandidateJobOrder($firstCandidateID, $firstJobOrderID);
+        $this->insertFakeCandidateJobOrder($secondCandidateID, $secondJobOrderID);
+        $this->assertGreaterThan(0, $workflow->ensureCandidateWorkflowRow($firstCandidateID, $firstJobOrderID, 1, 'Bulk test'));
+        $this->assertGreaterThan(0, $workflow->ensureCandidateWorkflowRow($secondCandidateID, $secondJobOrderID, 1, 'Bulk test'));
+
+        $preview = $workflow->getBulkQuestionnaireEmailPreview(200);
+        $snapshot = array();
+        foreach ($preview['ready'] as $row)
+        {
+            if (in_array((int) $row['candidate_id'], array($firstCandidateID, $secondCandidateID), true))
+            {
+                $snapshot[] = array(
+                    'candidate_id' => (int) $row['candidate_id'],
+                    'joborder_id' => (int) $row['joborder_id'],
+                    'candidate_name' => $row['candidate_name'],
+                    'role_title' => $row['role_title'],
+                    'email_fingerprint' => $row['email_fingerprint'],
+                    'questionnaire_fingerprint' => $row['questionnaire_fingerprint']
+                );
+            }
+        }
+        $this->assertCount(2, $snapshot);
+
+        $firstResult = $workflow->sendBulkQuestionnaireEmailsForReview($snapshot, 1);
+        $this->assertSame(2, $firstResult['sent']);
+        $this->assertSame(0, $firstResult['failed']);
+        $this->assertCount(2, $workflow->deliveryCalls);
+
+        $secondResult = $workflow->sendBulkQuestionnaireEmailsForReview($snapshot, 1);
+        $this->assertSame(0, $secondResult['sent']);
+        $this->assertSame(2, $secondResult['skipped']);
+        $this->assertCount(2, $secondResult['items']);
+        $this->assertCount(2, $workflow->deliveryCalls);
+        $this->assertSame(2, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf(
+                "candidate_id IN (%d, %d) AND status_key = 'waiting' AND auto_email_status_key = 'sent'",
+                $firstCandidateID,
+                $secondCandidateID
+            )
+        ));
+    }
+
+    public function testBulkQuestionnaireEmailSkipsApplicantWhoseWorkflowChangedAfterReview()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $database = \DatabaseConnection::getInstance();
+        $workflow = new class($database) extends \NESPWorkflow {
+            public $deliveryCalls = array();
+
+            public function getApplicantEmailDeliveryStatus()
+            {
+                return array('status_key' => 'enabled', 'message' => 'Test sender ready.');
+            }
+
+            protected function deliverQuestionnaireEmailMessage($actorUserID, $email, $firstName, $subject, $body)
+            {
+                $this->deliveryCalls[] = array($actorUserID, $email, $firstName, $subject, $body);
+                return true;
+            }
+        };
+
+        $candidateID = $this->insertFakeCandidate('Changed', 'Stage');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->assertGreaterThan(0, $workflow->ensureCandidateWorkflowRow($candidateID, $jobOrderID, 1, 'Bulk changed-stage test'));
+
+        $preview = $workflow->getBulkQuestionnaireEmailPreview(200);
+        $snapshot = array();
+        foreach ($preview['ready'] as $row)
+        {
+            if ((int) $row['candidate_id'] === $candidateID)
+            {
+                $snapshot[] = array(
+                    'candidate_id' => (int) $row['candidate_id'],
+                    'joborder_id' => (int) $row['joborder_id'],
+                    'candidate_name' => $row['candidate_name'],
+                    'role_title' => $row['role_title'],
+                    'email_fingerprint' => $row['email_fingerprint'],
+                    'questionnaire_fingerprint' => $row['questionnaire_fingerprint']
+                );
+            }
+        }
+        $this->assertCount(1, $snapshot);
+        $database->query(sprintf(
+            'UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (
+                    SELECT workflow_stage_id
+                    FROM nesp_workflow_stage
+                    WHERE stage_key = "needs_review"
+                    LIMIT 1
+                 ),
+                 waiting_on_key = "Craig",
+                 next_action_label = "Review application",
+                 date_modified = NOW()
+             WHERE candidate_id = %d
+               AND joborder_id = %d',
+            $candidateID,
+            $jobOrderID
+        ));
+        $this->assertSame(1, $database->getAffectedRows());
+
+        $result = $workflow->sendBulkQuestionnaireEmailsForReview($snapshot, 1);
+        $this->assertSame(0, $result['sent']);
+        $this->assertSame(1, $result['skipped']);
+        $this->assertSame('skipped', $result['items'][0]['status']);
+        $this->assertCount(0, $workflow->deliveryCalls);
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+    }
+
     public function testGuidedContactDetailsUpdateIsScopedAndContinuesWithoutSending()
     {
         include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');

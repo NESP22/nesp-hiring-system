@@ -3690,7 +3690,7 @@ class NESPWorkflow
         );
     }
 
-    public function sendQuestionnaireEmailForReview($questionnaireID, $actorUserID, $preparedQuestionnaire = array(), $reviewedEmailFingerprint = '')
+    public function sendQuestionnaireEmailForReview($questionnaireID, $actorUserID, $preparedQuestionnaire = array(), $reviewedEmailFingerprint = '', $reviewedQuestionnaireFingerprint = '')
     {
         $questionnaireID = (int) $questionnaireID;
         $detail = $this->getQuestionnaireDetail($questionnaireID);
@@ -3741,9 +3741,29 @@ class NESPWorkflow
             return array('ok' => false, 'sent' => false, 'error' => 'The applicant email changed after review. Refresh the page and confirm the recipient again. No email was sent.');
         }
 
+        if ($reviewedQuestionnaireFingerprint !== '')
+        {
+            $currentQuestionnaireFingerprint = self::questionnaireReviewFingerprint(
+                $detail['role_title'],
+                $detail['question_set_key'],
+                isset($detail['question_set_version_id']) ? $detail['question_set_version_id'] : 0,
+                isset($detail['question_set_version']) ? $detail['question_set_version'] : 1,
+                isset($detail['questions']) ? $detail['questions'] : array()
+            );
+            if (!hash_equals((string) $reviewedQuestionnaireFingerprint, $currentQuestionnaireFingerprint))
+            {
+                return array('ok' => false, 'sent' => false, 'error' => 'The role or questionnaire changed after review. Refresh and review the batch again. No email was sent.');
+            }
+        }
+
         // Reserve the delivery attempt and rotate the token in one database
         // update. Concurrent clicks can never invalidate the link that wins.
-        $reservation = $this->reserveQuestionnaireEmailForReview($detail, $actorUserID, $emailValidation['email']);
+        $reservation = $this->reserveQuestionnaireEmailForReview(
+            $detail,
+            $actorUserID,
+            $emailValidation['email'],
+            $reviewedQuestionnaireFingerprint
+        );
         if (empty($reservation['reserved']))
         {
             return array('ok' => false, 'sent' => false, 'error' => 'A questionnaire email delivery was already attempted. No duplicate email was sent.');
@@ -3815,6 +3835,18 @@ class NESPWorkflow
     {
         $validated = self::validateApplicantContactEmail($email);
         return empty($validated['ok']) ? '' : hash('sha256', $validated['email']);
+    }
+
+    public static function questionnaireReviewFingerprint($roleTitle, $questionSetKey, $questionSetVersionID, $questionSetVersion, $questions)
+    {
+        $normalizedQuestions = self::normalizeQuestionnaireSnapshotQuestions((array) $questions);
+        return hash('sha256', implode("\n", array(
+            trim((string) $roleTitle),
+            trim((string) $questionSetKey),
+            (string) ((int) $questionSetVersionID),
+            (string) ((int) $questionSetVersion),
+            json_encode($normalizedQuestions)
+        )));
     }
 
     public static function questionnaireEmailDeliveryErrorMessage($reason)
@@ -3901,7 +3933,7 @@ class NESPWorkflow
         );
     }
 
-    private function reserveQuestionnaireEmailForReview($questionnaireDetail, $actorUserID, $reviewedEmail)
+    private function reserveQuestionnaireEmailForReview($questionnaireDetail, $actorUserID, $reviewedEmail, $reviewedQuestionnaireFingerprint = '')
     {
         $questionnaireID = (int) $questionnaireDetail['screening_questionnaire_id'];
         $token = self::generateQuestionnaireToken();
@@ -3912,6 +3944,44 @@ class NESPWorkflow
             $questionnaireDetail['role_title'],
             $link
         );
+
+        $reviewedConditions = '';
+        if ($reviewedQuestionnaireFingerprint !== '')
+        {
+            $currentFingerprint = self::questionnaireReviewFingerprint(
+                $questionnaireDetail['role_title'],
+                $questionnaireDetail['question_set_key'],
+                isset($questionnaireDetail['question_set_version_id']) ? $questionnaireDetail['question_set_version_id'] : 0,
+                isset($questionnaireDetail['question_set_version']) ? $questionnaireDetail['question_set_version'] : 1,
+                isset($questionnaireDetail['questions']) ? $questionnaireDetail['questions'] : array()
+            );
+            if (!hash_equals((string) $reviewedQuestionnaireFingerprint, $currentFingerprint))
+            {
+                return array('reserved' => false);
+            }
+            $reviewedConditions .= ' AND q.question_set_key = '
+                . $this->_db->makeQueryString((string) $questionnaireDetail['question_set_key']);
+            $reviewedConditions .= ' AND q.question_set_version = '
+                . $this->_db->makeQueryInteger(isset($questionnaireDetail['question_set_version'])
+                    ? (int) $questionnaireDetail['question_set_version'] : 1);
+            if ($this->isColumnInstalled('nesp_screening_questionnaire', 'question_set_version_id'))
+            {
+                $reviewedConditions .= ' AND COALESCE(q.question_set_version_id, 0) = '
+                    . $this->_db->makeQueryInteger(isset($questionnaireDetail['question_set_version_id'])
+                        ? (int) $questionnaireDetail['question_set_version_id'] : 0);
+            }
+            if ($this->isColumnInstalled('nesp_screening_questionnaire', 'question_snapshot_json'))
+            {
+                $reviewedConditions .= ' AND SHA2(COALESCE(q.question_snapshot_json, ""), 256) = '
+                    . $this->_db->makeQueryString(hash('sha256', isset($questionnaireDetail['question_snapshot_json'])
+                        ? (string) $questionnaireDetail['question_snapshot_json'] : ''));
+            }
+            $reviewedConditions .= ' AND EXISTS (
+                SELECT 1 FROM joborder jo
+                WHERE jo.joborder_id = q.joborder_id
+                  AND jo.title = ' . $this->_db->makeQueryString((string) $questionnaireDetail['role_title']) . '
+            )';
+        }
 
         $this->_db->query(sprintf(
             'UPDATE nesp_screening_questionnaire q
@@ -3932,12 +4002,26 @@ class NESPWorkflow
                    SELECT 1
                    FROM candidate c
                    WHERE c.candidate_id = q.candidate_id
+                     AND c.is_active = 1
                      AND LOWER(TRIM(c.email1)) = %s
-               )',
+               )
+               AND EXISTS (
+                   SELECT 1
+                   FROM nesp_candidate_workflow cw
+                   INNER JOIN nesp_workflow_stage ws
+                      ON ws.workflow_stage_id = cw.workflow_stage_id
+                     AND ws.stage_key = "new"
+                   INNER JOIN candidate_joborder cjo
+                      ON cjo.candidate_id = cw.candidate_id
+                     AND cjo.joborder_id = cw.joborder_id
+                   WHERE cw.candidate_id = q.candidate_id
+                     AND cw.joborder_id = q.joborder_id
+               )%s',
             $this->_db->makeQueryString($tokenHash),
             $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()),
             $this->_db->makeQueryInteger($questionnaireID),
-            $this->_db->makeQueryString($reviewedEmail)
+            $this->_db->makeQueryString($reviewedEmail),
+            $reviewedConditions
         ));
         if ($this->_db->getAffectedRows() !== 1)
         {
@@ -6449,6 +6533,299 @@ class NESPWorkflow
         ));
 
         return !empty($row) && self::validateApplicantContactEmail($row['email1'])['ok'];
+    }
+
+    public function getBulkQuestionnaireEmailPreview($limit = 200)
+    {
+        $limit = max(1, min(200, (int) $limit));
+        $delivery = $this->getApplicantEmailDeliveryStatus();
+        $preview = array(
+            'delivery' => $delivery,
+            'ready' => array(),
+            'ready_count' => 0,
+            'missing_email_count' => 0,
+            'already_handled_count' => 0,
+            'blocked_count' => 0
+        );
+        if (!isset($delivery['status_key']) || $delivery['status_key'] !== 'enabled'
+            || !$this->isColumnInstalled('nesp_screening_questionnaire', 'auto_email_status_key'))
+        {
+            return $preview;
+        }
+
+        $rows = $this->_db->getAllAssoc(sprintf(
+            'SELECT
+                cw.candidate_id,
+                cw.joborder_id,
+                c.first_name,
+                c.last_name,
+                c.email1 AS candidate_email,
+                jo.title AS role_title,
+                q.screening_questionnaire_id,
+                q.status_key AS questionnaire_status_key,
+                q.auto_email_status_key
+             FROM nesp_candidate_workflow cw
+             INNER JOIN nesp_workflow_stage ws
+                ON ws.workflow_stage_id = cw.workflow_stage_id
+               AND ws.stage_key = "new"
+             INNER JOIN candidate c
+                ON c.candidate_id = cw.candidate_id
+               AND c.is_active = 1
+             INNER JOIN candidate_joborder cjo
+                ON cjo.candidate_id = cw.candidate_id
+               AND cjo.joborder_id = cw.joborder_id
+             INNER JOIN joborder jo
+                ON jo.joborder_id = cw.joborder_id
+             LEFT JOIN nesp_screening_questionnaire q
+                ON q.screening_questionnaire_id = (
+                    SELECT MAX(q2.screening_questionnaire_id)
+                    FROM nesp_screening_questionnaire q2
+                    WHERE q2.candidate_id = cw.candidate_id
+                      AND q2.joborder_id = cw.joborder_id
+                )
+             ORDER BY cw.date_modified ASC
+             LIMIT %s',
+            $this->_db->makeQueryInteger($limit)
+        ));
+        foreach ($rows as $row)
+        {
+            $canSendExisting = false;
+            $emailValidation = self::validateApplicantContactEmail(
+                isset($row['candidate_email']) ? $row['candidate_email'] : ''
+            );
+            if (empty($emailValidation['ok']))
+            {
+                $preview['missing_email_count']++;
+                continue;
+            }
+            if (!empty($row['screening_questionnaire_id']))
+            {
+                $statusKey = isset($row['questionnaire_status_key']) ? (string) $row['questionnaire_status_key'] : '';
+                $emailStatusKey = isset($row['auto_email_status_key'])
+                    ? (string) $row['auto_email_status_key'] : 'not_attempted';
+                $canSendExisting = $statusKey === 'link_ready' && $emailStatusKey === 'not_attempted';
+                $canCreateReplacement = in_array($statusKey, array('expired', 'revoked'), true);
+                if (!$canSendExisting && !$canCreateReplacement)
+                {
+                    $preview['already_handled_count']++;
+                    continue;
+                }
+            }
+
+            $preview['ready'][] = array(
+                'candidate_id' => (int) $row['candidate_id'],
+                'joborder_id' => (int) $row['joborder_id'],
+                'candidate_name' => trim($row['first_name'] . ' ' . $row['last_name']),
+                'role_title' => (string) $row['role_title'],
+                'email' => $emailValidation['email'],
+                'email_fingerprint' => self::applicantEmailFingerprint($emailValidation['email'])
+            );
+
+            $readyIndex = count($preview['ready']) - 1;
+            $questionnairePreview = array();
+            if (!empty($row['screening_questionnaire_id'])
+                && isset($canSendExisting) && $canSendExisting)
+            {
+                $questionnairePreview = $this->getQuestionnaireDetail((int) $row['screening_questionnaire_id']);
+                if (!empty($questionnairePreview))
+                {
+                    $questionnairePreview['title'] = $questionnairePreview['role_title'];
+                    $questionnairePreview['question_set_version'] = isset($questionnairePreview['question_set_version'])
+                        ? (int) $questionnairePreview['question_set_version'] : 1;
+                    $questionnairePreview['question_set_version_id'] = isset($questionnairePreview['question_set_version_id'])
+                        ? (int) $questionnairePreview['question_set_version_id'] : 0;
+                }
+            }
+            if (empty($questionnairePreview))
+            {
+                $questionnairePreview = $this->getCandidateQuestionnairePreview(
+                    (int) $row['candidate_id'],
+                    (int) $row['joborder_id']
+                );
+            }
+            if (empty($questionnairePreview))
+            {
+                array_pop($preview['ready']);
+                $preview['blocked_count']++;
+                continue;
+            }
+            $preview['ready'][$readyIndex]['question_set_label'] = (string) $questionnairePreview['question_set_label'];
+            $preview['ready'][$readyIndex]['question_set_key'] = (string) $questionnairePreview['question_set_key'];
+            $preview['ready'][$readyIndex]['question_set_version'] = (int) $questionnairePreview['question_set_version'];
+            $preview['ready'][$readyIndex]['question_set_version_id'] = (int) $questionnairePreview['question_set_version_id'];
+            $preview['ready'][$readyIndex]['questionnaire_fingerprint'] = self::questionnaireReviewFingerprint(
+                $questionnairePreview['title'],
+                $questionnairePreview['question_set_key'],
+                $questionnairePreview['question_set_version_id'],
+                $questionnairePreview['question_set_version'],
+                $questionnairePreview['questions']
+            );
+        }
+        $preview['ready_count'] = count($preview['ready']);
+        return $preview;
+    }
+
+    public function sendBulkQuestionnaireEmailsForReview($snapshotRows, $actorUserID)
+    {
+        $result = array(
+            'sent' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+            'warnings' => 0,
+            'items' => array()
+        );
+        $delivery = $this->getApplicantEmailDeliveryStatus();
+        if (!isset($delivery['status_key']) || $delivery['status_key'] !== 'enabled')
+        {
+            $result['failed'] = count((array) $snapshotRows);
+            foreach (array_slice((array) $snapshotRows, 0, 200) as $snapshot)
+            {
+                $result['items'][] = array(
+                    'status' => 'failed',
+                    'candidate_name' => isset($snapshot['candidate_name']) ? (string) $snapshot['candidate_name'] : 'Applicant',
+                    'role_title' => isset($snapshot['role_title']) ? (string) $snapshot['role_title'] : '',
+                    'message' => isset($delivery['message'])
+                        ? (string) $delivery['message'] : 'The applicant email sender is unavailable. No email was sent.'
+                );
+            }
+            return $result;
+        }
+
+        $seen = array();
+        foreach (array_slice((array) $snapshotRows, 0, 200) as $snapshot)
+        {
+            $candidateID = isset($snapshot['candidate_id']) ? (int) $snapshot['candidate_id'] : 0;
+            $jobOrderID = isset($snapshot['joborder_id']) ? (int) $snapshot['joborder_id'] : 0;
+            $fingerprint = isset($snapshot['email_fingerprint']) ? (string) $snapshot['email_fingerprint'] : '';
+            $questionnaireFingerprint = isset($snapshot['questionnaire_fingerprint'])
+                ? (string) $snapshot['questionnaire_fingerprint'] : '';
+            $snapshotName = isset($snapshot['candidate_name']) ? (string) $snapshot['candidate_name'] : 'Applicant';
+            $snapshotRole = isset($snapshot['role_title']) ? (string) $snapshot['role_title'] : '';
+            $key = $candidateID . ':' . $jobOrderID;
+            if ($candidateID <= 0 || $jobOrderID <= 0 || $fingerprint === ''
+                || $questionnaireFingerprint === '' || isset($seen[$key]))
+            {
+                $result['skipped']++;
+                $result['items'][] = array(
+                    'status' => 'skipped',
+                    'candidate_name' => $snapshotName,
+                    'role_title' => $snapshotRole,
+                    'message' => 'The reviewed batch row was incomplete or duplicated. No email was sent.'
+                );
+                continue;
+            }
+            $seen[$key] = true;
+
+            $candidate = $this->getCandidateQuestionnairePreview($candidateID, $jobOrderID);
+            if (empty($candidate)
+                || !$this->candidateCanPrepareQuestionnaire($candidateID, $jobOrderID)
+                || !hash_equals($fingerprint, self::applicantEmailFingerprint($candidate['email1'])))
+            {
+                $result['skipped']++;
+                $result['items'][] = array(
+                    'status' => 'skipped',
+                    'candidate_name' => $snapshotName,
+                    'role_title' => $snapshotRole,
+                    'message' => 'The applicant, role, stage, or email changed after review. No email was sent.'
+                );
+                continue;
+            }
+
+            if (!hash_equals(hash('sha256', trim($snapshotRole)), hash('sha256', trim($candidate['title']))))
+            {
+                $result['skipped']++;
+                $result['items'][] = array(
+                    'status' => 'skipped',
+                    'candidate_name' => $snapshotName,
+                    'role_title' => $snapshotRole,
+                    'message' => 'The role changed after review. Refresh and review the batch again. No email was sent.'
+                );
+                continue;
+            }
+
+            $questionnaire = $this->requestQuestionnaire($candidateID, $jobOrderID, $actorUserID, true);
+            if (!is_array($questionnaire) || empty($questionnaire['questionnaire_id']))
+            {
+                $result['failed']++;
+                $result['items'][] = array(
+                    'status' => 'failed',
+                    'candidate_name' => $snapshotName,
+                    'role_title' => $snapshotRole,
+                    'message' => 'The secure questionnaire link could not be prepared. No email was sent.'
+                );
+                continue;
+            }
+            $issuedQuestionnaire = $this->getQuestionnaireDetail((int) $questionnaire['questionnaire_id']);
+            $issuedFingerprint = empty($issuedQuestionnaire) ? '' : self::questionnaireReviewFingerprint(
+                $issuedQuestionnaire['role_title'],
+                $issuedQuestionnaire['question_set_key'],
+                isset($issuedQuestionnaire['question_set_version_id']) ? $issuedQuestionnaire['question_set_version_id'] : 0,
+                isset($issuedQuestionnaire['question_set_version']) ? $issuedQuestionnaire['question_set_version'] : 1,
+                isset($issuedQuestionnaire['questions']) ? $issuedQuestionnaire['questions'] : array()
+            );
+            if ($issuedFingerprint === '' || !hash_equals($questionnaireFingerprint, $issuedFingerprint))
+            {
+                $result['skipped']++;
+                $result['items'][] = array(
+                    'status' => 'skipped',
+                    'candidate_name' => $snapshotName,
+                    'role_title' => $snapshotRole,
+                    'message' => 'The generated questionnaire did not match the reviewed version. No email was sent.'
+                );
+                continue;
+            }
+            $deliveryResult = $this->sendQuestionnaireEmailForReview(
+                (int) $questionnaire['questionnaire_id'],
+                $actorUserID,
+                $questionnaire,
+                $fingerprint,
+                $questionnaireFingerprint
+            );
+            if (!empty($deliveryResult['sent']))
+            {
+                $result['sent']++;
+                if (empty($deliveryResult['ok']))
+                {
+                    $result['warnings']++;
+                    $result['items'][] = array(
+                        'status' => 'warning',
+                        'candidate_name' => $snapshotName,
+                        'role_title' => $snapshotRole,
+                        'message' => isset($deliveryResult['message']) ? $deliveryResult['message'] : 'The email was sent, but follow-up is required.'
+                    );
+                }
+            }
+            else if (isset($deliveryResult['error'])
+                && strpos((string) $deliveryResult['error'], 'already') !== false)
+            {
+                $result['skipped']++;
+                $result['items'][] = array(
+                    'status' => 'skipped',
+                    'candidate_name' => $snapshotName,
+                    'role_title' => $snapshotRole,
+                    'message' => (string) $deliveryResult['error']
+                );
+            }
+            else
+            {
+                $result['failed']++;
+                $result['items'][] = array(
+                    'status' => 'failed',
+                    'candidate_name' => $snapshotName,
+                    'role_title' => $snapshotRole,
+                    'message' => isset($deliveryResult['error'])
+                        ? (string) $deliveryResult['error'] : 'Questionnaire delivery failed safely. No automatic retry will occur.'
+                );
+            }
+        }
+
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_bulk_email_finished', 'screening_questionnaire', null, array(
+            'sent' => (int) $result['sent'],
+            'skipped' => (int) $result['skipped'],
+            'failed' => (int) $result['failed'],
+            'warnings' => (int) $result['warnings']
+        ));
+        return $result;
     }
 
     public function getCandidateQuestionnairePreview($candidateID, $jobOrderID)
