@@ -1002,6 +1002,520 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         ));
     }
 
+    public function testFourDayQuestionnaireReminderIsExactlyOnceAndClosureRequiresHumanAction()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $database = \DatabaseConnection::getInstance();
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED');
+        $disabledResult = (new \NESPWorkflow($database))->sendDueQuestionnaireReminders(1, 100);
+        $this->assertStringContainsString('disabled', $disabledResult['error']);
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED=1');
+        $workflow = new class($database) extends \NESPWorkflow {
+            public $deliveryCalls = array();
+
+            public function getApplicantEmailDeliveryStatus()
+            {
+                return array('status_key' => 'enabled', 'message' => 'Test sender ready.');
+            }
+
+            protected function deliverQuestionnaireEmailMessage($actorUserID, $email, $firstName, $subject, $body)
+            {
+                $this->deliveryCalls[] = array($actorUserID, $email, $firstName, $subject, $body);
+                return true;
+            }
+        };
+
+        $candidateID = $this->insertFakeCandidate('Reminder', 'Applicant');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->assertGreaterThan(0, $workflow->ensureCandidateWorkflowRow(
+            $candidateID,
+            $jobOrderID,
+            1,
+            'Protected reminder test'
+        ));
+        $questionnaire = $workflow->requestQuestionnaire($candidateID, $jobOrderID, 1);
+        $initial = $workflow->sendQuestionnaireEmailForReview(
+            $questionnaire['questionnaire_id'],
+            1,
+            $questionnaire,
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+        $this->assertTrue($initial['sent']);
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_screening_questionnaire
+             SET auto_email_sent_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY) - INTERVAL 1 MINUTE
+             WHERE screening_questionnaire_id = %d",
+            (int) $questionnaire['questionnaire_id']
+        ));
+
+        $firstReminder = $workflow->sendDueQuestionnaireReminders(1, 100);
+        $this->assertSame(1, $firstReminder['sent']);
+        $this->assertSame(0, $firstReminder['failed']);
+        $this->assertCount(2, $workflow->deliveryCalls);
+        $this->assertStringContainsString('Reminder:', $workflow->deliveryCalls[1][3]);
+        $this->assertStringContainsString('within 4 days', $workflow->deliveryCalls[1][4]);
+        $this->assertStringContainsString('screeningQuestionnaire.php?t=', $workflow->deliveryCalls[1][4]);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire_activity',
+            sprintf(
+                "screening_questionnaire_id = %d AND activity_key = 'reminder_email_sent'",
+                (int) $questionnaire['questionnaire_id']
+            )
+        ));
+
+        $secondReminder = $workflow->sendDueQuestionnaireReminders(1, 100);
+        $this->assertSame(0, $secondReminder['sent']);
+        $this->assertCount(2, $workflow->deliveryCalls);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf(
+                "candidate_id = %d AND joborder_id = %d AND workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'applicant_clarification_requested' LIMIT 1)",
+                $candidateID,
+                $jobOrderID
+            )
+        ));
+        $this->assertEmpty($workflow->getQuestionnaireCloseReviewContext($questionnaire['questionnaire_id']));
+        $earlyClosure = $workflow->closeQuestionnaireForNonresponse(
+            $questionnaire['questionnaire_id'],
+            1,
+            'Human reviewed before the grace period elapsed.'
+        );
+        $this->assertFalse($earlyClosure['ok']);
+
+        $completedCandidateID = $this->insertFakeCandidate('Completed', 'Applicant');
+        $completedJobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($completedCandidateID, $completedJobOrderID);
+        $this->assertGreaterThan(0, $workflow->ensureCandidateWorkflowRow(
+            $completedCandidateID,
+            $completedJobOrderID,
+            1,
+            'Completed questionnaire reminder exclusion test'
+        ));
+        $completedQuestionnaire = $workflow->requestQuestionnaire($completedCandidateID, $completedJobOrderID, 1);
+        $completedInitial = $workflow->sendQuestionnaireEmailForReview(
+            $completedQuestionnaire['questionnaire_id'],
+            1,
+            $completedQuestionnaire,
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+        $this->assertTrue($completedInitial['sent']);
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_screening_questionnaire
+             SET status_key = 'completed',
+                 submitted_at = UTC_TIMESTAMP(),
+                 auto_email_sent_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY) - INTERVAL 1 MINUTE
+             WHERE screening_questionnaire_id = %d",
+            (int) $completedQuestionnaire['questionnaire_id']
+        ));
+        $completedReminder = $workflow->sendDueQuestionnaireReminders(1, 100);
+        $this->assertSame(0, $completedReminder['sent']);
+        $this->assertCount(3, $workflow->deliveryCalls);
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_screening_questionnaire_activity',
+            sprintf(
+                "screening_questionnaire_id = %d AND activity_key LIKE 'reminder_email_%%'",
+                (int) $completedQuestionnaire['questionnaire_id']
+            )
+        ));
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_screening_questionnaire_activity
+             SET date_created = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY) - INTERVAL 1 MINUTE
+             WHERE screening_questionnaire_id = %d AND activity_key = 'reminder_email_sent'",
+            (int) $questionnaire['questionnaire_id']
+        ));
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_screening_questionnaire
+             SET started_at = UTC_TIMESTAMP()
+             WHERE screening_questionnaire_id = %d",
+            (int) $questionnaire['questionnaire_id']
+        ));
+        $this->assertEmpty($workflow->getQuestionnaireCloseReviewContext($questionnaire['questionnaire_id']));
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_screening_questionnaire
+             SET started_at = NULL
+             WHERE screening_questionnaire_id = %d",
+            (int) $questionnaire['questionnaire_id']
+        ));
+        $closure = $workflow->getQuestionnaireCloseReviewContext($questionnaire['questionnaire_id']);
+        $this->assertNotEmpty($closure);
+
+        $this->mySQLQueryLocal(sprintf(
+            'UPDATE candidate SET is_active = 0 WHERE candidate_id = %d',
+            $candidateID
+        ));
+        $this->assertEmpty($workflow->getQuestionnaireCloseReviewContext($questionnaire['questionnaire_id']));
+        $inactiveQueues = $workflow->getQuestionnaireQueues();
+        $inactiveCloseIDs = array_map(function ($row) {
+            return (int) $row['screening_questionnaire_id'];
+        }, $inactiveQueues['close_review_due']);
+        $this->assertNotContains((int) $questionnaire['questionnaire_id'], $inactiveCloseIDs);
+        $inactiveClosure = $workflow->closeQuestionnaireForNonresponse(
+            $questionnaire['questionnaire_id'],
+            1,
+            'Inactive applicants cannot be closed from this reminder queue.'
+        );
+        $this->assertFalse($inactiveClosure['ok']);
+        $this->mySQLQueryLocal(sprintf(
+            'UPDATE candidate SET is_active = 1 WHERE candidate_id = %d',
+            $candidateID
+        ));
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE joborder SET status = 'Closed' WHERE joborder_id = %d",
+            $jobOrderID
+        ));
+        $this->assertEmpty($workflow->getQuestionnaireCloseReviewContext($questionnaire['questionnaire_id']));
+        $closedJobAttempt = $workflow->closeQuestionnaireForNonresponse(
+            $questionnaire['questionnaire_id'],
+            1,
+            'Closed jobs cannot be changed from this reminder review queue.'
+        );
+        $this->assertFalse($closedJobAttempt['ok']);
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE joborder SET status = 'Active' WHERE joborder_id = %d",
+            $jobOrderID
+        ));
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'interview_requested' LIMIT 1)
+             WHERE candidate_id = %d AND joborder_id = %d",
+            $candidateID,
+            $jobOrderID
+        ));
+        $this->assertEmpty($workflow->getQuestionnaireCloseReviewContext($questionnaire['questionnaire_id']));
+        $advancedQueues = $workflow->getQuestionnaireQueues();
+        $advancedCloseIDs = array_map(function ($row) {
+            return (int) $row['screening_questionnaire_id'];
+        }, $advancedQueues['close_review_due']);
+        $this->assertNotContains((int) $questionnaire['questionnaire_id'], $advancedCloseIDs);
+        $advancedClosure = $workflow->closeQuestionnaireForNonresponse(
+            $questionnaire['questionnaire_id'],
+            1,
+            'Applicants who advanced cannot be closed by the reminder workflow.'
+        );
+        $this->assertFalse($advancedClosure['ok']);
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'applicant_clarification_requested' LIMIT 1)
+             WHERE candidate_id = %d AND joborder_id = %d",
+            $candidateID,
+            $jobOrderID
+        ));
+        $this->assertNotEmpty($workflow->getQuestionnaireCloseReviewContext($questionnaire['questionnaire_id']));
+
+        $shortReasonClosure = $workflow->closeQuestionnaireForNonresponse(
+            $questionnaire['questionnaire_id'],
+            1,
+            'Too short'
+        );
+        $this->assertFalse($shortReasonClosure['ok']);
+        $closed = $workflow->closeQuestionnaireForNonresponse(
+            $questionnaire['questionnaire_id'],
+            1,
+            'Human reviewed: no response after reminder and grace period.'
+        );
+        $this->assertTrue($closed['ok']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf("screening_questionnaire_id = %d AND status_key = 'revoked'", (int) $questionnaire['questionnaire_id'])
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf(
+                "candidate_id = %d AND joborder_id = %d AND workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'not_selected' LIMIT 1)",
+                $candidateID,
+                $jobOrderID
+            )
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_audit_event',
+            sprintf(
+                "event_type = 'screening_questionnaire_nonresponse_closed_by_human' AND entity_id = %d",
+                (int) $questionnaire['questionnaire_id']
+            )
+        ));
+        $this->assertCount(3, $workflow->deliveryCalls);
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED');
+    }
+
+    public function testFailedQuestionnaireReminderPreservesOriginalLinkAndStartedApplicantsAreExcluded()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED=1');
+
+        $database = \DatabaseConnection::getInstance();
+        $workflow = new class($database) extends \NESPWorkflow {
+            public $deliveryCalls = array();
+            public $shouldDeliver = true;
+
+            public function getApplicantEmailDeliveryStatus()
+            {
+                return array('status_key' => 'enabled', 'message' => 'Test sender ready.');
+            }
+
+            protected function deliverQuestionnaireEmailMessage($actorUserID, $email, $firstName, $subject, $body)
+            {
+                $this->deliveryCalls[] = array($actorUserID, $email, $firstName, $subject, $body);
+                return $this->shouldDeliver;
+            }
+        };
+
+        $candidateID = $this->insertFakeCandidate('Reminder', 'Failure');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->assertGreaterThan(0, $workflow->ensureCandidateWorkflowRow(
+            $candidateID,
+            $jobOrderID,
+            1,
+            'Failed reminder recovery test'
+        ));
+        $questionnaire = $workflow->requestQuestionnaire($candidateID, $jobOrderID, 1);
+        $initial = $workflow->sendQuestionnaireEmailForReview(
+            $questionnaire['questionnaire_id'],
+            1,
+            $questionnaire,
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+        $this->assertTrue($initial['sent']);
+        $original = $database->getAssoc(sprintf(
+            'SELECT token_hash, token_expires_at, token_used_at, link_created_at
+             FROM nesp_screening_questionnaire
+             WHERE screening_questionnaire_id = %d',
+            (int) $questionnaire['questionnaire_id']
+        ));
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_screening_questionnaire
+             SET auto_email_sent_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY) - INTERVAL 1 MINUTE
+             WHERE screening_questionnaire_id = %d",
+            (int) $questionnaire['questionnaire_id']
+        ));
+
+        $workflow->shouldDeliver = false;
+        $failedReminder = $workflow->sendDueQuestionnaireReminders(1, 100);
+        $this->assertSame(0, $failedReminder['sent']);
+        $this->assertSame(1, $failedReminder['failed']);
+        $this->assertCount(2, $workflow->deliveryCalls);
+        $afterFailure = $database->getAssoc(sprintf(
+            'SELECT token_hash, token_expires_at, token_used_at, link_created_at
+             FROM nesp_screening_questionnaire
+             WHERE screening_questionnaire_id = %d',
+            (int) $questionnaire['questionnaire_id']
+        ));
+        $this->assertSame($original, $afterFailure);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire_activity',
+            sprintf(
+                "screening_questionnaire_id = %d AND activity_key = 'reminder_email_attempt_started'",
+                (int) $questionnaire['questionnaire_id']
+            )
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire_activity',
+            sprintf(
+                "screening_questionnaire_id = %d AND activity_key = 'reminder_email_failed'",
+                (int) $questionnaire['questionnaire_id']
+            )
+        ));
+        $duplicateAttempt = $workflow->sendDueQuestionnaireReminders(1, 100);
+        $this->assertSame(0, $duplicateAttempt['sent']);
+        $this->assertCount(2, $workflow->deliveryCalls);
+
+        $startedCandidateID = $this->insertFakeCandidate('Reminder', 'Started');
+        $startedJobOrderID = $this->insertFakeJobOrder('Weekend Table Greeter / Field Assistant - Youth Sports');
+        $this->insertFakeCandidateJobOrder($startedCandidateID, $startedJobOrderID);
+        $this->assertGreaterThan(0, $workflow->ensureCandidateWorkflowRow(
+            $startedCandidateID,
+            $startedJobOrderID,
+            1,
+            'Started questionnaire reminder exclusion test'
+        ));
+        $startedQuestionnaire = $workflow->requestQuestionnaire($startedCandidateID, $startedJobOrderID, 1);
+        $workflow->shouldDeliver = true;
+        $startedInitial = $workflow->sendQuestionnaireEmailForReview(
+            $startedQuestionnaire['questionnaire_id'],
+            1,
+            $startedQuestionnaire,
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+        $this->assertTrue($startedInitial['sent']);
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_screening_questionnaire
+             SET started_at = UTC_TIMESTAMP(),
+                 auto_email_sent_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 4 DAY) - INTERVAL 1 MINUTE
+             WHERE screening_questionnaire_id = %d",
+            (int) $startedQuestionnaire['questionnaire_id']
+        ));
+        $startedReminder = $workflow->sendDueQuestionnaireReminders(1, 100);
+        $this->assertSame(0, $startedReminder['sent']);
+        $this->assertCount(3, $workflow->deliveryCalls);
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_screening_questionnaire_activity',
+            sprintf(
+                "screening_questionnaire_id = %d AND activity_key LIKE 'reminder_email_%%'",
+                (int) $startedQuestionnaire['questionnaire_id']
+            )
+        ));
+
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED');
+    }
+
+    public function testAmbiguousReminderDeliveryRequiresHumanResolutionAndNeverSendsAgain()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $database = \DatabaseConnection::getInstance();
+        $workflow = new class($database) extends \NESPWorkflow {
+            public function getApplicantEmailDeliveryStatus()
+            {
+                return array('status_key' => 'enabled', 'message' => 'Test sender ready.');
+            }
+
+            protected function deliverQuestionnaireEmailMessage($actorUserID, $email, $firstName, $subject, $body)
+            {
+                return true;
+            }
+        };
+
+        $candidateID = $this->insertFakeCandidate('Reminder', 'Ambiguous');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->assertGreaterThan(0, $workflow->ensureCandidateWorkflowRow(
+            $candidateID,
+            $jobOrderID,
+            1,
+            'Ambiguous reminder review test'
+        ));
+        $questionnaire = $workflow->requestQuestionnaire($candidateID, $jobOrderID, 1);
+        $initial = $workflow->sendQuestionnaireEmailForReview(
+            $questionnaire['questionnaire_id'],
+            1,
+            $questionnaire,
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+        $this->assertTrue($initial['sent']);
+        $stored = $database->getAssoc(sprintf(
+            'SELECT token_hash FROM nesp_screening_questionnaire WHERE screening_questionnaire_id = %d',
+            (int) $questionnaire['questionnaire_id']
+        ));
+        $ambiguousTokenHash = hash('sha256', 'ambiguous-reminder-token');
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_screening_questionnaire SET token_hash = '%s' WHERE screening_questionnaire_id = %d",
+            $this->escape($ambiguousTokenHash),
+            (int) $questionnaire['questionnaire_id']
+        ));
+        $attemptMetadata = json_encode(array('original_token_hash' => $stored['token_hash']));
+        $this->mySQLQueryLocal(sprintf(
+            "INSERT INTO nesp_screening_questionnaire_activity
+                (screening_questionnaire_id, token_hash, activity_key, ip_hash, user_agent_hash, metadata_json, date_created)
+             VALUES (%d, '%s', 'reminder_email_attempt_started', '', '', '%s', UTC_TIMESTAMP())",
+            (int) $questionnaire['questionnaire_id'],
+            $this->escape($ambiguousTokenHash),
+            $this->escape($attemptMetadata)
+        ));
+
+        $queues = $workflow->getQuestionnaireQueues();
+        $this->assertCount(1, $queues['reminder_review']);
+        $this->assertSame(
+            (int) $questionnaire['questionnaire_id'],
+            (int) $queues['reminder_review'][0]['screening_questionnaire_id']
+        );
+        $context = $workflow->getQuestionnaireReminderReviewContext($questionnaire['questionnaire_id']);
+        $this->assertNotEmpty($context);
+        $keptActive = $workflow->resolveQuestionnaireReminderReview(
+            $questionnaire['questionnaire_id'],
+            1,
+            'keep_active',
+            'Provider delivery could not be confirmed.'
+        );
+        $this->assertTrue($keptActive['ok']);
+        $this->assertEmpty($workflow->getQuestionnaireReminderReviewContext($questionnaire['questionnaire_id']));
+        $restored = $database->getAssoc(sprintf(
+            'SELECT token_hash, token_expires_at FROM nesp_screening_questionnaire WHERE screening_questionnaire_id = %d',
+            (int) $questionnaire['questionnaire_id']
+        ));
+        $this->assertSame($stored['token_hash'], $restored['token_hash']);
+        $this->assertGreaterThan(time() + (3 * 86400), strtotime($restored['token_expires_at']));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire_activity',
+            sprintf(
+                "screening_questionnaire_id = %d AND activity_key = 'reminder_email_review_kept_active'",
+                (int) $questionnaire['questionnaire_id']
+            )
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_audit_event',
+            sprintf(
+                "event_type = 'screening_questionnaire_reminder_kept_active_by_human' AND entity_id = %d",
+                (int) $questionnaire['questionnaire_id']
+            )
+        ));
+
+        $confirmedCandidateID = $this->insertFakeCandidate('Reminder', 'Confirmed');
+        $confirmedJobOrderID = $this->insertFakeJobOrder('Weekend Table Greeter / Field Assistant - Youth Sports');
+        $this->insertFakeCandidateJobOrder($confirmedCandidateID, $confirmedJobOrderID);
+        $this->assertGreaterThan(0, $workflow->ensureCandidateWorkflowRow(
+            $confirmedCandidateID,
+            $confirmedJobOrderID,
+            1,
+            'Confirmed reminder review test'
+        ));
+        $confirmedQuestionnaire = $workflow->requestQuestionnaire($confirmedCandidateID, $confirmedJobOrderID, 1);
+        $confirmedInitial = $workflow->sendQuestionnaireEmailForReview(
+            $confirmedQuestionnaire['questionnaire_id'],
+            1,
+            $confirmedQuestionnaire,
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+        $this->assertTrue($confirmedInitial['sent']);
+        $confirmedStored = $database->getAssoc(sprintf(
+            'SELECT token_hash FROM nesp_screening_questionnaire WHERE screening_questionnaire_id = %d',
+            (int) $confirmedQuestionnaire['questionnaire_id']
+        ));
+        $confirmedAttemptTokenHash = hash('sha256', 'confirmed-reminder-token');
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_screening_questionnaire SET token_hash = '%s' WHERE screening_questionnaire_id = %d",
+            $this->escape($confirmedAttemptTokenHash),
+            (int) $confirmedQuestionnaire['questionnaire_id']
+        ));
+        $confirmedAttemptMetadata = json_encode(array('original_token_hash' => $confirmedStored['token_hash']));
+        $this->mySQLQueryLocal(sprintf(
+            "INSERT INTO nesp_screening_questionnaire_activity
+                (screening_questionnaire_id, token_hash, activity_key, ip_hash, user_agent_hash, metadata_json, date_created)
+             VALUES (%d, '%s', 'reminder_email_attempt_started', '', '', '%s', UTC_TIMESTAMP())",
+            (int) $confirmedQuestionnaire['questionnaire_id'],
+            $this->escape($confirmedAttemptTokenHash),
+            $this->escape($confirmedAttemptMetadata)
+        ));
+        $confirmed = $workflow->resolveQuestionnaireReminderReview(
+            $confirmedQuestionnaire['questionnaire_id'],
+            1,
+            'confirm_sent',
+            'Provider delivery log confirms the reminder was sent.'
+        );
+        $this->assertTrue($confirmed['ok']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire_activity',
+            sprintf(
+                "screening_questionnaire_id = %d AND activity_key = 'reminder_email_sent'",
+                (int) $confirmedQuestionnaire['questionnaire_id']
+            )
+        ));
+        $workflowRow = $database->getAssoc(sprintf(
+            'SELECT due_at FROM nesp_candidate_workflow WHERE candidate_id = %d AND joborder_id = %d',
+            $confirmedCandidateID,
+            $confirmedJobOrderID
+        ));
+        $this->assertNotEmpty($workflowRow['due_at']);
+    }
+
     public function testCareerPortalApplicationUsesRoleSpecificQuestionnaireSet()
     {
         include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');

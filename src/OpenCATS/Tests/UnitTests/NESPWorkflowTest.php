@@ -112,6 +112,125 @@ class NESPWorkflowTest extends TestCase
         );
     }
 
+    public function testQuestionnaireReminderTimingUsesFourDayReminderAndGracePeriod()
+    {
+        $beforeReminder = NESPWorkflow::getQuestionnaireReminderTiming(
+            '2026-07-01 12:00:00',
+            '',
+            '2026-07-05 11:59:59'
+        );
+        $atReminder = NESPWorkflow::getQuestionnaireReminderTiming(
+            '2026-07-01 12:00:00',
+            '',
+            '2026-07-05 12:00:00'
+        );
+        $beforeClosure = NESPWorkflow::getQuestionnaireReminderTiming(
+            '2026-07-01 12:00:00',
+            '2026-07-05 12:00:00',
+            '2026-07-09 11:59:59'
+        );
+        $atClosure = NESPWorkflow::getQuestionnaireReminderTiming(
+            '2026-07-01 12:00:00',
+            '2026-07-05 12:00:00',
+            '2026-07-09 12:00:00'
+        );
+
+        $this->assertFalse($beforeReminder['reminder_due']);
+        $this->assertTrue($atReminder['reminder_due']);
+        $this->assertFalse($beforeClosure['close_review_due']);
+        $this->assertTrue($atClosure['close_review_due']);
+    }
+
+    public function testQuestionnaireReminderCopyExplainsDeadlineAndHumanReview()
+    {
+        $copy = NESPWorkflow::buildQuestionnaireReminderCopy(
+            'Alex',
+            'Photographer',
+            'https://careers.nesportsphoto.com/questionnaire/example'
+        );
+
+        $this->assertStringContainsString('within 4 days', $copy);
+        $this->assertStringContainsString('fresh secure link', $copy);
+        $this->assertStringContainsString('no automated hiring decision', $copy);
+        $this->assertStringContainsString('https://careers.nesportsphoto.com/questionnaire/example', $copy);
+    }
+
+    public function testQuestionnaireReminderSchedulerAndClosureStayFailClosed()
+    {
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED');
+        $this->assertFalse(NESPWorkflow::isQuestionnaireReminderSchedulerEnabled());
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED=1');
+        $this->assertTrue(NESPWorkflow::isQuestionnaireReminderSchedulerEnabled());
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED');
+
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $queue = file_get_contents(LEGACY_ROOT . '/modules/nesp/Questionnaires.tpl');
+        $closure = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireNonresponseClosure.tpl');
+        $reminderReview = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireReminderReview.tpl');
+        $script = file_get_contents(LEGACY_ROOT . '/scripts/nesp_questionnaire_reminders.php');
+        $blueprint = file_get_contents(LEGACY_ROOT . '/render.yaml');
+        $entrypoint = file_get_contents(LEGACY_ROOT . '/docker/render/entrypoint.sh');
+
+        $this->assertStringContainsString("case 'closeQuestionnaireNonresponse':", $ui);
+        $this->assertStringContainsString('$this->adminOnly();', $ui);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $ui);
+        $this->assertStringContainsString('Close Review Due', $queue);
+        $this->assertStringContainsString('Reminder Delivery Review', $queue);
+        $this->assertStringContainsString('name="csrfToken"', $closure);
+        $this->assertStringContainsString('name="confirmClose"', $closure);
+        $this->assertStringContainsString('human decision', $closure);
+        $this->assertStringContainsString('name="csrfToken"', $reminderReview);
+        $this->assertStringContainsString('name="confirmReview"', $reminderReview);
+        $this->assertStringContainsString('Check the approved mail provider', $reminderReview);
+        $this->assertStringContainsString("case 'resolveQuestionnaireReminderReview':", $ui);
+        $this->assertStringContainsString('isQuestionnaireReminderSchedulerEnabled', $script);
+        $this->assertStringContainsString('access_level >= 400', $script);
+        $this->assertStringContainsString('nesp-questionnaire-reminders', $blueprint);
+        $this->assertStringContainsString('0 13,14 * * *', $blueprint);
+        $this->assertStringContainsString("key: APP_BASIC_AUTH\n        value: 0", $blueprint);
+        $this->assertStringContainsString("\$serviceRole !== 'cron'", $entrypoint);
+        $this->assertStringNotContainsString('automatic rejection', strtolower($script));
+    }
+
+    public function testQuestionnaireReminderSelectionFailureIsReportedSafely()
+    {
+        $database = new class {
+            public function makeQueryString($value)
+            {
+                return "'" . addslashes((string) $value) . "'";
+            }
+
+            public function makeQueryInteger($value)
+            {
+                return (int) $value;
+            }
+
+            public function query($query)
+            {
+                return false;
+            }
+
+            public function getAllAssoc()
+            {
+                throw new RuntimeException('Rows must not be read after a failed reminder query.');
+            }
+        };
+        $workflow = new class($database) extends NESPWorkflow {
+            public function getApplicantEmailDeliveryStatus()
+            {
+                return array('status_key' => 'enabled', 'message' => 'Test sender ready.');
+            }
+        };
+
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED=1');
+        $result = $workflow->sendDueQuestionnaireReminders(1, 100, '2026-07-22 13:00:00');
+        putenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED');
+
+        $this->assertSame(0, $result['sent']);
+        $this->assertSame(1, $result['failed']);
+        $this->assertStringContainsString('Unable to load', $result['error']);
+    }
+
     public function testManualQuestionnaireEmailActionIsAdminCsrfProtectedAndKeepsCopyFallback()
     {
         $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');

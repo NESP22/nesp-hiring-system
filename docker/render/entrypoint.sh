@@ -222,10 +222,10 @@ if (file_put_contents($path, $config, LOCK_EX) === false) {
     exit(1);
 }
 
-// The web service owns persistent mail settings. Cron containers may load the
-// same constants, but scheduled board imports suppress questionnaire delivery
-// and must never rewrite the shared settings table during startup.
-if (mailEnv('NESP_SERVICE_ROLE') !== 'cron') {
+// The web service owns the legacy mailer's persistent settings. Cron containers
+// may load the same constants but must never rewrite the shared settings table.
+$serviceRole = strtolower(mailEnv('NESP_SERVICE_ROLE'));
+if ($serviceRole !== 'cron') {
     updateMailerSettings($mailEnabled, $fromAddress);
 }
 PHP
