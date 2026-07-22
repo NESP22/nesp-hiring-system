@@ -16,7 +16,7 @@ class NESPWorkflow
 {
     private $_db;
 
-    const APPLICANT_EMAIL_FEATURE_DESCRIPTION = 'When deliberately enabled with a configured sender, automatically sends one secure role-specific questionnaire email after a new applicant has a valid email and linked job.';
+    const APPLICANT_EMAIL_FEATURE_DESCRIPTION = 'When deliberately enabled with a configured sender, automatically sends one secure role-specific questionnaire email after a new applicant has a valid email and linked job, and allows an administrator to send one to an existing reviewed applicant.';
 
     public function __construct($db = null)
     {
@@ -2422,7 +2422,7 @@ class NESPWorkflow
 
         return array(
             'status_key' => 'enabled',
-            'Automatic delivery is active: new applicants with a valid email and linked job receive one role-specific secure questionnaire email. No reminders or other applicant messages are sent.'
+            'message' => 'Questionnaire email delivery is active. New eligible applicants receive one role-specific secure questionnaire email, and an administrator can send one to an existing reviewed applicant. No reminders or other applicant messages are sent.'
         );
     }
 
@@ -3690,7 +3690,150 @@ class NESPWorkflow
         );
     }
 
-    private function sendNewQuestionnaireEmail($questionnaireDetail, $invitationCopy, $linkGenerated, $actorUserID)
+    public function sendQuestionnaireEmailForReview($questionnaireID, $actorUserID, $preparedQuestionnaire = array(), $reviewedEmailFingerprint = '')
+    {
+        $questionnaireID = (int) $questionnaireID;
+        $detail = $this->getQuestionnaireDetail($questionnaireID);
+        if (empty($detail))
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'Choose a valid questionnaire.');
+        }
+
+        if (!$this->isColumnInstalled('nesp_screening_questionnaire', 'auto_email_status_key'))
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'Questionnaire email tracking is not installed. No email was sent.');
+        }
+
+        $deliveryStatus = $this->getApplicantEmailDeliveryStatus();
+        if ($deliveryStatus['status_key'] !== 'enabled')
+        {
+            return array(
+                'ok' => false,
+                'sent' => false,
+                'error' => isset($deliveryStatus['message']) ? $deliveryStatus['message'] : 'Questionnaire email delivery is not ready. No email was sent.'
+            );
+        }
+
+        if ($detail['status_key'] !== 'link_ready')
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'This questionnaire is already waiting, in progress, completed, expired, or revoked. No duplicate email was sent.');
+        }
+
+        if (!$this->candidateCanPrepareQuestionnaire((int) $detail['candidate_id'], (int) $detail['joborder_id']))
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'The applicant is no longer eligible for questionnaire sending from Needs Craig. No email was sent.');
+        }
+
+        $emailStatus = isset($detail['auto_email_status_key']) ? (string) $detail['auto_email_status_key'] : 'not_attempted';
+        if ($emailStatus !== 'not_attempted')
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'A questionnaire email delivery was already attempted. No duplicate email was sent.');
+        }
+
+        $emailValidation = self::validateApplicantContactEmail(isset($detail['email1']) ? $detail['email1'] : '');
+        if (empty($emailValidation['ok']))
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'Add and verify the applicant email before sending a questionnaire.');
+        }
+        if ($reviewedEmailFingerprint === ''
+            || !hash_equals(self::applicantEmailFingerprint($emailValidation['email']), (string) $reviewedEmailFingerprint))
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'The applicant email changed after review. Refresh the page and confirm the recipient again. No email was sent.');
+        }
+
+        // Reserve the delivery attempt and rotate the token in one database
+        // update. Concurrent clicks can never invalidate the link that wins.
+        $reservation = $this->reserveQuestionnaireEmailForReview($detail, $actorUserID, $emailValidation['email']);
+        if (empty($reservation['reserved']))
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'A questionnaire email delivery was already attempted. No duplicate email was sent.');
+        }
+
+        $invitationCopy = $reservation['one_time_invitation_copy'];
+        // Use the exact recipient snapshot reserved by the conditional update,
+        // even if someone edits the candidate record immediately afterward.
+        $detail['email1'] = $reservation['recipient_email'];
+        $delivery = $this->completeReservedQuestionnaireEmailDelivery(
+            $detail,
+            $invitationCopy,
+            $actorUserID,
+            'manual_admin'
+        );
+        if (empty($delivery['sent']))
+        {
+            return array(
+                'ok' => false,
+                'sent' => false,
+                'error' => self::questionnaireEmailDeliveryErrorMessage(isset($delivery['reason']) ? $delivery['reason'] : ''),
+                'one_time_invitation_copy' => $invitationCopy
+            );
+        }
+
+        $workflowUpdated = $this->setCandidateWorkflowStage(
+            (int) $detail['candidate_id'],
+            (int) $detail['joborder_id'],
+            'applicant_clarification_requested',
+            'Applicant',
+            'The role-specific questionnaire email was sent by an administrator and is awaiting completion.',
+            'Wait for questionnaire',
+            $actorUserID
+        );
+        if (!$workflowUpdated)
+        {
+            $this->logAuditEvent($actorUserID, 'screening_questionnaire_email_workflow_update_failed', 'screening_questionnaire', $questionnaireID, array(
+                'candidate_id' => (int) $detail['candidate_id'],
+                'joborder_id' => (int) $detail['joborder_id'],
+                'delivery' => 'manual_admin'
+            ));
+            return array(
+                'ok' => false,
+                'sent' => true,
+                'message' => 'Questionnaire email sent, but the waiting queue did not update. Do not resend; review the audit log.',
+                'one_time_invitation_copy' => $invitationCopy
+            );
+        }
+
+        if (isset($delivery['reason']) && $delivery['reason'] === 'sent_audit_incomplete')
+        {
+            return array(
+                'ok' => false,
+                'sent' => true,
+                'message' => 'Questionnaire email sent and the applicant queue updated, but the final audit event did not save. Do not resend; review the audit log.',
+                'one_time_invitation_copy' => $invitationCopy
+            );
+        }
+
+        return array(
+            'ok' => true,
+            'sent' => true,
+            'message' => 'Questionnaire email sent. The applicant is now waiting to complete it.',
+            'one_time_invitation_copy' => $invitationCopy
+        );
+    }
+
+    public static function applicantEmailFingerprint($email)
+    {
+        $validated = self::validateApplicantContactEmail($email);
+        return empty($validated['ok']) ? '' : hash('sha256', $validated['email']);
+    }
+
+    public static function questionnaireEmailDeliveryErrorMessage($reason)
+    {
+        $messages = array(
+            'workflow_not_ready' => 'The applicant is not ready in the hiring queue. No email was sent.',
+            'schema_not_ready' => 'Questionnaire email tracking is not installed. No email was sent.',
+            'not_ready' => 'The applicant email sender or applicant email is not ready. No email was sent.',
+            'already_attempted' => 'A questionnaire email delivery was already attempted. No duplicate email was sent.',
+            'delivery_failed' => 'The mail provider did not confirm delivery. No automatic retry will occur; use the copy fallback or investigate the sender.',
+            'delivery_failed_audit_incomplete' => 'The mail provider did not confirm delivery, and the final failure audit did not save. No automatic retry will occur; use the copy fallback and investigate the audit log.',
+            'audit_failed' => 'The delivery attempt could not be recorded safely. No email was sent; use the copy fallback or investigate the audit log.',
+            'persistence_unknown' => 'The mail provider accepted the message, but delivery tracking did not finish. Do not resend; review the audit log.',
+            'not_new' => 'A fresh secure questionnaire link was not available. No email was sent.'
+        );
+        return isset($messages[$reason]) ? $messages[$reason] : 'Questionnaire email delivery failed safely. No automatic retry will occur.';
+    }
+
+    protected function sendNewQuestionnaireEmail($questionnaireDetail, $invitationCopy, $linkGenerated, $actorUserID, $deliveryType = 'automatic')
     {
         if (!$linkGenerated || empty($questionnaireDetail['screening_questionnaire_id']) || trim((string) $invitationCopy) === '')
         {
@@ -3750,14 +3893,102 @@ class NESPWorkflow
             return array('sent' => false, 'reason' => 'already_attempted');
         }
 
-        $subject = 'Next step: NESP questionnaire for ' . trim((string) $questionnaireDetail['role_title']);
-        $mailer = new Mailer($actorUserID === null ? -1 : $actorUserID);
-        $sent = $mailer->sendToOne(
-            array($email, trim((string) $questionnaireDetail['first_name'])),
-            $subject,
+        return $this->completeReservedQuestionnaireEmailDelivery(
+            $questionnaireDetail,
             $invitationCopy,
-            true,
-            false
+            $actorUserID,
+            $deliveryType
+        );
+    }
+
+    private function reserveQuestionnaireEmailForReview($questionnaireDetail, $actorUserID, $reviewedEmail)
+    {
+        $questionnaireID = (int) $questionnaireDetail['screening_questionnaire_id'];
+        $token = self::generateQuestionnaireToken();
+        $tokenHash = self::questionnaireTokenHash($token);
+        $link = self::getQuestionnaireLink($token);
+        $invitationCopy = self::buildQuestionnaireInvitationCopy(
+            $questionnaireDetail['first_name'],
+            $questionnaireDetail['role_title'],
+            $link
+        );
+
+        $this->_db->query(sprintf(
+            'UPDATE nesp_screening_questionnaire q
+             SET q.token_hash = %s,
+                 q.token_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s HOUR),
+                 q.token_revoked_at = NULL,
+                 q.token_used_at = NULL,
+                 q.link_created_at = UTC_TIMESTAMP(),
+                 q.invitation_copied_at = NULL,
+                 q.auto_email_status_key = "sending",
+                 q.auto_email_attempted_at = UTC_TIMESTAMP(),
+                 q.date_modified = NOW()
+             WHERE q.screening_questionnaire_id = %s
+               AND q.status_key = "link_ready"
+               AND q.auto_email_status_key = "not_attempted"
+               AND q.submitted_at IS NULL
+               AND EXISTS (
+                   SELECT 1
+                   FROM candidate c
+                   WHERE c.candidate_id = q.candidate_id
+                     AND LOWER(TRIM(c.email1)) = %s
+               )',
+            $this->_db->makeQueryString($tokenHash),
+            $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()),
+            $this->_db->makeQueryInteger($questionnaireID),
+            $this->_db->makeQueryString($reviewedEmail)
+        ));
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            return array('reserved' => false);
+        }
+
+        $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'email_link_reserved', array());
+        return array(
+            'reserved' => true,
+            'recipient_email' => $reviewedEmail,
+            'one_time_invitation_copy' => $invitationCopy
+        );
+    }
+
+    private function completeReservedQuestionnaireEmailDelivery($questionnaireDetail, $invitationCopy, $actorUserID, $deliveryType)
+    {
+        $questionnaireID = (int) $questionnaireDetail['screening_questionnaire_id'];
+        $candidateID = (int) $questionnaireDetail['candidate_id'];
+        $jobOrderID = (int) $questionnaireDetail['joborder_id'];
+        $email = trim((string) $questionnaireDetail['email1']);
+
+        if (!$this->logAuditEvent(
+            $actorUserID,
+            $deliveryType === 'automatic' ? 'screening_questionnaire_auto_email_attempt_started' : 'screening_questionnaire_email_attempt_started',
+            'screening_questionnaire',
+            $questionnaireID,
+            array(
+                'candidate_id' => $candidateID,
+                'joborder_id' => $jobOrderID,
+                'delivery' => $deliveryType,
+                'recipient_fingerprint' => self::applicantEmailFingerprint($email)
+            )
+        ))
+        {
+            $this->_db->query(sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET auto_email_status_key = "failed", date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND auto_email_status_key = "sending"',
+                $this->_db->makeQueryInteger($questionnaireID)
+            ));
+            return array('sent' => false, 'reason' => 'audit_failed');
+        }
+
+        $subject = 'Next step: NESP questionnaire for ' . trim((string) $questionnaireDetail['role_title']);
+        $sent = $this->deliverQuestionnaireEmailMessage(
+            $actorUserID,
+            $email,
+            trim((string) $questionnaireDetail['first_name']),
+            $subject,
+            $invitationCopy
         );
 
         if (!$sent)
@@ -3770,12 +4001,17 @@ class NESPWorkflow
                    AND auto_email_status_key = "sending"',
                 $this->_db->makeQueryInteger($questionnaireID)
             ));
-            $this->logAuditEvent($actorUserID, 'screening_questionnaire_auto_email_failed', 'screening_questionnaire', $questionnaireID, array(
+            $failureAuditSaved = $this->logAuditEvent($actorUserID,
+                $deliveryType === 'automatic' ? 'screening_questionnaire_auto_email_failed' : 'screening_questionnaire_email_failed',
+                'screening_questionnaire', $questionnaireID, array(
                 'candidate_id' => $candidateID,
                 'joborder_id' => $jobOrderID,
-                'delivery' => 'automatic'
+                'delivery' => $deliveryType
             ));
-            return array('sent' => false, 'reason' => 'delivery_failed');
+            return array(
+                'sent' => false,
+                'reason' => $failureAuditSaved ? 'delivery_failed' : 'delivery_failed_audit_incomplete'
+            );
         }
 
         $this->_db->query(sprintf(
@@ -3788,12 +4024,50 @@ class NESPWorkflow
                AND auto_email_status_key = "sending"',
             $this->_db->makeQueryInteger($questionnaireID)
         ));
-        $this->logAuditEvent($actorUserID, 'screening_questionnaire_auto_email_sent', 'screening_questionnaire', $questionnaireID, array(
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            $this->logAuditEvent($actorUserID, 'screening_questionnaire_email_tracking_failed', 'screening_questionnaire', $questionnaireID, array(
+                'candidate_id' => $candidateID,
+                'joborder_id' => $jobOrderID,
+                'delivery' => $deliveryType,
+                'failure_code' => 'sent_status_not_persisted'
+            ));
+            return array('sent' => false, 'reason' => 'persistence_unknown');
+        }
+        $terminalAuditSaved = $this->logAuditEvent($actorUserID,
+            $deliveryType === 'automatic' ? 'screening_questionnaire_auto_email_sent' : 'screening_questionnaire_email_sent',
+            'screening_questionnaire', $questionnaireID, array(
             'candidate_id' => $candidateID,
             'joborder_id' => $jobOrderID,
-            'delivery' => 'automatic'
+            'delivery' => $deliveryType
         ));
-        return array('sent' => true, 'reason' => 'sent');
+        return array(
+            'sent' => true,
+            'reason' => $terminalAuditSaved ? 'sent' : 'sent_audit_incomplete'
+        );
+    }
+
+    /**
+     * Keep the provider boundary replaceable in tests so delivery tracking can
+     * be exercised without sending a real applicant message.
+     */
+    protected function deliverQuestionnaireEmailMessage($actorUserID, $email, $firstName, $subject, $body)
+    {
+        try
+        {
+            $mailer = new Mailer($actorUserID === null ? -1 : $actorUserID);
+            return (bool) $mailer->sendToOne(
+                array($email, $firstName),
+                $subject,
+                $body,
+                true,
+                false
+            );
+        }
+        catch (\Throwable $exception)
+        {
+            return false;
+        }
     }
 
     public function getInterviewDetail($interviewID)
@@ -7521,18 +7795,25 @@ class NESPWorkflow
                      active_candidate_job_key = NULL,
                      date_modified = NOW()
                  WHERE screening_questionnaire_id = %s
-                   AND status_key IN ("link_ready", "waiting", "in_progress")',
+                   AND status_key IN ("link_ready", "waiting", "in_progress")
+                   AND auto_email_status_key <> "sending"',
                 $this->_db->makeQueryInteger($questionnaireID)
             )
         );
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            return false;
+        }
         $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_revoked', 'screening_questionnaire', $questionnaireID, array());
-        return $this->_db->getAffectedRows() === 1;
+        return true;
     }
 
     public function regenerateQuestionnaireLink($questionnaireID, $actorUserID)
     {
         $detail = $this->getQuestionnaireDetail($questionnaireID);
-        if (empty($detail) || $detail['status_key'] === 'completed')
+        if (empty($detail)
+            || $detail['status_key'] === 'completed'
+            || in_array($detail['auto_email_status_key'], array('sending', 'sent'), true))
         {
             return false;
         }
@@ -7553,18 +7834,20 @@ class NESPWorkflow
                      invitation_copied_at = NULL,
                      date_modified = NOW()
                  WHERE screening_questionnaire_id = %s
-                   AND submitted_at IS NULL',
+                   AND submitted_at IS NULL
+                   AND auto_email_status_key NOT IN ("sending", "sent")',
                 $this->_db->makeQueryString($tokenHash),
                 $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()),
                 $this->_db->makeQueryInteger($questionnaireID)
             )
         );
-        $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'link_regenerated', array());
-        $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_regenerated', 'screening_questionnaire', $questionnaireID, array());
         if ($this->_db->getAffectedRows() !== 1)
         {
             return false;
         }
+
+        $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'link_regenerated', array());
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_link_regenerated', 'screening_questionnaire', $questionnaireID, array());
 
         return array(
             'questionnaire_id' => (int) $questionnaireID,

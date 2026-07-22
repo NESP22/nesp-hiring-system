@@ -100,7 +100,7 @@
                         </table>
                         <label class="nesp-confirmation-check">
                             <input type="checkbox" name="confirmApplicantQuestionnaireEmail" value="confirm" />
-                            I understand that enabling Applicant Questionnaire Email sends one questionnaire email automatically to each new applicant with a valid email address and linked job.
+                            I understand that enabling Applicant Questionnaire Email sends one questionnaire email automatically to each new applicant with a valid email address and linked job, and enables the admin Send Questionnaire Email action for existing reviewed applicants.
                         </label>
                         <button type="submit" class="nesp-primary-button">Save Feature Flags</button>
                     </form>
