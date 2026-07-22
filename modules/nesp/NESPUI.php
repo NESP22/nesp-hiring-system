@@ -521,6 +521,23 @@ class NESPUI extends UserInterface
         $enabledFlags = isset($_POST['featureFlags']) && is_array($_POST['featureFlags'])
             ? $_POST['featureFlags'] : array();
 
+        $applicantEmailRequested = in_array('NESP_APPLICANT_EMAIL_ENABLED', $enabledFlags);
+        $applicantEmailWasEnabled = $this->_workflow->isFeatureFlagEnabled('NESP_APPLICANT_EMAIL_ENABLED');
+        $applicantEmailConfirmation = isset($_POST['confirmApplicantQuestionnaireEmail'])
+            ? $_POST['confirmApplicantQuestionnaireEmail'] : '';
+        if (!NESPWorkflow::canEnableApplicantEmail(
+            $applicantEmailWasEnabled,
+            $applicantEmailRequested,
+            $applicantEmailConfirmation
+        ))
+        {
+            CommonErrors::fatal(
+                COMMONERROR_BADFIELDS,
+                $this,
+                'Confirm Applicant Questionnaire Email before enabling automatic questionnaire delivery.'
+            );
+        }
+
         foreach (NESPWorkflow::getRequiredFeatureFlagKeys() as $flagKey)
         {
             $this->_workflow->updateFeatureFlag(
@@ -917,9 +934,13 @@ class NESPUI extends UserInterface
 
     private function assignedCandidates()
     {
+        $isAdmin = $this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA;
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Interviews');
-        $this->_template->assign('assignedCandidates', $this->_workflow->getAssignedCandidatesForUser($this->_userID));
+        $this->_template->assign('isAdminAssignmentOverview', $isAdmin);
+        $this->_template->assign('assignedCandidates', $isAdmin
+            ? $this->_workflow->getAllAssignedCandidatesForAdmin()
+            : $this->_workflow->getAssignedCandidatesForUser($this->_userID));
         $this->_template->display('./modules/nesp/AssignedCandidates.tpl');
     }
 
@@ -1117,7 +1138,10 @@ class NESPUI extends UserInterface
         $this->_template->assign('isAdmin', $isAdmin);
         $this->_template->assign('questionnaire', $detail);
         $this->_template->assign('oneTimeInvitationCopy', $oneTimeInvitationCopy);
-        $this->_template->assign('interviewerProfiles', $isAdmin ? $this->_workflow->getInterviewerProfiles() : array());
+        // The reviewer picker must use the same eligibility rules enforced on save.
+        $this->_template->assign('eligibleReviewerProfiles', $isAdmin
+            ? $this->_workflow->getEligibleInterviewersForAssignment((int) $detail['joborder_id'])
+            : array());
         $this->_template->display('./modules/nesp/QuestionnaireReview.tpl');
     }
 
@@ -1151,9 +1175,19 @@ class NESPUI extends UserInterface
     {
         $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
         $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+
+        $detail = $this->_workflow->getQuestionnaireDetail($questionnaireID);
+        if (empty($detail))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid questionnaire.');
+        }
+        if ((int) $detail['joborder_id'] === 41001)
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Customer Service questionnaires stay with Craig and do not need an interviewer assignment.');
+        }
         if ($this->_workflow->assignQuestionnaireReviewer($questionnaireID, $interviewerProfileID, $this->_userID) === false)
         {
-            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid interviewer.');
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an active, open interviewer approved for this role.');
         }
         CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
     }

@@ -98,6 +98,10 @@
                             </tr>
                             <?php endforeach; ?>
                         </table>
+                        <label class="nesp-confirmation-check">
+                            <input type="checkbox" name="confirmApplicantQuestionnaireEmail" value="confirm" />
+                            I understand that enabling Applicant Questionnaire Email sends one questionnaire email automatically to each new applicant with a valid email address and linked job.
+                        </label>
                         <button type="submit" class="nesp-primary-button">Save Feature Flags</button>
                     </form>
                 </div>
