@@ -260,6 +260,12 @@ class NESPUI extends UserInterface
                 $this->requestQuestionnaire();
                 break;
 
+            case 'sendQuestionnaireEmail':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->sendQuestionnaireEmail();
+                break;
+
             case 'reviewQuestionnaire':
                 $this->reviewQuestionnaire();
                 break;
@@ -1107,6 +1113,8 @@ class NESPUI extends UserInterface
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Questionnaires');
         $this->_template->assign('preview', $preview);
+        $this->_template->assign('reviewedEmailFingerprint', NESPWorkflow::applicantEmailFingerprint($preview['email1']));
+        $this->_template->assign('applicantEmailDelivery', $this->_workflow->getApplicantEmailDeliveryStatus());
         $contactDetailsMessage = isset($_SESSION['NESP_CONTACT_DETAILS_MESSAGE'])
             ? $_SESSION['NESP_CONTACT_DETAILS_MESSAGE'] : '';
         unset($_SESSION['NESP_CONTACT_DETAILS_MESSAGE']);
@@ -1159,6 +1167,14 @@ class NESPUI extends UserInterface
     {
         $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
         $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+        $deliveryMode = isset($_POST['deliveryMode']) ? trim((string) $_POST['deliveryMode']) : 'copy';
+        $reviewedEmailFingerprint = isset($_POST['reviewedEmailFingerprint'])
+            ? trim((string) $_POST['reviewedEmailFingerprint']) : '';
+        if ($deliveryMode === 'email'
+            && (!isset($_POST['confirmSend']) || $_POST['confirmSend'] !== 'confirm'))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Confirm the applicant and role before sending the questionnaire email.');
+        }
         $questionnaireID = $this->_workflow->requestQuestionnaire($candidateID, $jobOrderID, $this->_userID, true);
         if ($questionnaireID === false)
         {
@@ -1168,14 +1184,56 @@ class NESPUI extends UserInterface
         {
             $result = $questionnaireID;
             $questionnaireID = (int) $result['questionnaire_id'];
+            if ($deliveryMode === 'email')
+            {
+                $delivery = $this->_workflow->sendQuestionnaireEmailForReview(
+                    $questionnaireID,
+                    $this->_userID,
+                    $result,
+                    $reviewedEmailFingerprint
+                );
+                $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_MESSAGE'] = !empty($delivery['sent'])
+                    ? $delivery['message'] : $delivery['error'];
+                $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_OK'] = !empty($delivery['ok']) ? 1 : 0;
+                $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_SEVERITY'] = !empty($delivery['ok'])
+                    ? 'success' : (!empty($delivery['sent']) ? 'warning' : 'error');
+                $_SESSION['NESP_QUESTIONNAIRE_INVITATION_COPY'] = isset($delivery['one_time_invitation_copy'])
+                    ? $delivery['one_time_invitation_copy'] : '';
+                CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
+            }
             if (!empty($result['one_time_invitation_copy']))
             {
-                $this->displayQuestionnaireReview($questionnaireID, $result['one_time_invitation_copy']);
-                return;
+                $_SESSION['NESP_QUESTIONNAIRE_INVITATION_COPY'] = $result['one_time_invitation_copy'];
+                CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
             }
         }
 
         CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . (int) $questionnaireID);
+    }
+
+    private function sendQuestionnaireEmail()
+    {
+        $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
+        $reviewedEmailFingerprint = isset($_POST['reviewedEmailFingerprint'])
+            ? trim((string) $_POST['reviewedEmailFingerprint']) : '';
+        if (!isset($_POST['confirmSend']) || $_POST['confirmSend'] !== 'confirm')
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Confirm the applicant and role before sending the questionnaire email.');
+        }
+        $delivery = $this->_workflow->sendQuestionnaireEmailForReview(
+            $questionnaireID,
+            $this->_userID,
+            array(),
+            $reviewedEmailFingerprint
+        );
+        $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_MESSAGE'] = !empty($delivery['sent'])
+            ? $delivery['message'] : $delivery['error'];
+        $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_OK'] = !empty($delivery['ok']) ? 1 : 0;
+        $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_SEVERITY'] = !empty($delivery['ok'])
+            ? 'success' : (!empty($delivery['sent']) ? 'warning' : 'error');
+        $_SESSION['NESP_QUESTIONNAIRE_INVITATION_COPY'] = isset($delivery['one_time_invitation_copy'])
+            ? $delivery['one_time_invitation_copy'] : '';
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
     }
 
     private function reviewQuestionnaire()
@@ -1196,8 +1254,29 @@ class NESPUI extends UserInterface
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Questionnaires');
         $this->_template->assign('isAdmin', $isAdmin);
+        if ($oneTimeInvitationCopy === '' && isset($_SESSION['NESP_QUESTIONNAIRE_INVITATION_COPY']))
+        {
+            $oneTimeInvitationCopy = (string) $_SESSION['NESP_QUESTIONNAIRE_INVITATION_COPY'];
+        }
+        unset($_SESSION['NESP_QUESTIONNAIRE_INVITATION_COPY']);
         $this->_template->assign('questionnaire', $detail);
         $this->_template->assign('oneTimeInvitationCopy', $oneTimeInvitationCopy);
+        $this->_template->assign('reviewedEmailFingerprint', NESPWorkflow::applicantEmailFingerprint($detail['email1']));
+        $this->_template->assign('applicantEmailDelivery', $this->_workflow->getApplicantEmailDeliveryStatus());
+        $questionnaireDeliveryMessage = isset($_SESSION['NESP_QUESTIONNAIRE_DELIVERY_MESSAGE'])
+            ? $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_MESSAGE'] : '';
+        $questionnaireDeliveryOK = isset($_SESSION['NESP_QUESTIONNAIRE_DELIVERY_OK'])
+            ? (int) $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_OK'] : 0;
+        $questionnaireDeliverySeverity = isset($_SESSION['NESP_QUESTIONNAIRE_DELIVERY_SEVERITY'])
+            ? (string) $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_SEVERITY'] : '';
+        unset(
+            $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_MESSAGE'],
+            $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_OK'],
+            $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_SEVERITY']
+        );
+        $this->_template->assign('questionnaireDeliveryMessage', $questionnaireDeliveryMessage);
+        $this->_template->assign('questionnaireDeliveryOK', $questionnaireDeliveryOK);
+        $this->_template->assign('questionnaireDeliverySeverity', $questionnaireDeliverySeverity);
         // The reviewer picker must use the same eligibility rules enforced on save.
         $this->_template->assign('eligibleReviewerProfiles', $isAdmin
             ? $this->_workflow->getEligibleInterviewersForAssignment((int) $detail['joborder_id'])

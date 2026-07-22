@@ -1,6 +1,12 @@
 <?php TemplateUtility::printHeader('Review Screening Questionnaire', array('modules/nesp/nespWorkflow.css')); ?>
 <?php TemplateUtility::printHeaderBlock(); ?>
 <?php TemplateUtility::printTabs($this->active, $this->subActive); ?>
+<?php
+$applicantEmailReady = isset($this->applicantEmailDelivery['status_key']) && $this->applicantEmailDelivery['status_key'] === 'enabled';
+$questionnaireComplete = $this->questionnaire['status_key'] === 'completed';
+$questionnaireWaiting = in_array($this->questionnaire['status_key'], array('waiting', 'in_progress'), true);
+$emailStatus = isset($this->questionnaire['auto_email_status_key']) ? $this->questionnaire['auto_email_status_key'] : 'not_attempted';
+?>
     <div id="main" class="nesp-workflow">
         <?php TemplateUtility::printQuickSearch(); ?>
         <div id="contents">
@@ -10,7 +16,7 @@
                     <div>
                         <span class="nesp-kicker">New England Sports Photo</span>
                         <h2>Review Screening Questionnaire</h2>
-                        <p>Human-reviewed applicant answers with copy-only invitation controls.</p>
+                        <p>Send and track one secure questionnaire email, with manual copy available as a fallback.</p>
                     </div>
                 </div>
             </div>
@@ -19,10 +25,16 @@
                 Reviewing a questionnaire does not change candidate stage or make an automated hiring decision.
             </div>
 
+            <?php if ($this->questionnaireDeliveryMessage !== ''): ?>
+                <div class="<?php echo($this->questionnaireDeliverySeverity === 'success' ? 'nesp-success' : 'nesp-safety-banner'); ?>" role="status">
+                    <?php $this->_($this->questionnaireDeliveryMessage); ?>
+                </div>
+            <?php endif; ?>
+
             <div class="nesp-step-row" aria-label="Questionnaire review progress">
-                <div class="nesp-step"><span>1</span><strong>Invite</strong></div>
-                <div class="nesp-step"><span>2</span><strong>Applicant answers</strong></div>
-                <div class="nesp-step is-current"><span>3</span><strong>Human review</strong></div>
+                <div class="nesp-step<?php echo(!$questionnaireWaiting && !$questionnaireComplete ? ' is-current' : ''); ?>"><span>1</span><strong>Prepare invite</strong></div>
+                <div class="nesp-step<?php echo($questionnaireWaiting ? ' is-current' : ''); ?>"><span>2</span><strong>Waiting for applicant</strong></div>
+                <div class="nesp-step<?php echo($questionnaireComplete ? ' is-current' : ''); ?>"><span>3</span><strong>Human review</strong></div>
             </div>
 
             <div class="nesp-panel">
@@ -30,6 +42,8 @@
                 <dl class="nesp-detail-list">
                     <dt>Candidate</dt>
                     <dd><?php $this->_($this->questionnaire['candidate_name']); ?></dd>
+                    <dt>Email recipient</dt>
+                    <dd><?php $this->_($this->questionnaire['email1']); ?></dd>
                     <dt>Role</dt>
                     <dd><?php $this->_($this->questionnaire['role_title']); ?></dd>
                     <dt>Status</dt>
@@ -40,26 +54,59 @@
                     <dd><?php $this->_($this->questionnaire['reviewer_name']); ?></dd>
                     <dt>Submitted</dt>
                     <dd><?php $this->_(empty($this->questionnaire['submitted_at']) ? 'Not submitted' : $this->questionnaire['submitted_at']); ?></dd>
+                    <dt>Email delivery</dt>
+                    <dd>
+                        <?php
+                        $emailLabels = array(
+                            'not_attempted' => 'Not sent',
+                            'sending' => 'Delivery status uncertain - do not resend',
+                            'sent' => 'Sent',
+                            'failed' => 'Failed - manual review required'
+                        );
+                        $this->_(isset($emailLabels[$emailStatus]) ? $emailLabels[$emailStatus] : $emailStatus);
+                        ?>
+                    </dd>
                 </dl>
             </div>
 
             <?php if ($this->isAdmin): ?>
             <div class="nesp-panel">
-                <h3>Copy-Only Invitation</h3>
+                <h3>Questionnaire Invitation</h3>
+                <?php if ($applicantEmailReady
+                    && $this->questionnaire['status_key'] === 'link_ready'
+                    && (!isset($this->questionnaire['auto_email_status_key']) || $this->questionnaire['auto_email_status_key'] === 'not_attempted')): ?>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=sendQuestionnaireEmail">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />
+                        <input type="hidden" name="reviewedEmailFingerprint" value="<?php echo(htmlspecialchars($this->reviewedEmailFingerprint, ENT_QUOTES, 'UTF-8')); ?>" />
+                        <label class="nesp-confirmation-check">
+                            <input type="checkbox" name="confirmSend" value="confirm" required />
+                            I reviewed this applicant and role. Send one questionnaire email now.
+                        </label>
+                        <button class="nesp-primary-action" type="submit">Send Questionnaire Email</button>
+                    </form>
+                    <p class="nesp-muted">Sends one email to the verified applicant address. Duplicate sends are blocked.</p>
+                <?php elseif (!$applicantEmailReady): ?>
+                    <div class="nesp-empty"><?php $this->_($this->applicantEmailDelivery['message']); ?> Use the copy fallback below.</div>
+                <?php endif; ?>
                 <?php if ($this->oneTimeInvitationCopy !== ''): ?>
-                <label class="nesp-field-label" for="questionnaireInvitationCopy">One-time invitation text</label>
+                <label class="nesp-field-label" for="questionnaireInvitationCopy"><?php echo($emailStatus === 'sent' ? 'Sent invitation copy (for reference)' : 'One-time invitation text'); ?></label>
                 <textarea id="questionnaireInvitationCopy" rows="5" readonly><?php $this->_($this->oneTimeInvitationCopy); ?></textarea>
                 <p>
                     <button type="button" class="nesp-secondary-action" onclick="document.getElementById('questionnaireInvitationCopy').select(); document.execCommand('copy');">Copy Invitation</button>
                 </p>
+                <?php elseif ($emailStatus === 'sent'): ?>
+                <div class="nesp-empty">The questionnaire email was sent. Do not regenerate its link.</div>
                 <?php else: ?>
-                <div class="nesp-empty">The secure invitation text is shown only immediately after link generation. Regenerate the link if Craig needs a fresh copy.</div>
+                <div class="nesp-empty">The secure invitation text is shown only immediately after link generation.</div>
                 <?php endif; ?>
+                <?php if ($this->oneTimeInvitationCopy !== '' && $emailStatus !== 'sent'): ?>
                 <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=markQuestionnaireInvitationCopied">
                     <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                     <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />
-                    <button class="nesp-primary-action" type="submit">Mark Invitation Copied</button>
+                    <button class="nesp-secondary-action" type="submit">Mark Invitation Copied</button>
                 </form>
+                <?php endif; ?>
             </div>
 
             <div class="nesp-two-column">
@@ -70,11 +117,15 @@
                         <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />
                         <button class="nesp-secondary-action" type="submit">Revoke Link</button>
                     </form>
+                    <?php if (!in_array($emailStatus, array('sending', 'sent'), true)): ?>
                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=regenerateQuestionnaireLink">
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
                         <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />
                         <button class="nesp-secondary-action" type="submit">Regenerate Link</button>
                     </form>
+                    <?php else: ?>
+                    <p class="nesp-muted">Regeneration is locked after an email attempt so the delivered link cannot be replaced accidentally.</p>
+                    <?php endif; ?>
                 </div>
 
                 <div class="nesp-panel">

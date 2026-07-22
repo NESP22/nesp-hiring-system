@@ -87,6 +87,48 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('stored description', NESPWorkflow::getFeatureFlagDescription('NESP_WORKFLOW_ENABLED', 'stored description'));
     }
 
+    public function testQuestionnaireEmailDeliveryErrorsAreSafeAndActionable()
+    {
+        $this->assertStringContainsString(
+            'No duplicate email was sent',
+            NESPWorkflow::questionnaireEmailDeliveryErrorMessage('already_attempted')
+        );
+        $this->assertStringContainsString(
+            'No automatic retry will occur',
+            NESPWorkflow::questionnaireEmailDeliveryErrorMessage('delivery_failed')
+        );
+        $this->assertStringContainsString(
+            'failed safely',
+            NESPWorkflow::questionnaireEmailDeliveryErrorMessage('unknown_reason')
+        );
+    }
+
+    public function testManualQuestionnaireEmailActionIsAdminCsrfProtectedAndKeepsCopyFallback()
+    {
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $confirm = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireConfirm.tpl');
+        $review = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireReview.tpl');
+        $actionStart = strpos($ui, "case 'sendQuestionnaireEmail':");
+        $actionEnd = strpos($ui, "case 'reviewQuestionnaire':", $actionStart);
+        $action = substr($ui, $actionStart, $actionEnd - $actionStart);
+
+        $this->assertStringContainsString('$this->adminOnly();', $action);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $action);
+        $this->assertStringContainsString('Send Questionnaire Email', $confirm);
+        $this->assertStringContainsString('Generate Copy Instead', $confirm);
+        $this->assertStringContainsString('a=sendQuestionnaireEmail', $review);
+        $this->assertStringContainsString('name="csrfToken"', $review);
+        $this->assertStringContainsString('name="confirmSend"', $confirm);
+        $this->assertStringContainsString('name="confirmSend"', $review);
+        $this->assertStringContainsString('name="reviewedEmailFingerprint"', $confirm);
+        $this->assertStringContainsString('name="reviewedEmailFingerprint"', $review);
+        $this->assertStringContainsString("\$_POST['confirmSend'] !== 'confirm'", $ui);
+        $this->assertStringContainsString('NESP_QUESTIONNAIRE_INVITATION_COPY', $ui);
+        $this->assertStringContainsString('transferRelativeURI', $ui);
+        $this->assertStringContainsString('Copy Invitation', $review);
+        $this->assertStringContainsString('Duplicate sends are blocked', $review);
+    }
+
     public function testApplicantContactEmailValidationNormalizesAndRejectsInvalidValues()
     {
         $missing = NESPWorkflow::validateApplicantContactEmail('   ');
@@ -97,6 +139,10 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse($invalid['ok']);
         $this->assertTrue($valid['ok']);
         $this->assertSame('applicant@example.com', $valid['email']);
+        $this->assertSame(
+            NESPWorkflow::applicantEmailFingerprint('applicant@example.com'),
+            NESPWorkflow::applicantEmailFingerprint(' Applicant@Example.COM ')
+        );
         $this->assertFalse(NESPWorkflow::validateApplicantContactEmail(str_repeat('a', 117) . '@example.com')['ok']);
     }
 

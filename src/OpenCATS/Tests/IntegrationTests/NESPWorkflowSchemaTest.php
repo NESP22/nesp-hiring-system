@@ -645,6 +645,154 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         ));
     }
 
+    public function testQuestionnaireEmailDeliveryTracksSuccessFailureAndDuplicateProtectionWithoutSending()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $database = \DatabaseConnection::getInstance();
+        $createWorkflow = function ($shouldDeliver, $deliveryEnabled = true) use ($database) {
+            return new class($database, $shouldDeliver, $deliveryEnabled) extends \NESPWorkflow {
+                private $shouldDeliver;
+                private $deliveryEnabled;
+                public $deliveryCalls = array();
+
+                public function __construct($database, $shouldDeliver, $deliveryEnabled)
+                {
+                    parent::__construct($database);
+                    $this->shouldDeliver = (bool) $shouldDeliver;
+                    $this->deliveryEnabled = (bool) $deliveryEnabled;
+                }
+
+                public function getApplicantEmailDeliveryStatus()
+                {
+                    return $this->deliveryEnabled
+                        ? array('status_key' => 'enabled', 'message' => 'Test sender ready.')
+                        : array('status_key' => 'disabled', 'message' => 'Test sender disabled.');
+                }
+
+                protected function deliverQuestionnaireEmailMessage($actorUserID, $email, $firstName, $subject, $body)
+                {
+                    $this->deliveryCalls[] = array($actorUserID, $email, $firstName, $subject, $body);
+                    return $this->shouldDeliver;
+                }
+            };
+        };
+
+        $successfulCandidateID = $this->insertFakeCandidate('Delivery', 'Success');
+        $successfulJobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($successfulCandidateID, $successfulJobOrderID);
+        $successfulWorkflow = $createWorkflow(true);
+        $this->assertGreaterThan(0, $successfulWorkflow->ensureCandidateWorkflowRow(
+            $successfulCandidateID,
+            $successfulJobOrderID,
+            1,
+            'Protected delivery test'
+        ));
+        $successfulQuestionnaire = $successfulWorkflow->requestQuestionnaire(
+            $successfulCandidateID,
+            $successfulJobOrderID,
+            1
+        );
+        $successfulDelivery = $successfulWorkflow->sendQuestionnaireEmailForReview(
+            $successfulQuestionnaire['questionnaire_id'],
+            1,
+            $successfulQuestionnaire,
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+
+        $this->assertTrue($successfulDelivery['ok']);
+        $this->assertTrue($successfulDelivery['sent']);
+        $this->assertCount(1, $successfulWorkflow->deliveryCalls);
+        $this->assertSame('fixture@example.test', $successfulWorkflow->deliveryCalls[0][1]);
+        $this->assertStringContainsString('screeningQuestionnaire.php?t=', $successfulWorkflow->deliveryCalls[0][4]);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf(
+                "screening_questionnaire_id = %d AND status_key = 'waiting' AND auto_email_status_key = 'sent' AND auto_email_sent_at IS NOT NULL",
+                (int) $successfulQuestionnaire['questionnaire_id']
+            )
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_audit_event',
+            sprintf(
+                "event_type = 'screening_questionnaire_email_sent' AND entity_id = %d",
+                (int) $successfulQuestionnaire['questionnaire_id']
+            )
+        ));
+        $duplicateDelivery = $successfulWorkflow->sendQuestionnaireEmailForReview(
+            $successfulQuestionnaire['questionnaire_id'],
+            1,
+            array(),
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+        $this->assertFalse($duplicateDelivery['sent']);
+        $this->assertStringContainsString('No duplicate email was sent', $duplicateDelivery['error']);
+        $this->assertCount(1, $successfulWorkflow->deliveryCalls);
+
+        $failedCandidateID = $this->insertFakeCandidate('Delivery', 'Failure');
+        $failedJobOrderID = $this->insertFakeJobOrder('Weekend Table Greeter / Field Assistant - Youth Sports');
+        $this->insertFakeCandidateJobOrder($failedCandidateID, $failedJobOrderID);
+        $failedWorkflow = $createWorkflow(false);
+        $this->assertGreaterThan(0, $failedWorkflow->ensureCandidateWorkflowRow(
+            $failedCandidateID,
+            $failedJobOrderID,
+            1,
+            'Protected delivery test'
+        ));
+        $failedQuestionnaire = $failedWorkflow->requestQuestionnaire($failedCandidateID, $failedJobOrderID, 1);
+        $failedDelivery = $failedWorkflow->sendQuestionnaireEmailForReview(
+            $failedQuestionnaire['questionnaire_id'],
+            1,
+            $failedQuestionnaire,
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+        $this->assertFalse($failedDelivery['sent']);
+        $this->assertStringContainsString('No automatic retry will occur', $failedDelivery['error']);
+        $this->assertCount(1, $failedWorkflow->deliveryCalls);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf(
+                "screening_questionnaire_id = %d AND status_key = 'link_ready' AND auto_email_status_key = 'failed' AND auto_email_sent_at IS NULL",
+                (int) $failedQuestionnaire['questionnaire_id']
+            )
+        ));
+
+        $disabledCandidateID = $this->insertFakeCandidate('Delivery', 'Disabled');
+        $disabledJobOrderID = $this->insertFakeJobOrder('Part-Time Customer Service Representative');
+        $this->insertFakeCandidateJobOrder($disabledCandidateID, $disabledJobOrderID);
+        $disabledWorkflow = $createWorkflow(true, false);
+        $this->assertGreaterThan(0, $disabledWorkflow->ensureCandidateWorkflowRow(
+            $disabledCandidateID,
+            $disabledJobOrderID,
+            1,
+            'Protected delivery test'
+        ));
+        $disabledQuestionnaire = $disabledWorkflow->requestQuestionnaire($disabledCandidateID, $disabledJobOrderID, 1);
+        $disabledDelivery = $disabledWorkflow->sendQuestionnaireEmailForReview(
+            $disabledQuestionnaire['questionnaire_id'],
+            1,
+            $disabledQuestionnaire,
+            \NESPWorkflow::applicantEmailFingerprint('fixture@example.test')
+        );
+        $this->assertFalse($disabledDelivery['sent']);
+        $this->assertCount(0, $disabledWorkflow->deliveryCalls);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf(
+                "screening_questionnaire_id = %d AND status_key = 'link_ready' AND auto_email_status_key = 'not_attempted' AND auto_email_attempted_at IS NULL",
+                (int) $disabledQuestionnaire['questionnaire_id']
+            )
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_audit_event',
+            sprintf(
+                "event_type = 'screening_questionnaire_email_failed' AND entity_id = %d",
+                (int) $failedQuestionnaire['questionnaire_id']
+            )
+        ));
+    }
+
     public function testCareerPortalApplicationUsesRoleSpecificQuestionnaireSet()
     {
         include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
