@@ -360,11 +360,23 @@ class NESPWorkflow
 
     public static function isApplicantEmailDeliveryReady($featureEnabled, $mailerConfigured, $fromAddress)
     {
-        return (bool) $featureEnabled
+        return self::isApplicantEmailFeatureExplicitlyEnabled($featureEnabled)
             && (string) $mailerConfigured === '1'
             && defined('MAIL_MAILER')
             && MAIL_MAILER !== MAILER_MODE_DISABLED
             && filter_var(trim((string) $fromAddress), FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    /**
+     * Delivery is opt-in: only the feature flag's canonical enabled values are
+     * accepted. Values such as "true", "yes", or "false" must never become an
+     * accidental send through PHP's loose boolean coercion.
+     */
+    public static function isApplicantEmailFeatureExplicitlyEnabled($featureEnabled)
+    {
+        return $featureEnabled === true
+            || $featureEnabled === 1
+            || $featureEnabled === '1';
     }
 
     /**
