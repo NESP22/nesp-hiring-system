@@ -94,7 +94,15 @@ class NESPBoardIntakeSchedulerTest extends TestCase
         $entrypoint = file_get_contents(LEGACY_ROOT . '/docker/render/entrypoint.sh');
         $blueprint = file_get_contents(LEGACY_ROOT . '/render.yaml');
 
-        $this->assertStringContainsString("mailEnv('NESP_SERVICE_ROLE') !== 'cron'", $entrypoint);
+        $this->assertStringContainsString(
+            "\$serviceRole = strtolower(mailEnv('NESP_SERVICE_ROLE'))",
+            $entrypoint
+        );
+        $this->assertStringContainsString("if (\$serviceRole !== 'cron')", $entrypoint);
+        $this->assertStringContainsString(
+            'updateMailerSettings($mailEnabled, $fromAddress);',
+            $entrypoint
+        );
         $this->assertStringContainsString('NESP_SERVICE_ROLE', $blueprint);
         $this->assertStringContainsString('nesp-board-intake-scheduler', $blueprint);
         $this->assertStringContainsString('0 12,13,22,23 * * *', $blueprint);
