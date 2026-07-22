@@ -123,6 +123,12 @@ class NESPUI extends UserInterface
                 $this->deactivateInterviewerRoleRule();
                 break;
 
+            case 'archiveInertInterviewerProfile':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->archiveInertInterviewerProfile();
+                break;
+
             case 'createCandidateGrant':
                 $this->adminOnly();
                 $this->requirePostCSRF();
@@ -699,6 +705,19 @@ class NESPUI extends UserInterface
         if ($this->_workflow->deactivateInterviewerRoleRule($ruleID, $this->_userID) === false)
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an active routing rule to remove.');
+        }
+
+        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+    }
+
+    private function archiveInertInterviewerProfile()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        $confirmation = isset($_POST['archiveConfirmation']) ? $_POST['archiveConfirmation'] : '';
+        $result = $this->_workflow->archiveInertInterviewerProfile($interviewerProfileID, $confirmation, $this->_userID);
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to archive this interviewer profile.');
         }
 
         CATSUtility::transferRelativeURI('m=nesp&a=settings');
