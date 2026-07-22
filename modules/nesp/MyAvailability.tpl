@@ -39,6 +39,20 @@
                 </div>
 
                 <div class="nesp-panel">
+                    <h3>My Koalendar Booking Link</h3>
+                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=updateInterviewerKoalendarLink" class="nesp-form">
+                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                        <input type="hidden" name="interviewerProfileID" value="<?php echo((int) $this->profile['interviewer_profile_id']); ?>" />
+                        <label>
+                            Public Koalendar booking page
+                            <input type="url" name="koalendarBookingURL" value="<?php echo(htmlspecialchars(isset($this->profile['koalendar_booking_url']) ? $this->profile['koalendar_booking_url'] : '', ENT_QUOTES, 'UTF-8')); ?>" placeholder="https://koalendar.com/e/your-page" />
+                            <span class="nesp-help-text">Copy the public booking-page link from Koalendar. This stores the link only; it does not send it or create a booking.</span>
+                        </label>
+                        <button type="submit" class="nesp-primary-button">Save Koalendar Link</button>
+                    </form>
+                </div>
+
+                <div class="nesp-panel">
                     <h3>Zoom Participant Link</h3>
                     <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=updateInterviewerZoomLink" class="nesp-form">
                         <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />

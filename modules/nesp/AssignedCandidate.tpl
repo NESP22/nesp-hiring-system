@@ -30,6 +30,19 @@
                 </div>
             </div>
 
+            <?php if (!empty($this->candidate['questionnaire_review_completed_at'])): ?>
+            <div class="nesp-panel">
+                <h3>Applicant Scheduling Handoff</h3>
+                <?php if (!empty($this->candidate['koalendar_booking_url'])): ?>
+                    <p>The questionnaire is reviewed. This is your approved Koalendar booking page for the applicant's next scheduling step.</p>
+                    <a class="nesp-primary-action" href="<?php echo(htmlspecialchars($this->candidate['koalendar_booking_url'], ENT_QUOTES, 'UTF-8')); ?>" target="_blank" rel="noopener noreferrer">Open My Booking Page</a>
+                    <p class="nesp-muted">Nothing is sent automatically from this page.</p>
+                <?php else: ?>
+                    <div class="nesp-empty">The questionnaire is reviewed, but your Koalendar booking page is not saved. Add it under My Availability.</div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
             <div class="nesp-two-column">
                 <div class="nesp-panel">
                     <h3>Assignment Snapshot</h3>

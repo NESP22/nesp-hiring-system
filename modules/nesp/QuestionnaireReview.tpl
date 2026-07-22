@@ -184,6 +184,19 @@ $emailStatus = isset($this->questionnaire['auto_email_status_key']) ? $this->que
                     <button class="nesp-primary-action" type="submit">Save Review</button>
                 </form>
             </div>
+
+            <?php if ($questionnaireComplete && !empty($this->questionnaire['review_completed_at']) && !empty($this->questionnaire['reviewer_profile_id'])): ?>
+            <div class="nesp-panel">
+                <h3>Reviewed Next Action</h3>
+                <?php if (!empty($this->questionnaire['reviewer_koalendar_booking_url'])): ?>
+                    <p>The questionnaire is reviewed and <?php $this->_($this->questionnaire['reviewer_name']); ?> is assigned. Use that interviewer's approved Koalendar page for applicant scheduling.</p>
+                    <a class="nesp-primary-action" href="<?php echo(htmlspecialchars($this->questionnaire['reviewer_koalendar_booking_url'], ENT_QUOTES, 'UTF-8')); ?>" target="_blank" rel="noopener noreferrer">Open <?php $this->_($this->questionnaire['reviewer_name']); ?>'s Booking Page</a>
+                    <p class="nesp-muted">Opening this page does not email the applicant or create a booking.</p>
+                <?php else: ?>
+                    <div class="nesp-empty"><?php $this->_($this->questionnaire['reviewer_name']); ?> is assigned, but no approved Koalendar booking page is saved yet. Add it in Interviewer Settings or My Availability.</div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 <?php TemplateUtility::printFooter(); ?>

@@ -273,6 +273,50 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse($zak['ok']);
     }
 
+    public function testKoalendarBookingLinkValidationAcceptsOnlyPublicBookingPages()
+    {
+        $valid = NESPWorkflow::validateKoalendarBookingURL('https://koalendar.com/e/nesp-photographer-interview');
+        $empty = NESPWorkflow::validateKoalendarBookingURL('');
+        $http = NESPWorkflow::validateKoalendarBookingURL('http://koalendar.com/e/nesp-interview');
+        $login = NESPWorkflow::validateKoalendarBookingURL('https://koalendar.com/login');
+        $workspace = NESPWorkflow::validateKoalendarBookingURL('https://koalendar.com/join/fixture');
+        $otherHost = NESPWorkflow::validateKoalendarBookingURL('https://example.test/e/nesp-interview');
+
+        $this->assertTrue($valid['ok']);
+        $this->assertSame('https://koalendar.com/e/nesp-photographer-interview', $valid['url']);
+        $this->assertTrue($empty['ok']);
+        $this->assertSame('', $empty['url']);
+        $this->assertFalse($http['ok']);
+        $this->assertFalse($login['ok']);
+        $this->assertFalse($workspace['ok']);
+        $this->assertFalse($otherHost['ok']);
+    }
+
+    public function testKoalendarHandoffIsInterviewerOwnedReviewedAndManualOnly()
+    {
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $dashboard = file_get_contents(LEGACY_ROOT . '/modules/nesp/Dashboard.tpl');
+        $questionnaire = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireReview.tpl');
+        $availability = file_get_contents(LEGACY_ROOT . '/modules/nesp/MyAvailability.tpl');
+        $assignments = file_get_contents(LEGACY_ROOT . '/modules/nesp/AssignedCandidates.tpl');
+        $candidate = file_get_contents(LEGACY_ROOT . '/modules/nesp/AssignedCandidate.tpl');
+
+        $this->assertStringContainsString('ip.koalendar_booking_url', $workflow);
+        $this->assertStringContainsString('questionnaire_review_completed_at', $workflow);
+        $this->assertStringContainsString("case 'updateInterviewerKoalendarLink':", $ui);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $ui);
+        $this->assertStringContainsString('You can edit only your own Koalendar booking link.', $ui);
+        $this->assertStringContainsString('Reviewed next action', $dashboard);
+        $this->assertStringContainsString('review_completed_at', $questionnaire);
+        $this->assertStringContainsString('it does not send it or create a booking', $availability);
+        $this->assertStringContainsString('questionnaire_review_completed_at', $assignments);
+        $this->assertStringContainsString("candidate['koalendar_booking_url']", $assignments);
+        $this->assertStringContainsString('Open My Booking Page', $candidate);
+        $this->assertStringNotContainsString('sendKoalendar', $ui);
+        $this->assertStringNotContainsString('globalKoalendar', $workflow);
+    }
+
     public function testTrackedInterviewLinkUsesOpaqueTokenAndInvitationDoesNotExposeZoomURL()
     {
         $token = NESPWorkflow::generateQuestionnaireToken();
