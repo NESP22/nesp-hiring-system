@@ -19,6 +19,10 @@
                 This creates copy-only invitation text for Craig to review. It does not email, text, call, rank, reject, approve, hire, or change stage.
             </div>
 
+            <?php if (!empty($this->contactDetailsMessage)): ?>
+            <div class="nesp-success" role="status"><?php $this->_($this->contactDetailsMessage); ?></div>
+            <?php endif; ?>
+
             <div class="nesp-step-row" aria-label="Questionnaire invitation steps">
                 <div class="nesp-step is-current"><span>1</span><strong>Review candidate</strong></div>
                 <div class="nesp-step"><span>2</span><strong>Generate link</strong></div>

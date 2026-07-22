@@ -87,6 +87,79 @@ class NESPWorkflowTest extends TestCase
         $this->assertSame('stored description', NESPWorkflow::getFeatureFlagDescription('NESP_WORKFLOW_ENABLED', 'stored description'));
     }
 
+    public function testApplicantContactEmailValidationNormalizesAndRejectsInvalidValues()
+    {
+        $missing = NESPWorkflow::validateApplicantContactEmail('   ');
+        $invalid = NESPWorkflow::validateApplicantContactEmail('not-an-email');
+        $valid = NESPWorkflow::validateApplicantContactEmail(' Applicant@Example.COM ');
+
+        $this->assertFalse($missing['ok']);
+        $this->assertFalse($invalid['ok']);
+        $this->assertTrue($valid['ok']);
+        $this->assertSame('applicant@example.com', $valid['email']);
+        $this->assertFalse(NESPWorkflow::validateApplicantContactEmail(str_repeat('a', 117) . '@example.com')['ok']);
+    }
+
+    public function testSavedApplicantEmailAdvancesLegacyContactActionToQuestionnaire()
+    {
+        $this->assertSame(
+            'Send questionnaire',
+            NESPWorkflow::resolveContactNextAction('Collect contact details', 'applicant@example.com')
+        );
+        $this->assertSame(
+            'Collect contact details',
+            NESPWorkflow::resolveContactNextAction('Collect contact details', '')
+        );
+        $this->assertSame(
+            'Collect contact details',
+            NESPWorkflow::resolveContactNextAction('Collect contact details', 'not-an-email')
+        );
+        $this->assertSame(
+            'Review application',
+            NESPWorkflow::resolveContactNextAction('Review application', 'applicant@example.com')
+        );
+        $this->assertSame(
+            'Collect contact details',
+            NESPWorkflow::resolveContactNextAction('Collect contact details', 'applicant@example.com', 'hired')
+        );
+    }
+
+    public function testCollectContactDetailsIsAdminCsrfProtectedAndDoesNotSend()
+    {
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $dashboard = file_get_contents(LEGACY_ROOT . '/modules/nesp/Dashboard.tpl');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/nesp/ContactDetails.tpl');
+        $saveActionStart = strpos($ui, "case 'saveContactDetails':");
+        $saveActionEnd = strpos($ui, "case 'requestQuestionnaire':", $saveActionStart);
+        $saveAction = substr($ui, $saveActionStart, $saveActionEnd - $saveActionStart);
+
+        $this->assertStringContainsString("case 'collectContactDetails':", $ui);
+        $this->assertStringContainsString("case 'saveContactDetails':", $ui);
+        $this->assertStringContainsString('$this->adminOnly();', $saveAction);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $saveAction);
+        $this->assertStringContainsString('getCandidateContactDetailsContext($workflowID, $candidateID, $jobOrderID, true)', $workflow);
+        $this->assertStringContainsString('candidate_workflow_id = %s', $workflow);
+        $this->assertStringContainsString('candidate_contact_email_saved', $workflow);
+        $this->assertStringContainsString('c.email1 AS candidate_email', $workflow);
+        $this->assertStringContainsString('resolveContactNextAction($nextAction, $candidateEmail,', $workflow);
+        $this->assertStringContainsString('candidateCanPrepareQuestionnaire($candidateID, $jobOrderID)', $workflow . $ui);
+        $this->assertStringContainsString('maxlength="128"', $template);
+        $this->assertStringContainsString("validateApplicantContactEmail(\$row['email1'])['ok']", $workflow);
+        $this->assertStringContainsString('a=collectContactDetails', $workflow . $dashboard);
+        $this->assertStringContainsString('a=confirmQuestionnaire', $workflow);
+        $this->assertStringContainsString("if (!empty(\$card['can_prepare_questionnaire']))", $dashboard);
+        $this->assertStringContainsString('name="csrfToken"', $template);
+        $this->assertStringContainsString('name="workflowID"', $template);
+        $this->assertStringContainsString('Save Email and Continue to Questionnaire', $template);
+        $this->assertStringContainsString('It does not send email', $template);
+        $this->assertStringNotContainsString('requestQuestionnaire(', substr(
+            $ui,
+            strpos($ui, 'private function saveContactDetails()'),
+            strpos($ui, 'private function requestQuestionnaire()') - strpos($ui, 'private function saveContactDetails()')
+        ));
+    }
+
     public function testInterviewerProfileEmailIdentityIsNormalizedBeforeDuplicateCheck()
     {
         $this->assertSame('', NESPWorkflow::normalizeInterviewerProfileEmail('   '));

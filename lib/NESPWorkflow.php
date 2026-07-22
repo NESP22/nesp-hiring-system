@@ -196,6 +196,8 @@ class NESPWorkflow
             'publishQuestionSetDraft',
             'archiveQuestionSet',
             'confirmQuestionnaire',
+            'collectContactDetails',
+            'saveContactDetails',
             'requestQuestionnaire',
             'reviewQuestionnaire',
             'markQuestionnaireInvitationCopied',
@@ -2957,6 +2959,7 @@ class NESPWorkflow
                     cw.date_modified,
                     c.first_name,
                     c.last_name,
+                    c.email1 AS candidate_email,
                     jo.title AS role_title,
                     ws.stage_key,
                     ws.display_name AS stage_name,
@@ -3523,7 +3526,6 @@ class NESPWorkflow
         {
             return array();
         }
-
         $row['candidate_name'] = trim($row['first_name'] . ' ' . $row['last_name']);
         $row['interviewer_profiles'] = $this->getInterviewerProfiles();
         $row['existing_interview'] = $interviewID > 0 ? $this->getInterviewDetail($interviewID) : array();
@@ -6142,6 +6144,38 @@ class NESPWorkflow
         return NESPVapiIntegration::getConfigurationStatus($this->isFeatureFlagEnabled('NESP_VAPI_ENABLED'));
     }
 
+    public function candidateCanPrepareQuestionnaire($candidateID, $jobOrderID)
+    {
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        if ($candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return false;
+        }
+
+        $row = $this->_db->getAssoc(sprintf(
+            'SELECT c.email1
+             FROM nesp_candidate_workflow cw
+             INNER JOIN nesp_workflow_stage ws
+                ON ws.workflow_stage_id = cw.workflow_stage_id
+             INNER JOIN candidate c
+                ON c.candidate_id = cw.candidate_id
+               AND c.is_active = 1
+             INNER JOIN candidate_joborder cjo
+                ON cjo.candidate_id = cw.candidate_id
+               AND cjo.joborder_id = cw.joborder_id
+             WHERE cw.candidate_id = %s
+               AND cw.joborder_id = %s
+               AND ws.stage_key = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($candidateID),
+            $this->_db->makeQueryInteger($jobOrderID),
+            $this->_db->makeQueryString('new')
+        ));
+
+        return !empty($row) && self::validateApplicantContactEmail($row['email1'])['ok'];
+    }
+
     public function getCandidateQuestionnairePreview($candidateID, $jobOrderID)
     {
         $candidateID = (int) $candidateID;
@@ -6177,6 +6211,10 @@ class NESPWorkflow
         {
             return array();
         }
+        if (!self::validateApplicantContactEmail($row['email1'])['ok'])
+        {
+            return array();
+        }
 
         $row['candidate_name'] = trim($row['first_name'] . ' ' . $row['last_name']);
         $version = $this->getPublishedQuestionSetVersionForRole($row['title'], $jobOrderID);
@@ -6191,6 +6229,212 @@ class NESPWorkflow
         $row['question_snapshot_json'] = json_encode($row['questions']);
         $row['estimated_minutes'] = '5-10 minutes';
         return $row;
+    }
+
+    public static function validateApplicantContactEmail($email)
+    {
+        $email = strtolower(trim((string) $email));
+        if ($email === '')
+        {
+            return array('ok' => false, 'email' => '', 'error' => 'Enter the applicant email address.');
+        }
+        if (strlen($email) > 128 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)
+        {
+            return array('ok' => false, 'email' => '', 'error' => 'Enter a valid applicant email address.');
+        }
+
+        return array('ok' => true, 'email' => $email, 'error' => '');
+    }
+
+    public static function resolveContactNextAction($nextAction, $candidateEmail, $stageKey = 'new')
+    {
+        $nextAction = trim((string) $nextAction);
+        if (strcasecmp($nextAction, 'Collect contact details') === 0
+            && (string) $stageKey === 'new'
+            && self::validateApplicantContactEmail($candidateEmail)['ok'])
+        {
+            return 'Send questionnaire';
+        }
+
+        return $nextAction;
+    }
+
+    public function getCandidateContactDetailsContext($workflowID, $candidateID, $jobOrderID, $lockForUpdate = false)
+    {
+        $workflowID = (int) $workflowID;
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        if ($workflowID <= 0 || $candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return array();
+        }
+
+        $row = $this->_db->getAssoc(sprintf(
+            'SELECT
+                cw.candidate_workflow_id,
+                c.candidate_id,
+                c.first_name,
+                c.last_name,
+                c.email1,
+                c.source,
+                jo.joborder_id,
+                jo.title AS role_title
+             FROM nesp_candidate_workflow cw
+             INNER JOIN candidate c
+                ON c.candidate_id = cw.candidate_id
+               AND c.is_active = 1
+             INNER JOIN candidate_joborder cjo
+                ON cjo.candidate_id = cw.candidate_id
+               AND cjo.joborder_id = cw.joborder_id
+             INNER JOIN joborder jo
+                ON jo.joborder_id = cw.joborder_id
+             INNER JOIN nesp_workflow_stage ws
+                ON ws.workflow_stage_id = cw.workflow_stage_id
+             WHERE cw.candidate_workflow_id = %s
+               AND cw.candidate_id = %s
+               AND cw.joborder_id = %s
+               AND ws.stage_key = %s
+               AND cw.next_action_label = %s
+             LIMIT 1%s',
+            $this->_db->makeQueryInteger($workflowID),
+            $this->_db->makeQueryInteger($candidateID),
+            $this->_db->makeQueryInteger($jobOrderID),
+            $this->_db->makeQueryString('new'),
+            $this->_db->makeQueryString('Collect contact details'),
+            $lockForUpdate ? ' FOR UPDATE' : ''
+        ));
+        if (empty($row))
+        {
+            return array();
+        }
+
+        $row['candidate_name'] = trim($row['first_name'] . ' ' . $row['last_name']);
+        return $row;
+    }
+
+    public function saveCandidateContactDetails($workflowID, $candidateID, $jobOrderID, $email, $actorUserID)
+    {
+        $workflowID = (int) $workflowID;
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        $validated = self::validateApplicantContactEmail($email);
+        if (!$validated['ok'])
+        {
+            return $validated;
+        }
+
+        $transactionStarted = $this->_db->beginTransaction();
+        if (!$transactionStarted)
+        {
+            return array('ok' => false, 'error' => 'Applicant contact details could not be safely locked. Try again.');
+        }
+        $candidateRowsLocked = $this->_db->query(
+            'SELECT candidate_id FROM candidate WHERE is_active = 1 ORDER BY candidate_id FOR UPDATE'
+        );
+        if (!$candidateRowsLocked)
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            return array('ok' => false, 'error' => 'Applicant contact details are temporarily busy. Try again.');
+        }
+
+        $context = $this->getCandidateContactDetailsContext($workflowID, $candidateID, $jobOrderID, true);
+        if (empty($context))
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            return array('ok' => false, 'error' => 'The selected applicant and role no longer match. Return to Needs Craig and try again.');
+        }
+
+        $duplicate = $this->_db->getAssoc(sprintf(
+            'SELECT candidate_id
+             FROM candidate
+             WHERE candidate_id <> %s
+               AND is_active = 1
+               AND (
+                    LOWER(TRIM(email1)) = %s
+                    OR LOWER(TRIM(email2)) = %s
+               )
+             LIMIT 1',
+            $this->_db->makeQueryInteger($candidateID),
+            $this->_db->makeQueryString($validated['email']),
+            $this->_db->makeQueryString($validated['email'])
+        ));
+        if (!empty($duplicate))
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            return array('ok' => false, 'error' => 'That email is already attached to another active candidate. Review the possible duplicate before continuing.');
+        }
+
+        $emailChanged = strtolower(trim((string) $context['email1'])) !== $validated['email'];
+        $candidateUpdated = $this->_db->query(sprintf(
+            'UPDATE candidate
+             SET email1 = %s,
+                 date_modified = NOW()
+             WHERE candidate_id = %s
+               AND is_active = 1',
+            $this->_db->makeQueryString($validated['email']),
+            $this->_db->makeQueryInteger($candidateID)
+        ));
+        $workflowUpdated = $this->_db->query(sprintf(
+            'UPDATE nesp_candidate_workflow cw
+             INNER JOIN nesp_workflow_stage ws
+                ON ws.workflow_stage_id = cw.workflow_stage_id
+             SET cw.waiting_on_key = %s,
+                 summary = %s,
+                 cw.next_action_label = %s,
+                 cw.date_modified = NOW()
+             WHERE cw.candidate_workflow_id = %s
+               AND cw.candidate_id = %s
+               AND cw.joborder_id = %s
+               AND ws.stage_key = %s
+               AND cw.next_action_label = %s',
+            $this->_db->makeQueryString('Craig'),
+            $this->_db->makeQueryString('Applicant contact email verified. Review and prepare the role-specific questionnaire.'),
+            $this->_db->makeQueryString('Send questionnaire'),
+            $this->_db->makeQueryInteger($workflowID),
+            $this->_db->makeQueryInteger($candidateID),
+            $this->_db->makeQueryInteger($jobOrderID),
+            $this->_db->makeQueryString('new'),
+            $this->_db->makeQueryString('Collect contact details')
+        ));
+        $workflowUpdatedExactlyOnce = $workflowUpdated && $this->_db->getAffectedRows() === 1;
+        if (!$candidateUpdated || !$workflowUpdatedExactlyOnce)
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            return array('ok' => false, 'error' => 'The contact details could not be saved. No changes were committed.');
+        }
+
+        $auditLogged = $this->logAuditEvent($actorUserID, 'candidate_contact_email_saved', 'candidate_workflow', $workflowID, array(
+            'candidate_id' => $candidateID,
+            'joborder_id' => $jobOrderID,
+            'email_changed' => $emailChanged,
+            'previous_email_present' => trim((string) $context['email1']) !== ''
+        ));
+        if (!$auditLogged)
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            return array('ok' => false, 'error' => 'The contact details could not be audited. No changes were committed.');
+        }
+        if ($transactionStarted)
+        {
+            $this->_db->commitTransaction();
+        }
+
+        return array('ok' => true, 'email' => $validated['email'], 'error' => '');
     }
 
     public function ensureDefaultQuestionSetsSeeded($actorUserID = null)
@@ -6955,8 +7199,12 @@ class NESPWorkflow
         }
     }
 
-    public function requestQuestionnaire($candidateID, $jobOrderID, $actorUserID)
+    public function requestQuestionnaire($candidateID, $jobOrderID, $actorUserID, $requireEligibleWorkflow = false)
     {
+        if ($requireEligibleWorkflow && !$this->candidateCanPrepareQuestionnaire($candidateID, $jobOrderID))
+        {
+            return false;
+        }
         $preview = $this->getCandidateQuestionnairePreview($candidateID, $jobOrderID);
         if (empty($preview))
         {
@@ -9288,9 +9536,20 @@ class NESPWorkflow
             $nextAction = $this->inferNextAction($row['stage_key']);
         }
 
+        $candidateEmail = isset($row['candidate_email']) ? (string) $row['candidate_email'] : '';
+        $nextAction = self::resolveContactNextAction($nextAction, $candidateEmail, $row['stage_key']);
+
         $candidateURL = CATSUtility::getIndexName() . '?m=candidates&amp;a=show&amp;candidateID=' . (int) $row['candidate_id'];
         $primaryActionURL = $candidateURL;
-        if ($row['stage_key'] === 'interview_requested')
+        if (strcasecmp($nextAction, 'Collect contact details') === 0)
+        {
+            $primaryActionURL = CATSUtility::getIndexName() . '?m=nesp&amp;a=collectContactDetails&amp;workflowID=' . (int) $row['candidate_workflow_id'] . '&amp;candidateID=' . (int) $row['candidate_id'] . '&amp;jobOrderID=' . (int) $row['joborder_id'];
+        }
+        else if (strcasecmp($nextAction, 'Send questionnaire') === 0)
+        {
+            $primaryActionURL = CATSUtility::getIndexName() . '?m=nesp&amp;a=confirmQuestionnaire&amp;candidateID=' . (int) $row['candidate_id'] . '&amp;jobOrderID=' . (int) $row['joborder_id'];
+        }
+        else if ($row['stage_key'] === 'interview_requested')
         {
             $primaryActionURL = CATSUtility::getIndexName() . '?m=nesp&amp;a=scheduleInterview&amp;candidateID=' . (int) $row['candidate_id'] . '&amp;jobOrderID=' . (int) $row['joborder_id'];
         }
@@ -9302,10 +9561,13 @@ class NESPWorkflow
         $statusLabels = self::getManualInterviewStatusLabels();
 
         return array(
+            'candidate_workflow_id' => (int) $row['candidate_workflow_id'],
             'candidate_id' => (int) $row['candidate_id'],
             'joborder_id' => (int) $row['joborder_id'],
             'interview_id' => isset($row['interview_id']) ? (int) $row['interview_id'] : 0,
             'candidate_name' => $candidateName,
+            'can_prepare_questionnaire' => $row['stage_key'] === 'new'
+                && self::validateApplicantContactEmail($candidateEmail)['ok'],
             'role_title' => $row['role_title'],
             'stage_name' => $row['stage_name'],
             'stage_key' => $row['stage_key'],
@@ -9389,7 +9651,7 @@ class NESPWorkflow
             $this->_db->makeQueryString($metadataJSON)
         );
 
-        $this->_db->query($sql);
+        return $this->_db->query($sql);
     }
 
     public function interviewerCanReceiveAssignment($interviewerProfileID, $jobOrderID)

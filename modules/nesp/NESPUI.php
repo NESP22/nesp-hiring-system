@@ -243,6 +243,17 @@ class NESPUI extends UserInterface
                 $this->confirmQuestionnaire();
                 break;
 
+            case 'collectContactDetails':
+                $this->adminOnly();
+                $this->collectContactDetails();
+                break;
+
+            case 'saveContactDetails':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->saveContactDetails();
+                break;
+
             case 'requestQuestionnaire':
                 $this->adminOnly();
                 $this->requirePostCSRF();
@@ -1083,6 +1094,10 @@ class NESPUI extends UserInterface
     {
         $candidateID = isset($_GET['candidateID']) ? (int) $_GET['candidateID'] : 0;
         $jobOrderID = isset($_GET['jobOrderID']) ? (int) $_GET['jobOrderID'] : 0;
+        if (!$this->_workflow->candidateCanPrepareQuestionnaire($candidateID, $jobOrderID))
+        {
+            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Collect and verify the applicant email before preparing a questionnaire.');
+        }
         $preview = $this->_workflow->getCandidateQuestionnairePreview($candidateID, $jobOrderID);
         if (empty($preview))
         {
@@ -1092,14 +1107,59 @@ class NESPUI extends UserInterface
         $this->_template->assign('active', $this);
         $this->_template->assign('subActive', 'Questionnaires');
         $this->_template->assign('preview', $preview);
+        $contactDetailsMessage = isset($_SESSION['NESP_CONTACT_DETAILS_MESSAGE'])
+            ? $_SESSION['NESP_CONTACT_DETAILS_MESSAGE'] : '';
+        unset($_SESSION['NESP_CONTACT_DETAILS_MESSAGE']);
+        $this->_template->assign('contactDetailsMessage', $contactDetailsMessage);
         $this->_template->display('./modules/nesp/QuestionnaireConfirm.tpl');
+    }
+
+    private function collectContactDetails()
+    {
+        $workflowID = isset($_GET['workflowID']) ? (int) $_GET['workflowID'] : 0;
+        $candidateID = isset($_GET['candidateID']) ? (int) $_GET['candidateID'] : 0;
+        $jobOrderID = isset($_GET['jobOrderID']) ? (int) $_GET['jobOrderID'] : 0;
+        $context = $this->_workflow->getCandidateContactDetailsContext($workflowID, $candidateID, $jobOrderID);
+        if (empty($context))
+        {
+            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid applicant contact-details request.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Needs Craig');
+        $this->_template->assign('contact', $context);
+        $this->_template->display('./modules/nesp/ContactDetails.tpl');
+    }
+
+    private function saveContactDetails()
+    {
+        $workflowID = isset($_POST['workflowID']) ? (int) $_POST['workflowID'] : 0;
+        $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
+        $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
+        $email = isset($_POST['email']) ? $_POST['email'] : '';
+        $result = $this->_workflow->saveCandidateContactDetails(
+            $workflowID,
+            $candidateID,
+            $jobOrderID,
+            $email,
+            $this->_userID
+        );
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to save applicant contact details.');
+        }
+
+        $_SESSION['NESP_CONTACT_DETAILS_MESSAGE'] = 'Email saved. Review the role-specific questionnaire below; nothing has been sent.';
+        CATSUtility::transferRelativeURI(
+            'm=nesp&a=confirmQuestionnaire&candidateID=' . $candidateID . '&jobOrderID=' . $jobOrderID
+        );
     }
 
     private function requestQuestionnaire()
     {
         $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
         $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
-        $questionnaireID = $this->_workflow->requestQuestionnaire($candidateID, $jobOrderID, $this->_userID);
+        $questionnaireID = $this->_workflow->requestQuestionnaire($candidateID, $jobOrderID, $this->_userID, true);
         if ($questionnaireID === false)
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Unable to prepare questionnaire link.');
