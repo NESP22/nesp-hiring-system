@@ -17,6 +17,28 @@
                 <div class="nesp-confirm-box nesp-assignment-message"><?php $this->_($this->assignmentMessage); ?></div>
             <?php endif; ?>
 
+            <?php if (!empty($this->bulkQuestionnaireMessage)): ?>
+                <div class="nesp-confirm-box"><?php $this->_($this->bulkQuestionnaireMessage); ?></div>
+            <?php endif; ?>
+
+            <?php if (!empty($this->bulkQuestionnaireItems)): ?>
+                <div class="nesp-panel">
+                    <h3>Questionnaire Batch Follow-Up</h3>
+                    <p>These applicants were skipped, failed safely, or need an audit check. Review them before trying again.</p>
+                    <table class="nesp-table">
+                        <tr><th>Applicant</th><th>Role</th><th>Result</th><th>What to do</th></tr>
+                        <?php foreach ($this->bulkQuestionnaireItems as $item): ?>
+                            <tr>
+                                <td data-label="Applicant"><?php $this->_($item['candidate_name']); ?></td>
+                                <td data-label="Role"><?php $this->_($item['role_title']); ?></td>
+                                <td data-label="Result"><?php $this->_(ucfirst($item['status'])); ?></td>
+                                <td data-label="What to do"><?php $this->_($item['message']); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </table>
+                </div>
+            <?php endif; ?>
+
             <div class="nesp-dashboard-nav">
                 <?php foreach ($this->dashboardNavigation as $navItem): ?>
                     <?php if ($navItem['key'] === 'settings' && $this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA): ?>
@@ -33,6 +55,26 @@
                     <a class="<?php echo($isActive ? 'active' : ''); ?>" href="<?php echo($navURL); ?>"><?php $this->_($navItem['label']); ?></a>
                 <?php endforeach; ?>
             </div>
+
+            <?php if ($this->viewKey === 'dashboard'): ?>
+                <div class="nesp-panel nesp-bulk-questionnaire-panel">
+                    <h3>Questionnaire Email</h3>
+                    <?php if ($this->bulkQuestionnairePreview['delivery']['status_key'] !== 'enabled'): ?>
+                        <p><?php $this->_($this->bulkQuestionnairePreview['delivery']['message']); ?></p>
+                    <?php else: ?>
+                        <p><strong><?php echo((int) $this->bulkQuestionnairePreview['ready_count']); ?></strong> reviewed applicants are ready for one questionnaire email.</p>
+                        <p class="nesp-muted">
+                            <?php echo((int) $this->bulkQuestionnairePreview['missing_email_count']); ?> need an email;
+                            <?php echo((int) $this->bulkQuestionnairePreview['already_handled_count']); ?> were already handled.
+                        </p>
+                        <?php if ((int) $this->bulkQuestionnairePreview['ready_count'] > 0): ?>
+                            <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmBulkQuestionnaireEmails">Review and Send All Ready</a>
+                        <?php else: ?>
+                            <div class="nesp-empty">No questionnaire emails need sending right now.</div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
 
             <div class="nesp-card-grid nesp-card-grid-compact">
                 <div class="nesp-card">

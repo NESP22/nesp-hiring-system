@@ -129,6 +129,30 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('Duplicate sends are blocked', $review);
     }
 
+    public function testBulkQuestionnaireEmailRequiresAdminReviewCsrfAndSingleUseSnapshot()
+    {
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $dashboard = file_get_contents(LEGACY_ROOT . '/modules/nesp/Dashboard.tpl');
+        $confirm = file_get_contents(LEGACY_ROOT . '/modules/nesp/BulkQuestionnaireConfirm.tpl');
+        $actionStart = strpos($ui, "case 'sendBulkQuestionnaireEmails':");
+        $actionEnd = strpos($ui, "case 'reviewQuestionnaire':", $actionStart);
+        $action = substr($ui, $actionStart, $actionEnd - $actionStart);
+
+        $this->assertStringContainsString('$this->adminOnly();', $action);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $action);
+        $this->assertStringContainsString('NESP_BULK_QUESTIONNAIRE_SEND', $ui);
+        $this->assertStringContainsString('unset($_SESSION[\'NESP_BULK_QUESTIONNAIRE_SEND\'])', $ui);
+        $this->assertStringContainsString("<= 900", $ui);
+        $this->assertStringContainsString('email_fingerprint', $ui);
+        $this->assertStringContainsString('questionnaire_fingerprint', $ui);
+        $this->assertStringContainsString('NESP_BULK_QUESTIONNAIRE_ITEMS', $ui);
+        $this->assertStringContainsString('Review and Send All Ready', $dashboard);
+        $this->assertStringContainsString('Questionnaire Batch Follow-Up', $dashboard);
+        $this->assertStringContainsString('name="csrfToken"', $confirm);
+        $this->assertStringContainsString('name="confirmSend"', $confirm);
+        $this->assertStringContainsString('Duplicate sends are blocked', $confirm);
+    }
+
     public function testApplicantContactEmailValidationNormalizesAndRejectsInvalidValues()
     {
         $missing = NESPWorkflow::validateApplicantContactEmail('   ');
@@ -144,6 +168,23 @@ class NESPWorkflowTest extends TestCase
             NESPWorkflow::applicantEmailFingerprint(' Applicant@Example.COM ')
         );
         $this->assertFalse(NESPWorkflow::validateApplicantContactEmail(str_repeat('a', 117) . '@example.com')['ok']);
+    }
+
+    public function testBulkQuestionnaireReviewFingerprintChangesWithRoleVersionOrQuestions()
+    {
+        $questions = array(array(
+            'key' => 'availability',
+            'label' => 'When are you available?',
+            'type' => 'textarea',
+            'required' => true
+        ));
+        $base = NESPWorkflow::questionnaireReviewFingerprint('Photographer', 'photographer', 4, 2, $questions);
+
+        $this->assertSame($base, NESPWorkflow::questionnaireReviewFingerprint('Photographer', 'photographer', 4, 2, $questions));
+        $this->assertNotSame($base, NESPWorkflow::questionnaireReviewFingerprint('Field Assistant', 'photographer', 4, 2, $questions));
+        $this->assertNotSame($base, NESPWorkflow::questionnaireReviewFingerprint('Photographer', 'photographer', 5, 3, $questions));
+        $questions[0]['label'] = 'What days are you available?';
+        $this->assertNotSame($base, NESPWorkflow::questionnaireReviewFingerprint('Photographer', 'photographer', 4, 2, $questions));
     }
 
     public function testSavedApplicantEmailAdvancesLegacyContactActionToQuestionnaire()
