@@ -555,6 +555,20 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
                 $jobOrderID
             )
         ));
+        $dashboardQueues = $workflow->getDashboardQueues();
+        $guidedCard = null;
+        foreach ($dashboardQueues['needsCraig'] as $card)
+        {
+            if ((int) $card['candidate_id'] === $candidateID && (int) $card['joborder_id'] === $jobOrderID)
+            {
+                $guidedCard = $card;
+                break;
+            }
+        }
+        $this->assertNotNull($guidedCard);
+        $this->assertSame('Send questionnaire', $guidedCard['next_action_label']);
+        $this->assertStringContainsString('a=confirmQuestionnaire', $guidedCard['primary_action_url']);
+        $this->assertTrue($guidedCard['can_prepare_questionnaire']);
         $this->assertSame(1, $this->countRowsWhere(
             'nesp_screening_questionnaire',
             sprintf(
@@ -654,6 +668,149 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
                 $candidateID,
                 $jobOrderID
             )
+        ));
+    }
+
+    public function testGuidedContactDetailsUpdateIsScopedAndContinuesWithoutSending()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Guided', 'Applicant');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE candidate SET email1 = '' WHERE candidate_id = %d",
+            $candidateID
+        ));
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $workflowID = $workflow->ensureCandidateWorkflowRow(
+            $candidateID,
+            $jobOrderID,
+            1,
+            'NESP Ad: Indeed',
+            'Contact details required before any questionnaire or outreach.',
+            'Collect contact details'
+        );
+        $this->assertGreaterThan(0, $workflowID);
+        $this->assertNotEmpty($workflow->getCandidateContactDetailsContext($workflowID, $candidateID, $jobOrderID));
+        $this->assertFalse($workflow->candidateCanPrepareQuestionnaire($candidateID, $jobOrderID));
+        $this->assertSame(array(), $workflow->getCandidateQuestionnairePreview($candidateID, $jobOrderID));
+        $this->assertSame(array(), $workflow->getCandidateContactDetailsContext($workflowID, $candidateID, $jobOrderID + 1));
+
+        $mismatched = $workflow->saveCandidateContactDetails(
+            $workflowID,
+            $candidateID,
+            $jobOrderID + 1,
+            'wrong-record@example.com',
+            1
+        );
+        $this->assertFalse($mismatched['ok']);
+
+        $invalid = $workflow->saveCandidateContactDetails($workflowID, $candidateID, $jobOrderID, 'bad-email', 1);
+        $this->assertFalse($invalid['ok']);
+        $this->assertSame(0, $this->countRowsWhere(
+            'candidate',
+            sprintf("candidate_id = %d AND email1 <> ''", $candidateID)
+        ));
+
+        $duplicateCandidateID = $this->insertFakeCandidate('Existing', 'Applicant');
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE candidate SET email1 = '', email2 = 'existing.applicant@example.com' WHERE candidate_id = %d",
+            $duplicateCandidateID
+        ));
+        $duplicate = $workflow->saveCandidateContactDetails(
+            $workflowID,
+            $candidateID,
+            $jobOrderID,
+            'Existing.Applicant@Example.com',
+            1
+        );
+        $this->assertFalse($duplicate['ok']);
+        $this->assertSame(0, $this->countRowsWhere(
+            'candidate',
+            sprintf("candidate_id = %d AND email1 <> ''", $candidateID)
+        ));
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'hired' LIMIT 1)
+             WHERE candidate_workflow_id = %d",
+            $workflowID
+        ));
+        $laterStage = $workflow->saveCandidateContactDetails(
+            $workflowID,
+            $candidateID,
+            $jobOrderID,
+            'later-stage@example.com',
+            1
+        );
+        $this->assertFalse($laterStage['ok']);
+        $this->assertSame(0, $this->countRowsWhere(
+            'candidate',
+            sprintf("candidate_id = %d AND email1 <> ''", $candidateID)
+        ));
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'new' LIMIT 1)
+             WHERE candidate_workflow_id = %d",
+            $workflowID
+        ));
+
+        $saved = $workflow->saveCandidateContactDetails(
+            $workflowID,
+            $candidateID,
+            $jobOrderID,
+            ' Guided.Applicant@Example.com ',
+            1
+        );
+        $this->assertTrue($saved['ok']);
+        $this->assertSame('guided.applicant@example.com', $saved['email']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'candidate',
+            sprintf("candidate_id = %d AND email1 = 'guided.applicant@example.com'", $candidateID)
+        ));
+        $this->assertNotEmpty($workflow->getCandidateQuestionnairePreview($candidateID, $jobOrderID));
+        $this->assertTrue($workflow->candidateCanPrepareQuestionnaire($candidateID, $jobOrderID));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf(
+                "candidate_workflow_id = %d AND candidate_id = %d AND joborder_id = %d AND next_action_label = 'Send questionnaire'",
+                $workflowID,
+                $candidateID,
+                $jobOrderID
+            )
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_audit_event',
+            sprintf(
+                "event_type = 'candidate_contact_email_saved' AND entity_type = 'candidate_workflow' AND entity_id = %d",
+                $workflowID
+            )
+        ));
+        $this->assertSame(0, $this->countRows('nesp_screening_questionnaire'));
+        $this->assertSame(array(), $workflow->getCandidateContactDetailsContext($workflowID, $candidateID, $jobOrderID));
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'hired' LIMIT 1)
+             WHERE candidate_workflow_id = %d",
+            $workflowID
+        ));
+        $this->assertFalse($workflow->requestQuestionnaire($candidateID, $jobOrderID, 1, true));
+        $this->assertSame(0, $this->countRows('nesp_screening_questionnaire'));
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (SELECT workflow_stage_id FROM nesp_workflow_stage WHERE stage_key = 'new' LIMIT 1)
+             WHERE candidate_workflow_id = %d",
+            $workflowID
+        ));
+        $this->assertNotFalse($workflow->requestQuestionnaire($candidateID, $jobOrderID, 1, true));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
         ));
     }
 

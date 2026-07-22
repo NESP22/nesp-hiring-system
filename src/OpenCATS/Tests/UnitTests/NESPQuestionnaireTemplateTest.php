@@ -9,7 +9,8 @@ class NESPQuestionnaireTemplateTest extends TestCase
             'modules/nesp/Questionnaires.tpl',
             'modules/nesp/QuestionSets.tpl',
             'modules/nesp/QuestionnaireConfirm.tpl',
-            'modules/nesp/QuestionnaireReview.tpl'
+            'modules/nesp/QuestionnaireReview.tpl',
+            'modules/nesp/ContactDetails.tpl'
         );
 
         $this->assertFileExists('images/nesp-logo.png');

@@ -239,7 +239,9 @@
                                             <summary>Details</summary>
                                             <a href="<?php echo($card['candidate_url']); ?>">Candidate</a>
                                             <a href="<?php echo($card['job_url']); ?>">Role</a>
-                                            <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmQuestionnaire&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Questionnaire</a>
+                                            <?php if (!empty($card['can_prepare_questionnaire'])): ?>
+                                                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmQuestionnaire&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Questionnaire</a>
+                                            <?php endif; ?>
                                             <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmPhoneScreen&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Phone Screen</a>
                                             <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=scheduleInterview&amp;candidateID=<?php echo((int) $card['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $card['joborder_id']); ?>">Schedule Interview</a>
                                             <?php if (!empty($card['interview_id'])): ?>
