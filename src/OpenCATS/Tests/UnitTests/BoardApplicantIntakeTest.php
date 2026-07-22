@@ -251,6 +251,24 @@ class BoardApplicantIntakeTest extends TestCase
         $this->assertStringContainsString('never creates candidates, changes contact details, or sends a questionnaire', $template);
     }
 
+    public function testCandidatePipelineKeepsInternalJobPostingLinksVisibleWithoutCompanyRecord()
+    {
+        $pipelines = file_get_contents(LEGACY_ROOT . '/lib/Pipelines.php');
+
+        $this->assertStringContainsString(
+            'Legacy job orders can legitimately use the internal posting',
+            $pipelines
+        );
+        $this->assertSame(
+            0,
+            substr_count(
+                $pipelines,
+                "INNER JOIN company\n                ON company.company_id = joborder.company_id"
+            ),
+            'Candidate pipeline rendering must not hide valid job links when a legacy company record is absent.'
+        );
+    }
+
     public function testDuplicateReviewFlagsRepeatedEmailOrNameRows()
     {
         $rows = array(
