@@ -676,8 +676,9 @@ class BoardApplicantIntake
                 }
 
                 // An approved board record with contact details can be prepared
-                // for Craig's review immediately. This produces a hashed,
-                // role-specific questionnaire link only; it never sends it.
+                // for Craig's review immediately. The link is always hashed;
+                // delivery occurs only when the separately confirmed applicant
+                // email feature and configured sender are both active.
                 if (!$contactDetailsRequired)
                 {
                     if (!$workflow->prepareQuestionnaireForHumanReview(
