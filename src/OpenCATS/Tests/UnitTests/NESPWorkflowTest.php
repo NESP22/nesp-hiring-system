@@ -67,6 +67,52 @@ class NESPWorkflowTest extends TestCase
         $this->assertTrue(NESPWorkflow::isApplicantEmailDeliveryReady(true, '1', 'hiring@nesportsphoto.com'));
     }
 
+    public function testApplicantQuestionnaireEmailFirstEnablementRequiresExplicitConfirmation()
+    {
+        $this->assertTrue(NESPWorkflow::canEnableApplicantEmail(false, false, ''));
+        $this->assertFalse(NESPWorkflow::canEnableApplicantEmail(false, true, ''));
+        $this->assertFalse(NESPWorkflow::canEnableApplicantEmail(false, true, 'yes'));
+        $this->assertTrue(NESPWorkflow::canEnableApplicantEmail(false, true, 'confirm'));
+        $this->assertTrue(NESPWorkflow::canEnableApplicantEmail(true, true, ''));
+    }
+
+    public function testApplicantQuestionnaireEmailDescriptionStatesAutomaticBehavior()
+    {
+        $description = NESPWorkflow::getFeatureFlagDescription(
+            'NESP_APPLICANT_EMAIL_ENABLED',
+            'stale description'
+        );
+
+        $this->assertStringContainsString('automatically sends one secure role-specific questionnaire email', $description);
+        $this->assertSame('stored description', NESPWorkflow::getFeatureFlagDescription('NESP_WORKFLOW_ENABLED', 'stored description'));
+    }
+
+    public function testInterviewerProfileEmailIdentityIsNormalizedBeforeDuplicateCheck()
+    {
+        $this->assertSame('', NESPWorkflow::normalizeInterviewerProfileEmail('   '));
+        $this->assertSame('suthir@nesportsphoto.com', NESPWorkflow::normalizeInterviewerProfileEmail(' SUTHIR@NESPORTSPHOTO.COM '));
+
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $this->assertStringContainsString('interviewerProfileEmailIsInUse($email)', $workflow);
+        $this->assertStringContainsString('interviewerProfileEmailIsInUse($requestedEmail, $interviewerProfileID)', $workflow);
+        $this->assertStringContainsString('LOWER(TRIM(email))', $workflow);
+    }
+
+    public function testApplicantQuestionnaireEmailRejectsAmbiguousFeatureFlagValues()
+    {
+        foreach (array(false, 0, '0', 'true', 'yes', 'false', -1) as $featureEnabled)
+        {
+            $this->assertFalse(
+                NESPWorkflow::isApplicantEmailDeliveryReady($featureEnabled, '1', 'hiring@nesportsphoto.com'),
+                'Applicant email must remain disabled for non-canonical feature flag values.'
+            );
+        }
+
+        $this->assertTrue(NESPWorkflow::isApplicantEmailFeatureExplicitlyEnabled(true));
+        $this->assertTrue(NESPWorkflow::isApplicantEmailFeatureExplicitlyEnabled(1));
+        $this->assertTrue(NESPWorkflow::isApplicantEmailFeatureExplicitlyEnabled('1'));
+    }
+
     public function testZoomParticipantLinkValidationRejectsHostLinks()
     {
         $valid = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?pwd=abc');
@@ -182,6 +228,33 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('ip.account_state_key = "active"', $workflow);
         $this->assertStringContainsString('ip.availability_status_key = "open"', $workflow);
         $this->assertStringContainsString('ijr.joborder_id = %s', $workflow);
+    }
+
+    public function testQuestionnaireReviewerPickerUsesTheSameEligibilityRulesAsAssignment()
+    {
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireReview.tpl');
+
+        $this->assertStringContainsString('getEligibleInterviewersForAssignment((int) $detail[\'joborder_id\'])', $ui);
+        $this->assertStringContainsString('Customer Service questionnaires stay with Craig', $ui);
+        $this->assertStringContainsString('Choose an active, open interviewer approved for this role.', $ui);
+        $this->assertStringContainsString('eligibleReviewerProfiles', $template);
+        $this->assertStringContainsString('No active, open interviewer is approved for this role yet.', $template);
+        $this->assertStringNotContainsString('interviewerProfiles as $profile', $template);
+    }
+
+    public function testAdminsReceiveAnAllAssignmentsOverviewWithoutBroadeningInterviewerAccess()
+    {
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/nesp/AssignedCandidates.tpl');
+
+        $this->assertStringContainsString('getAllAssignedCandidatesForAdmin()', $ui);
+        $this->assertStringContainsString('getAssignedCandidatesForUser($this->_userID)', $ui);
+        $this->assertStringContainsString('public function getAllAssignedCandidatesForAdmin()', $workflow);
+        $this->assertStringContainsString('All Interviewer Assignments', $template);
+        $this->assertStringContainsString('Interviewers continue to see only their own assignments.', $template);
+        $this->assertStringContainsString('Open candidate', $template);
     }
 
     public function testGoogleCalendarFreeBusyDefaultsAreReadOnlyAndDisabled()
