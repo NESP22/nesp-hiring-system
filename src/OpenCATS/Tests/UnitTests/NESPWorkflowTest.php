@@ -67,6 +67,17 @@ class NESPWorkflowTest extends TestCase
         $this->assertTrue(NESPWorkflow::isApplicantEmailDeliveryReady(true, '1', 'hiring@nesportsphoto.com'));
     }
 
+    public function testInterviewerProfileEmailIdentityIsNormalizedBeforeDuplicateCheck()
+    {
+        $this->assertSame('', NESPWorkflow::normalizeInterviewerProfileEmail('   '));
+        $this->assertSame('suthir@nesportsphoto.com', NESPWorkflow::normalizeInterviewerProfileEmail(' SUTHIR@NESPORTSPHOTO.COM '));
+
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $this->assertStringContainsString('interviewerProfileEmailIsInUse($email)', $workflow);
+        $this->assertStringContainsString('interviewerProfileEmailIsInUse($requestedEmail, $interviewerProfileID)', $workflow);
+        $this->assertStringContainsString('LOWER(TRIM(email))', $workflow);
+    }
+
     public function testZoomParticipantLinkValidationRejectsHostLinks()
     {
         $valid = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?pwd=abc');
