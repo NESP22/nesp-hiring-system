@@ -16,7 +16,7 @@
             </div>
 
             <div class="nesp-safety-banner">
-                Human-reviewed only: questionnaires do not rank, reject, approve, hire, email, text, call, publish ads, or move candidates automatically.
+                Human-reviewed only: questionnaires do not rank, reject, approve, hire, text, call, publish ads, or move candidates automatically. This screen's copy controls never send email. A new applicant can receive one automatic questionnaire email only when Applicant Questionnaire Email is explicitly enabled and its mail sender is configured.
                 Question wording is managed separately in <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=questionSets">Manage Question Sets</a>.
             </div>
 

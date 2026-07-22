@@ -10,7 +10,7 @@
             </div>
 
             <div class="nesp-safety-banner">
-                Human-reviewed only: no automatic rejection, ranking, applicant email, phone calls, Zoom meetings, AI review, or external posting happens from this dashboard.
+                Human-reviewed hiring only: no automatic rejection, ranking, phone calls, Zoom meetings, AI review, or external posting happens here. Questionnaire email is the single exception only when Applicant Questionnaire Email is explicitly enabled and its mail sender is configured.
             </div>
 
             <?php if (!empty($this->assignmentMessage)): ?>

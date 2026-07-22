@@ -521,6 +521,23 @@ class NESPUI extends UserInterface
         $enabledFlags = isset($_POST['featureFlags']) && is_array($_POST['featureFlags'])
             ? $_POST['featureFlags'] : array();
 
+        $applicantEmailRequested = in_array('NESP_APPLICANT_EMAIL_ENABLED', $enabledFlags);
+        $applicantEmailWasEnabled = $this->_workflow->isFeatureFlagEnabled('NESP_APPLICANT_EMAIL_ENABLED');
+        $applicantEmailConfirmation = isset($_POST['confirmApplicantQuestionnaireEmail'])
+            ? $_POST['confirmApplicantQuestionnaireEmail'] : '';
+        if (!NESPWorkflow::canEnableApplicantEmail(
+            $applicantEmailWasEnabled,
+            $applicantEmailRequested,
+            $applicantEmailConfirmation
+        ))
+        {
+            CommonErrors::fatal(
+                COMMONERROR_BADFIELDS,
+                $this,
+                'Confirm Applicant Questionnaire Email before enabling automatic questionnaire delivery.'
+            );
+        }
+
         foreach (NESPWorkflow::getRequiredFeatureFlagKeys() as $flagKey)
         {
             $this->_workflow->updateFeatureFlag(
