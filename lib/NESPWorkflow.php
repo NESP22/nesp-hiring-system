@@ -16,6 +16,8 @@ class NESPWorkflow
 {
     private $_db;
 
+    const APPLICANT_EMAIL_FEATURE_DESCRIPTION = 'When deliberately enabled with a configured sender, automatically sends one secure role-specific questionnaire email after a new applicant has a valid email and linked job.';
+
     public function __construct($db = null)
     {
         $this->_db = ($db === null) ? DatabaseConnection::getInstance() : $db;
@@ -34,7 +36,7 @@ class NESPWorkflow
             array('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0),
             array('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0),
             array('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0),
-            array('NESP_APPLICANT_EMAIL_ENABLED', 'Applicant Questionnaire Email', 'Sends one secure role-specific questionnaire email only after a new applicant has a valid email and linked job.', 0),
+            array('NESP_APPLICANT_EMAIL_ENABLED', 'Applicant Questionnaire Email', self::APPLICANT_EMAIL_FEATURE_DESCRIPTION, 0),
             NESPGoogleCalendarFreeBusy::getDefaultFeatureFlag()
         );
     }
@@ -363,6 +365,31 @@ class NESPWorkflow
             && defined('MAIL_MAILER')
             && MAIL_MAILER !== MAILER_MODE_DISABLED
             && filter_var(trim((string) $fromAddress), FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    /**
+     * The first enablement of applicant email requires a distinct confirmation
+     * in addition to the feature-flag checkbox. Existing enabled settings may
+     * still be saved with the rest of the feature flags.
+     */
+    public static function canEnableApplicantEmail($wasEnabled, $requestedEnabled, $confirmed)
+    {
+        if (!(bool) $requestedEnabled || (bool) $wasEnabled)
+        {
+            return true;
+        }
+
+        return (string) $confirmed === 'confirm';
+    }
+
+    public static function getFeatureFlagDescription($flagKey, $storedDescription)
+    {
+        if ((string) $flagKey === 'NESP_APPLICANT_EMAIL_ENABLED')
+        {
+            return self::APPLICANT_EMAIL_FEATURE_DESCRIPTION;
+        }
+
+        return (string) $storedDescription;
     }
 
     public static function buildManualInterviewInvitationCopy($firstName, $roleTitle, $scheduledStart, $durationMinutes, $timezone, $joinURL)
@@ -2240,7 +2267,7 @@ class NESPWorkflow
 
     public function getFeatureFlags()
     {
-        return $this->_db->getAllAssoc(
+        $flags = $this->_db->getAllAssoc(
             'SELECT
                 flag_key,
                 display_name,
@@ -2255,6 +2282,16 @@ class NESPWorkflow
             ORDER BY
                 display_name'
         );
+        foreach ($flags as &$flag)
+        {
+            $flag['description'] = self::getFeatureFlagDescription(
+                isset($flag['flag_key']) ? $flag['flag_key'] : '',
+                isset($flag['description']) ? $flag['description'] : ''
+            );
+        }
+        unset($flag);
+
+        return $flags;
     }
 
     public function updateFeatureFlag($flagKey, $isEnabled, $actorUserID)
@@ -2370,20 +2407,20 @@ class NESPWorkflow
         {
             return array(
                 'status_key' => 'disabled',
-                'message' => 'Disabled. No applicant questionnaire email can be sent.'
+                'message' => 'Disabled. New applicants receive no automatic questionnaire email.'
             );
         }
         if (!$ready)
         {
             return array(
                 'status_key' => 'not_configured',
-                'message' => 'Enabled for questionnaire delivery, but the approved mail sender is not configured. No email will be sent.'
+                'message' => 'Automatic questionnaire delivery is enabled, but the approved mail sender is not configured. No email will be sent.'
             );
         }
 
         return array(
             'status_key' => 'enabled',
-            'message' => 'Sends one role-specific secure questionnaire email after a new applicant has a valid email and linked job. No reminders or other applicant messages are sent.'
+            'Automatic delivery is active: new applicants with a valid email and linked job receive one role-specific secure questionnaire email. No reminders or other applicant messages are sent.'
         );
     }
 
@@ -3731,7 +3768,11 @@ class NESPWorkflow
                    AND auto_email_status_key = "sending"',
                 $this->_db->makeQueryInteger($questionnaireID)
             ));
-            $this->logAuditEvent($actorUserID, 'screening_questionnaire_auto_email_failed', 'screening_questionnaire', $questionnaireID, array());
+            $this->logAuditEvent($actorUserID, 'screening_questionnaire_auto_email_failed', 'screening_questionnaire', $questionnaireID, array(
+                'candidate_id' => $candidateID,
+                'joborder_id' => $jobOrderID,
+                'delivery' => 'automatic'
+            ));
             return array('sent' => false, 'reason' => 'delivery_failed');
         }
 
@@ -3745,7 +3786,11 @@ class NESPWorkflow
                AND auto_email_status_key = "sending"',
             $this->_db->makeQueryInteger($questionnaireID)
         ));
-        $this->logAuditEvent($actorUserID, 'screening_questionnaire_auto_email_sent', 'screening_questionnaire', $questionnaireID, array());
+        $this->logAuditEvent($actorUserID, 'screening_questionnaire_auto_email_sent', 'screening_questionnaire', $questionnaireID, array(
+            'candidate_id' => $candidateID,
+            'joborder_id' => $jobOrderID,
+            'delivery' => 'automatic'
+        ));
         return array('sent' => true, 'reason' => 'sent');
     }
 
