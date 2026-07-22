@@ -14,6 +14,8 @@ class NESPBoardInboxIntegration
     const VERIFICATION_SHARED_LABEL_ONLY = 'missive_shared_label_only_v1';
     const MAX_RATE_LIMIT_RETRIES = 3;
     const MAX_RATE_LIMIT_DELAY_SECONDS = 5;
+    const DEFAULT_RATE_LIMIT_BACKOFF_SECONDS = 60;
+    const MAX_RATE_LIMIT_BACKOFF_SECONDS = 86400;
     const WEBHOOK_MAX_BYTES = 262144;
     const API_RESPONSE_MAX_BYTES = 2097152;
     const CONNECT_TIMEOUT_SECONDS = 5;
@@ -511,6 +513,295 @@ class NESPBoardInboxIntegration
         $sharedLabelID = null,
         $httpClient = null
     ) {
+        $sinceEpoch = is_numeric($sinceEpoch) ? max(0, (int) $sinceEpoch) : 0;
+        $events = array();
+        $conversationIDs = array();
+        $conversationUntil = null;
+        while (true)
+        {
+            $conversationPage = self::discoverConversationPage(
+                $sinceEpoch,
+                $conversationUntil,
+                $apiToken,
+                $sharedLabelID,
+                $httpClient
+            );
+            if (empty($conversationPage['ok']))
+            {
+                return $conversationPage;
+            }
+
+            foreach ($conversationPage['conversation_ids'] as $conversationID)
+            {
+                $conversationIDs[$conversationID] = true;
+            }
+
+            if (!empty($conversationPage['complete']))
+            {
+                break;
+            }
+            $nextConversationUntil = isset($conversationPage['next_until'])
+                ? (int) $conversationPage['next_until']
+                : 0;
+            if ($nextConversationUntil <= 0
+                || ($conversationUntil !== null && $nextConversationUntil >= $conversationUntil))
+            {
+                return self::fetchError(502, 'reconciliation_cursor_stalled');
+            }
+            $conversationUntil = $nextConversationUntil;
+        }
+
+        foreach (array_keys($conversationIDs) as $conversationID)
+        {
+            $messageUntil = null;
+            while (true)
+            {
+                $messagePage = self::discoverConversationMessagePage(
+                    $conversationID,
+                    $sinceEpoch,
+                    $messageUntil,
+                    $apiToken,
+                    $sharedLabelID,
+                    $httpClient
+                );
+                if (empty($messagePage['ok']))
+                {
+                    return $messagePage;
+                }
+                foreach ($messagePage['events'] as $event)
+                {
+                    $events[$event['provider_message_id']] = $event;
+                }
+                if (!empty($messagePage['complete']))
+                {
+                    break;
+                }
+                $nextMessageUntil = isset($messagePage['next_until'])
+                    ? (int) $messagePage['next_until']
+                    : 0;
+                if ($nextMessageUntil <= 0
+                    || ($messageUntil !== null && $nextMessageUntil >= $messageUntil))
+                {
+                    return self::fetchError(502, 'reconciliation_cursor_stalled');
+                }
+                $messageUntil = $nextMessageUntil;
+            }
+        }
+
+        return array('ok' => true, 'status' => 200, 'error' => '', 'events' => array_values($events));
+    }
+
+    public static function discoverConversationPage(
+        $sinceEpoch = null,
+        $untilEpoch = null,
+        $apiToken = null,
+        $sharedLabelID = null,
+        $httpClient = null
+    ) {
+        $configuration = self::reconciliationConfiguration($apiToken, $sharedLabelID);
+        if (empty($configuration['ok']))
+        {
+            return $configuration;
+        }
+
+        $sinceEpoch = is_numeric($sinceEpoch) ? max(0, (int) $sinceEpoch) : 0;
+        $untilEpoch = is_numeric($untilEpoch) && (int) $untilEpoch > 0
+            ? (int) $untilEpoch
+            : null;
+        $query = array('shared_label' => $configuration['shared_label_id'], 'limit' => 50);
+        if ($untilEpoch !== null)
+        {
+            $query['until'] = $untilEpoch;
+        }
+        $url = self::API_CONVERSATION_ENDPOINT . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        $response = self::performReadRequest($url, $configuration['api_token'], $httpClient);
+        if (empty($response['ok']))
+        {
+            return $response;
+        }
+        $conversations = isset($response['data']['conversations']) && is_array($response['data']['conversations'])
+            ? $response['data']['conversations']
+            : null;
+        if ($conversations === null || !array_is_list($conversations))
+        {
+            return self::fetchError(502, 'invalid_missive_response');
+        }
+        if (!$conversations)
+        {
+            return array(
+                'ok' => true,
+                'status' => 200,
+                'error' => '',
+                'conversation_ids' => array(),
+                'next_until' => null,
+                'complete' => true
+            );
+        }
+
+        $conversationIDs = array();
+        $oldest = null;
+        $boundaryReached = false;
+        foreach ($conversations as $conversation)
+        {
+            if (!is_array($conversation))
+            {
+                return self::fetchError(502, 'invalid_missive_response');
+            }
+            $conversationID = self::safeMessageID(isset($conversation['id']) ? $conversation['id'] : null);
+            $activity = isset($conversation['last_activity_at']) && is_numeric($conversation['last_activity_at'])
+                ? (int) $conversation['last_activity_at']
+                : 0;
+            if ($conversationID === '' || $activity <= 0)
+            {
+                return self::fetchError(502, 'reconciliation_cursor_missing');
+            }
+            $oldest = $oldest === null ? $activity : min($oldest, $activity);
+            if ($activity < $sinceEpoch)
+            {
+                $boundaryReached = true;
+                continue;
+            }
+            $conversationIDs[$conversationID] = true;
+        }
+
+        $complete = $boundaryReached || count($conversations) < 50;
+        if (!$complete && $untilEpoch !== null && $oldest >= $untilEpoch)
+        {
+            return self::fetchError(502, 'reconciliation_cursor_stalled');
+        }
+        return array(
+            'ok' => true,
+            'status' => 200,
+            'error' => '',
+            'conversation_ids' => array_keys($conversationIDs),
+            'next_until' => $complete ? null : $oldest,
+            'complete' => $complete
+        );
+    }
+
+    public static function discoverConversationMessagePage(
+        $conversationID,
+        $sinceEpoch = null,
+        $untilEpoch = null,
+        $apiToken = null,
+        $sharedLabelID = null,
+        $httpClient = null
+    ) {
+        $configuration = self::reconciliationConfiguration($apiToken, $sharedLabelID);
+        if (empty($configuration['ok']))
+        {
+            return $configuration;
+        }
+        $conversationID = self::safeMessageID($conversationID);
+        if ($conversationID === '')
+        {
+            return self::fetchError(502, 'reconciliation_cursor_missing');
+        }
+
+        $sinceEpoch = is_numeric($sinceEpoch) ? max(0, (int) $sinceEpoch) : 0;
+        $untilEpoch = is_numeric($untilEpoch) && (int) $untilEpoch > 0
+            ? (int) $untilEpoch
+            : null;
+        $query = array('limit' => 10);
+        if ($untilEpoch !== null)
+        {
+            $query['until'] = $untilEpoch;
+        }
+        $url = self::API_CONVERSATION_ENDPOINT . '/' . rawurlencode($conversationID)
+            . '/messages?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        $response = self::performReadRequest($url, $configuration['api_token'], $httpClient);
+        if (empty($response['ok']))
+        {
+            return $response;
+        }
+        $messages = isset($response['data']['messages']) && is_array($response['data']['messages'])
+            ? $response['data']['messages']
+            : null;
+        if ($messages === null || !array_is_list($messages))
+        {
+            return self::fetchError(502, 'invalid_missive_response');
+        }
+        if (!$messages)
+        {
+            return array(
+                'ok' => true,
+                'status' => 200,
+                'error' => '',
+                'events' => array(),
+                'next_until' => null,
+                'complete' => true
+            );
+        }
+
+        $events = array();
+        $oldestDeliveredAt = null;
+        $boundaryReached = false;
+        foreach ($messages as $rawMessage)
+        {
+            $deliveredAt = is_array($rawMessage) && isset($rawMessage['delivered_at'])
+                && is_numeric($rawMessage['delivered_at'])
+                ? (int) $rawMessage['delivered_at']
+                : 0;
+            if (!is_array($rawMessage) || $deliveredAt <= 0)
+            {
+                return self::fetchError(502, 'reconciliation_cursor_missing');
+            }
+            $oldestDeliveredAt = $oldestDeliveredAt === null
+                ? $deliveredAt
+                : min($oldestDeliveredAt, $deliveredAt);
+            if ($deliveredAt < $sinceEpoch)
+            {
+                $boundaryReached = true;
+                continue;
+            }
+            $type = strtolower(self::safeSingleLine(
+                isset($rawMessage['type']) ? $rawMessage['type'] : '',
+                32
+            ));
+            if ($type !== '' && $type !== 'email')
+            {
+                continue;
+            }
+            $message = self::normalizeFetchedMessage($rawMessage);
+            if ($message === null)
+            {
+                return self::fetchError(502, 'invalid_missive_response');
+            }
+            $events[$message['id']] = array(
+                'provider_message_id' => $message['id'],
+                'email_message_id' => $message['email_message_id'],
+                'payload_hash' => hash(
+                    'sha256',
+                    'missive-reconcile|' . $configuration['shared_label_id'] . '|' . $message['id']
+                ),
+                'subject_hash' => hash('sha256', $message['subject']),
+                'sender_hash' => hash('sha256', strtolower($message['from_field']['address'])),
+                'verification_key' => self::VERIFICATION_SHARED_LABEL_ONLY,
+                'approved_rule_hash' => '',
+                'verification_proof' => '',
+                'signature_verified_at' => '',
+                'approved_rule_verified_at' => '',
+                'received_at' => gmdate('Y-m-d H:i:s', $deliveredAt)
+            );
+        }
+
+        $complete = $boundaryReached || count($messages) < 10;
+        if (!$complete && $untilEpoch !== null && $oldestDeliveredAt >= $untilEpoch)
+        {
+            return self::fetchError(502, 'reconciliation_cursor_stalled');
+        }
+        return array(
+            'ok' => true,
+            'status' => 200,
+            'error' => '',
+            'events' => array_values($events),
+            'next_until' => $complete ? null : $oldestDeliveredAt,
+            'complete' => $complete
+        );
+    }
+
+    private static function reconciliationConfiguration($apiToken, $sharedLabelID)
+    {
         $apiToken = $apiToken === null
             ? self::getEnvValue('NESP_BOARD_INTAKE_MISSIVE_API_TOKEN')
             : trim((string) $apiToken);
@@ -526,170 +817,11 @@ class NESPBoardInboxIntegration
         {
             return self::fetchError(503, 'approved_label_missing');
         }
-
-        $sinceEpoch = is_numeric($sinceEpoch) ? max(0, (int) $sinceEpoch) : 0;
-        $conversationIDs = array();
-        $until = null;
-        while (true)
-        {
-            $query = array('shared_label' => $sharedLabelID, 'limit' => 50);
-            if ($until !== null)
-            {
-                $query['until'] = $until;
-            }
-            $url = self::API_CONVERSATION_ENDPOINT . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
-            $response = self::performReadRequest($url, $apiToken, $httpClient);
-            if (empty($response['ok']))
-            {
-                return $response;
-            }
-            $conversations = isset($response['data']['conversations']) && is_array($response['data']['conversations'])
-                ? $response['data']['conversations']
-                : null;
-            if ($conversations === null || !array_is_list($conversations))
-            {
-                return self::fetchError(502, 'invalid_missive_response');
-            }
-            if (!$conversations)
-            {
-                break;
-            }
-
-            $oldest = null;
-            $timestamps = array();
-            $conversationBoundaryReached = false;
-            foreach ($conversations as $conversation)
-            {
-                if (!is_array($conversation))
-                {
-                    return self::fetchError(502, 'invalid_missive_response');
-                }
-                $conversationID = self::safeMessageID(isset($conversation['id']) ? $conversation['id'] : null);
-                $activity = isset($conversation['last_activity_at']) && is_numeric($conversation['last_activity_at'])
-                    ? (int) $conversation['last_activity_at']
-                    : 0;
-                if ($conversationID === '' || $activity <= 0)
-                {
-                    return self::fetchError(502, 'reconciliation_cursor_missing');
-                }
-                if ($oldest === null || $activity < $oldest)
-                {
-                    $oldest = $activity;
-                }
-                $timestamps[$activity] = true;
-                if ($activity < $sinceEpoch)
-                {
-                    $conversationBoundaryReached = true;
-                }
-                else
-                {
-                    $conversationIDs[$conversationID] = true;
-                }
-            }
-            if ($conversationBoundaryReached || count($conversations) < 50 || count($timestamps) === 1)
-            {
-                break;
-            }
-            if ($until !== null && $oldest >= $until)
-            {
-                return self::fetchError(502, 'reconciliation_cursor_stalled');
-            }
-            $until = $oldest;
-        }
-
-        $events = array();
-        foreach (array_keys($conversationIDs) as $conversationID)
-        {
-            $messageUntil = null;
-            while (true)
-            {
-                $query = array('limit' => 10);
-                if ($messageUntil !== null)
-                {
-                    $query['until'] = $messageUntil;
-                }
-                $url = self::API_CONVERSATION_ENDPOINT . '/' . rawurlencode($conversationID)
-                    . '/messages?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
-                $response = self::performReadRequest($url, $apiToken, $httpClient);
-                if (empty($response['ok']))
-                {
-                    return $response;
-                }
-                $messages = isset($response['data']['messages']) && is_array($response['data']['messages'])
-                    ? $response['data']['messages']
-                    : null;
-                if ($messages === null || !array_is_list($messages))
-                {
-                    return self::fetchError(502, 'invalid_missive_response');
-                }
-                if (!$messages)
-                {
-                    break;
-                }
-
-                $oldestDeliveredAt = null;
-                $timestamps = array();
-                $messageBoundaryReached = false;
-                foreach ($messages as $rawMessage)
-                {
-                    $deliveredAt = is_array($rawMessage) && isset($rawMessage['delivered_at'])
-                        && is_numeric($rawMessage['delivered_at'])
-                        ? (int) $rawMessage['delivered_at']
-                        : 0;
-                    if (!is_array($rawMessage) || $deliveredAt <= 0)
-                    {
-                        return self::fetchError(502, 'reconciliation_cursor_missing');
-                    }
-                    if ($oldestDeliveredAt === null || $deliveredAt < $oldestDeliveredAt)
-                    {
-                        $oldestDeliveredAt = $deliveredAt;
-                    }
-                    $timestamps[$deliveredAt] = true;
-                    if ($deliveredAt < $sinceEpoch)
-                    {
-                        $messageBoundaryReached = true;
-                        continue;
-                    }
-                    $type = strtolower(self::safeSingleLine(
-                        isset($rawMessage['type']) ? $rawMessage['type'] : '',
-                        32
-                    ));
-                    if ($type !== '' && $type !== 'email')
-                    {
-                        continue;
-                    }
-                    $message = self::normalizeFetchedMessage($rawMessage);
-                    if ($message === null)
-                    {
-                        return self::fetchError(502, 'invalid_missive_response');
-                    }
-                    $events[$message['id']] = array(
-                        'provider_message_id' => $message['id'],
-                        'email_message_id' => $message['email_message_id'],
-                        'payload_hash' => hash('sha256', 'missive-reconcile|' . $sharedLabelID . '|' . $message['id']),
-                        'subject_hash' => hash('sha256', $message['subject']),
-                        'sender_hash' => hash('sha256', strtolower($message['from_field']['address'])),
-                        'verification_key' => self::VERIFICATION_SHARED_LABEL_ONLY,
-                        'approved_rule_hash' => '',
-                        'verification_proof' => '',
-                        'signature_verified_at' => '',
-                        'approved_rule_verified_at' => '',
-                        'received_at' => gmdate('Y-m-d H:i:s', $deliveredAt)
-                    );
-                }
-                if ($messageBoundaryReached || count($messages) < 10 || count($timestamps) === 1)
-                {
-                    break;
-                }
-                if ($messageUntil !== null && $oldestDeliveredAt >= $messageUntil)
-                {
-                    return self::fetchError(502, 'reconciliation_cursor_stalled');
-                }
-                $messageUntil = $oldestDeliveredAt;
-            }
-        }
-
-        return array('ok' => true, 'status' => 200, 'error' => '', 'events' => array_values($events));
+        return array(
+            'ok' => true,
+            'api_token' => $apiToken,
+            'shared_label_id' => $sharedLabelID
+        );
     }
 
     public static function classifyMessage($message)
@@ -1204,15 +1336,24 @@ class NESPBoardInboxIntegration
             {
                 break;
             }
+            $retryDelay = self::retryAfterDelaySeconds($response);
+            if ($retryDelay < 1)
+            {
+                $retryDelay = self::DEFAULT_RATE_LIMIT_BACKOFF_SECONDS;
+            }
+            $retryDelay = min(self::MAX_RATE_LIMIT_BACKOFF_SECONDS, $retryDelay);
             if ($attempt >= self::MAX_RATE_LIMIT_RETRIES)
             {
-                return self::fetchError(503, 'missive_rate_limited');
+                return self::fetchError(503, 'missive_rate_limited', array(
+                    'retry_after_seconds' => $retryDelay
+                ));
             }
 
-            $retryDelay = self::retryAfterDelaySeconds($response);
-            if ($retryDelay < 1 || $retryDelay > self::MAX_RATE_LIMIT_DELAY_SECONDS)
+            if ($retryDelay > self::MAX_RATE_LIMIT_DELAY_SECONDS)
             {
-                return self::fetchError(503, 'missive_rate_limited');
+                return self::fetchError(503, 'missive_rate_limited', array(
+                    'retry_after_seconds' => $retryDelay
+                ));
             }
             // Injected test clients advance immediately. Production honors a
             // short provider delay and stops instead of sleeping without limit.
@@ -1566,15 +1707,15 @@ class NESPBoardInboxIntegration
         return array('ok' => false, 'status' => (int) $status, 'error' => $error);
     }
 
-    private static function fetchError($status, $error)
+    private static function fetchError($status, $error, $metadata = array())
     {
-        return array(
+        return array_merge(array(
             'ok' => false,
             'status' => (int) $status,
             'status_code' => (int) $status,
             'error' => $error,
             'message' => null
-        );
+        ), is_array($metadata) ? $metadata : array());
     }
 
     private static function getEnvValue($key)

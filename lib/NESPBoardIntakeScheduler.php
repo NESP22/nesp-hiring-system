@@ -232,30 +232,16 @@ class NESPBoardIntakeScheduler
                 $runID = (int) $this->_db->getLastInsertID();
             }
 
-            $checkpointEpoch = $this->getReconciliationCheckpoint();
-            $scanHighWaterEpoch = max($checkpointEpoch, $localNow->getTimestamp());
-            $reconciliation = $this->_inbox->discoverRecentMessages($checkpointEpoch);
+            $reconciliation = $this->reconcileProviderPages(
+                $runID,
+                $localNow->getTimestamp()
+            );
             if (empty($reconciliation['ok']))
             {
                 $counts['failed']++;
                 $runErrorCode = isset($reconciliation['error'])
                     ? substr((string) $reconciliation['error'], 0, 64)
                     : 'provider_reconciliation_failed';
-            }
-            else
-            {
-                foreach ($reconciliation['events'] as $discoveredEvent)
-                {
-                    $queued = $this->queueWebhookEvent($discoveredEvent);
-                    if (empty($queued['ok']))
-                    {
-                        throw new RuntimeException('Reconciled event could not be queued.');
-                    }
-                }
-                if (!$this->advanceReconciliationCheckpoint($checkpointEpoch, $scanHighWaterEpoch, $runID))
-                {
-                    throw new RuntimeException('reconciliation_checkpoint_write_failed');
-                }
             }
 
             while (true)
@@ -327,7 +313,8 @@ class NESPBoardIntakeScheduler
                 'event_terminal_write_failed',
                 'run_terminal_write_failed',
                 'reconciliation_checkpoint_write_failed',
-                'reconciliation_checkpoint_missing'
+                'reconciliation_checkpoint_missing',
+                'reconciliation_checkpoint_corrupt'
             ), true) ? $e->getMessage() : 'run_failed';
             if ($runID > 0)
             {
@@ -537,7 +524,10 @@ class NESPBoardIntakeScheduler
             $this->markEvent($eventID, 'review', $classified['platform'], (int) $classified['joborder_id'], 0, 'approval_failed');
             return array('bucket' => 'review');
         }
-        $import = $this->_intake->importApprovedRows($actorUserID, $batchID);
+        $import = $this->_intake->importApprovedRowsWithoutApplicantContact(
+            $actorUserID,
+            $batchID
+        );
         if ((int) $import['imported'] !== 1)
         {
             $this->markEvent($eventID, 'error', $classified['platform'], (int) $classified['joborder_id'], 0, 'import_failed');
@@ -610,45 +600,265 @@ class NESPBoardIntakeScheduler
         }
     }
 
+    private function reconcileProviderPages($runID, $nowEpoch)
+    {
+        $nowEpoch = max(0, (int) $nowEpoch);
+        $checkpoint = $this->getReconciliationCheckpoint();
+        if ($checkpoint['retry_not_before_epoch'] > $nowEpoch)
+        {
+            return array(
+                'ok' => false,
+                'error' => 'missive_rate_limited',
+                'retry_after_seconds' => $checkpoint['retry_not_before_epoch'] - $nowEpoch,
+                'backoff_active' => true
+            );
+        }
+
+        if ($checkpoint['scan_high_water_epoch'] === 0)
+        {
+            $scanHighWaterEpoch = max($checkpoint['high_water_epoch'], $nowEpoch);
+            if (!$this->startReconciliationScan($checkpoint['high_water_epoch'], $scanHighWaterEpoch, $runID))
+            {
+                throw new RuntimeException('reconciliation_checkpoint_write_failed');
+            }
+            $checkpoint = $this->getReconciliationCheckpoint();
+        }
+
+        while (true)
+        {
+            $conversationCount = count($checkpoint['conversation_page']);
+            if ($checkpoint['conversation_page_index'] >= $conversationCount)
+            {
+                if (!empty($checkpoint['conversation_page_complete']))
+                {
+                    if (!$this->completeReconciliationScan($checkpoint, $runID))
+                    {
+                        throw new RuntimeException('reconciliation_checkpoint_write_failed');
+                    }
+                    return array('ok' => true, 'error' => '');
+                }
+
+                $conversationPage = $this->_inbox->discoverConversationPage(
+                    $checkpoint['high_water_epoch'],
+                    $checkpoint['conversation_until_epoch'] > 0
+                        ? $checkpoint['conversation_until_epoch']
+                        : null
+                );
+                if (empty($conversationPage['ok']))
+                {
+                    $this->persistProviderBackoff($conversationPage, $nowEpoch, $runID);
+                    return $conversationPage;
+                }
+                $conversationIDs = isset($conversationPage['conversation_ids'])
+                    && is_array($conversationPage['conversation_ids'])
+                    ? array_values($conversationPage['conversation_ids'])
+                    : null;
+                if ($conversationIDs === null
+                    || (!$conversationIDs && empty($conversationPage['complete'])))
+                {
+                    return array('ok' => false, 'error' => 'invalid_missive_response');
+                }
+                if (!$this->persistConversationPage($conversationPage, $runID))
+                {
+                    throw new RuntimeException('reconciliation_checkpoint_write_failed');
+                }
+                $checkpoint = $this->getReconciliationCheckpoint();
+                continue;
+            }
+
+            $conversationID = $checkpoint['conversation_page'][$checkpoint['conversation_page_index']];
+            $messagePage = $this->_inbox->discoverConversationMessagePage(
+                $conversationID,
+                $checkpoint['high_water_epoch'],
+                $checkpoint['message_until_epoch'] > 0
+                    ? $checkpoint['message_until_epoch']
+                    : null
+            );
+            if (empty($messagePage['ok']))
+            {
+                $this->persistProviderBackoff($messagePage, $nowEpoch, $runID);
+                return $messagePage;
+            }
+            if (!isset($messagePage['events']) || !is_array($messagePage['events']))
+            {
+                return array('ok' => false, 'error' => 'invalid_missive_response');
+            }
+            foreach ($messagePage['events'] as $discoveredEvent)
+            {
+                $queued = $this->queueWebhookEvent($discoveredEvent);
+                if (empty($queued['ok']))
+                {
+                    throw new RuntimeException('Reconciled event could not be queued.');
+                }
+            }
+            if (!$this->persistMessagePage($checkpoint, $messagePage, $runID))
+            {
+                throw new RuntimeException('reconciliation_checkpoint_write_failed');
+            }
+            $checkpoint = $this->getReconciliationCheckpoint();
+        }
+    }
+
     private function getReconciliationCheckpoint()
     {
         $checkpoint = $this->_db->getAssoc(
-            'SELECT high_water_epoch FROM nesp_board_intake_checkpoint '
-            . 'WHERE provider_key = "missive" LIMIT 1'
+            'SELECT high_water_epoch, scan_high_water_epoch, conversation_until_epoch,
+                    conversation_page_json, conversation_page_index,
+                    conversation_page_complete, message_until_epoch,
+                    retry_not_before_epoch, last_run_id
+             FROM nesp_board_intake_checkpoint
+             WHERE provider_key = "missive" LIMIT 1'
         );
         if (!is_array($checkpoint) || !array_key_exists('high_water_epoch', $checkpoint))
         {
             throw new RuntimeException('reconciliation_checkpoint_missing');
         }
 
-        return max(0, (int) $checkpoint['high_water_epoch']);
-    }
-
-    private function advanceReconciliationCheckpoint($expectedEpoch, $newEpoch, $runID)
-    {
-        $expectedEpoch = max(0, (int) $expectedEpoch);
-        $newEpoch = max($expectedEpoch, (int) $newEpoch);
-        if ($newEpoch === $expectedEpoch)
+        $conversationPage = json_decode((string) $checkpoint['conversation_page_json'], true);
+        if (!is_array($conversationPage) || !array_is_list($conversationPage))
         {
-            return true;
+            throw new RuntimeException('reconciliation_checkpoint_corrupt');
+        }
+        foreach ($conversationPage as $conversationID)
+        {
+            if (!is_string($conversationID) || $conversationID === '' || strlen($conversationID) > 128)
+            {
+                throw new RuntimeException('reconciliation_checkpoint_corrupt');
+            }
+        }
+        $pageIndex = max(0, (int) $checkpoint['conversation_page_index']);
+        if ($pageIndex > count($conversationPage))
+        {
+            throw new RuntimeException('reconciliation_checkpoint_corrupt');
         }
 
+        return array(
+            'high_water_epoch' => max(0, (int) $checkpoint['high_water_epoch']),
+            'scan_high_water_epoch' => max(0, (int) $checkpoint['scan_high_water_epoch']),
+            'conversation_until_epoch' => max(0, (int) $checkpoint['conversation_until_epoch']),
+            'conversation_page' => $conversationPage,
+            'conversation_page_index' => $pageIndex,
+            'conversation_page_complete' => (int) $checkpoint['conversation_page_complete'] === 1,
+            'message_until_epoch' => max(0, (int) $checkpoint['message_until_epoch']),
+            'retry_not_before_epoch' => max(0, (int) $checkpoint['retry_not_before_epoch']),
+            'last_run_id' => max(0, (int) $checkpoint['last_run_id'])
+        );
+    }
+
+    private function startReconciliationScan($expectedHighWaterEpoch, $scanHighWaterEpoch, $runID)
+    {
+        return $this->writeCheckpoint(sprintf(
+            'UPDATE nesp_board_intake_checkpoint
+             SET scan_high_water_epoch = %s, conversation_until_epoch = NULL,
+                 conversation_page_json = "[]", conversation_page_index = 0,
+                 conversation_page_complete = 0, message_until_epoch = NULL,
+                 retry_not_before_epoch = 0, last_run_id = %s, date_modified = NOW()
+             WHERE provider_key = "missive" AND high_water_epoch = %s
+                AND scan_high_water_epoch = 0',
+            $this->_db->makeQueryInteger($scanHighWaterEpoch),
+            $this->_db->makeQueryInteger((int) $runID),
+            $this->_db->makeQueryInteger($expectedHighWaterEpoch)
+        ));
+    }
+
+    private function persistConversationPage($page, $runID)
+    {
+        $conversationIDs = array_values($page['conversation_ids']);
+        $nextUntil = isset($page['next_until']) && (int) $page['next_until'] > 0
+            ? $this->_db->makeQueryInteger((int) $page['next_until'])
+            : 'NULL';
+        return $this->writeCheckpoint(sprintf(
+            'UPDATE nesp_board_intake_checkpoint
+             SET conversation_until_epoch = %s, conversation_page_json = %s,
+                 conversation_page_index = 0, conversation_page_complete = %s,
+                 message_until_epoch = NULL, retry_not_before_epoch = 0,
+                 last_run_id = %s, date_modified = NOW()
+             WHERE provider_key = "missive" AND scan_high_water_epoch > 0',
+            $nextUntil,
+            $this->_db->makeQueryString(json_encode($conversationIDs)),
+            !empty($page['complete']) ? '1' : '0',
+            $this->_db->makeQueryInteger((int) $runID)
+        ));
+    }
+
+    private function persistMessagePage($checkpoint, $page, $runID)
+    {
+        $complete = !empty($page['complete']);
+        $nextUntil = isset($page['next_until']) ? (int) $page['next_until'] : 0;
+        if (!$complete && ($nextUntil <= 0
+            || ($checkpoint['message_until_epoch'] > 0
+                && $nextUntil >= $checkpoint['message_until_epoch'])))
+        {
+            return false;
+        }
+
+        return $this->writeCheckpoint(sprintf(
+            'UPDATE nesp_board_intake_checkpoint
+             SET conversation_page_index = %s, message_until_epoch = %s,
+                 retry_not_before_epoch = 0, last_run_id = %s, date_modified = NOW()
+             WHERE provider_key = "missive" AND scan_high_water_epoch = %s
+                AND conversation_page_index = %s',
+            $this->_db->makeQueryInteger(
+                $complete
+                    ? $checkpoint['conversation_page_index'] + 1
+                    : $checkpoint['conversation_page_index']
+            ),
+            $complete ? 'NULL' : $this->_db->makeQueryInteger($nextUntil),
+            $this->_db->makeQueryInteger((int) $runID),
+            $this->_db->makeQueryInteger($checkpoint['scan_high_water_epoch']),
+            $this->_db->makeQueryInteger($checkpoint['conversation_page_index'])
+        ));
+    }
+
+    private function persistProviderBackoff($result, $nowEpoch, $runID)
+    {
+        if (!isset($result['error']) || $result['error'] !== 'missive_rate_limited')
+        {
+            return;
+        }
+        $delay = isset($result['retry_after_seconds'])
+            ? max(1, min(86400, (int) $result['retry_after_seconds']))
+            : 60;
+        if (!$this->writeCheckpoint(sprintf(
+            'UPDATE nesp_board_intake_checkpoint
+             SET retry_not_before_epoch = %s, last_run_id = %s, date_modified = NOW()
+             WHERE provider_key = "missive" AND scan_high_water_epoch > 0',
+            $this->_db->makeQueryInteger((int) $nowEpoch + $delay),
+            $this->_db->makeQueryInteger((int) $runID)
+        )))
+        {
+            throw new RuntimeException('reconciliation_checkpoint_write_failed');
+        }
+    }
+
+    private function completeReconciliationScan($checkpoint, $runID)
+    {
+        return $this->writeCheckpoint(sprintf(
+            'UPDATE nesp_board_intake_checkpoint
+             SET high_water_epoch = %s, scan_high_water_epoch = 0,
+                 conversation_until_epoch = NULL, conversation_page_json = "[]",
+                 conversation_page_index = 0, conversation_page_complete = 0,
+                 message_until_epoch = NULL, retry_not_before_epoch = 0,
+                 last_run_id = %s, date_modified = NOW()
+             WHERE provider_key = "missive" AND high_water_epoch = %s
+                AND scan_high_water_epoch = %s',
+            $this->_db->makeQueryInteger($checkpoint['scan_high_water_epoch']),
+            $this->_db->makeQueryInteger((int) $runID),
+            $this->_db->makeQueryInteger($checkpoint['high_water_epoch']),
+            $this->_db->makeQueryInteger($checkpoint['scan_high_water_epoch'])
+        ));
+    }
+
+    private function writeCheckpoint($sql)
+    {
         try
         {
-            $updated = $this->_db->query(sprintf(
-                'UPDATE nesp_board_intake_checkpoint
-                 SET high_water_epoch = %s, last_run_id = %s, date_modified = NOW()
-                 WHERE provider_key = "missive" AND high_water_epoch = %s',
-                $this->_db->makeQueryInteger($newEpoch),
-                $this->_db->makeQueryInteger((int) $runID),
-                $this->_db->makeQueryInteger($expectedEpoch)
-            ));
+            return $this->_db->query($sql) && (int) $this->_db->getAffectedRows() === 1;
         }
         catch (Throwable $exception)
         {
             return false;
         }
-        return $updated && (int) $this->_db->getAffectedRows() === 1;
     }
 
     private function tableExists($table)

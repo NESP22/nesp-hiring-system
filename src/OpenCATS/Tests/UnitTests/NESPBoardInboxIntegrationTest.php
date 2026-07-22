@@ -443,6 +443,7 @@ class NESPBoardInboxIntegrationTest extends TestCase
 
         $this->assertFalse($result['ok']);
         $this->assertSame('missive_rate_limited', $result['error']);
+        $this->assertSame(60, $result['retry_after_seconds']);
         $this->assertSame(1, $attempts);
     }
 

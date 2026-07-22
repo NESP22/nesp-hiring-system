@@ -31,11 +31,27 @@ CREATE TABLE IF NOT EXISTS `nesp_board_intake_run` (
 CREATE TABLE IF NOT EXISTS `nesp_board_intake_checkpoint` (
   `provider_key` VARCHAR(32) COLLATE utf8mb4_bin NOT NULL,
   `high_water_epoch` BIGINT UNSIGNED NOT NULL DEFAULT '0',
+  `scan_high_water_epoch` BIGINT UNSIGNED NOT NULL DEFAULT '0',
+  `conversation_until_epoch` BIGINT UNSIGNED,
+  `conversation_page_json` VARCHAR(8192) COLLATE utf8mb4_bin NOT NULL DEFAULT '[]',
+  `conversation_page_index` INT UNSIGNED NOT NULL DEFAULT '0',
+  `conversation_page_complete` TINYINT(1) NOT NULL DEFAULT '0',
+  `message_until_epoch` BIGINT UNSIGNED,
+  `retry_not_before_epoch` BIGINT UNSIGNED NOT NULL DEFAULT '0',
   `last_run_id` BIGINT UNSIGNED,
   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   PRIMARY KEY (`provider_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `nesp_board_intake_checkpoint`
+  ADD COLUMN IF NOT EXISTS `scan_high_water_epoch` BIGINT UNSIGNED NOT NULL DEFAULT '0' AFTER `high_water_epoch`,
+  ADD COLUMN IF NOT EXISTS `conversation_until_epoch` BIGINT UNSIGNED AFTER `scan_high_water_epoch`,
+  ADD COLUMN IF NOT EXISTS `conversation_page_json` VARCHAR(8192) COLLATE utf8mb4_bin NOT NULL DEFAULT '[]' AFTER `conversation_until_epoch`,
+  ADD COLUMN IF NOT EXISTS `conversation_page_index` INT UNSIGNED NOT NULL DEFAULT '0' AFTER `conversation_page_json`,
+  ADD COLUMN IF NOT EXISTS `conversation_page_complete` TINYINT(1) NOT NULL DEFAULT '0' AFTER `conversation_page_index`,
+  ADD COLUMN IF NOT EXISTS `message_until_epoch` BIGINT UNSIGNED AFTER `conversation_page_complete`,
+  ADD COLUMN IF NOT EXISTS `retry_not_before_epoch` BIGINT UNSIGNED NOT NULL DEFAULT '0' AFTER `message_until_epoch`;
 
 INSERT INTO `nesp_board_intake_checkpoint`
     (`provider_key`, `high_water_epoch`, `date_created`, `date_modified`)

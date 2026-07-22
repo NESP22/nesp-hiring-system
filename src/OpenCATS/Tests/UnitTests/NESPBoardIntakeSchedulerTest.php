@@ -62,6 +62,14 @@ class NESPBoardIntakeSchedulerTest extends TestCase
         $this->assertStringContainsString('AUTO_IMPORT_FEATURE_FLAG', $source);
         $this->assertStringContainsString('event_terminal_write_failed', $source);
         $this->assertStringContainsString('run_terminal_write_failed', $source);
+        $this->assertStringContainsString('discoverConversationPage', $source);
+        $this->assertStringContainsString('persistMessagePage', $source);
+        $this->assertStringContainsString('retry_not_before_epoch', $source);
+        $this->assertStringContainsString('importApprovedRowsWithoutApplicantContact', $source);
+        $this->assertStringNotContainsString(
+            '$this->_intake->importApprovedRows($actorUserID, $batchID)',
+            $source
+        );
     }
 
     public function testQuestionnaireRecordIsTransactionalAndDeliveryIsAfterCommit()
@@ -95,6 +103,33 @@ class NESPBoardIntakeSchedulerTest extends TestCase
         ));
     }
 
+    public function testBasicAuthExemptsOnlyExactHmacWebhookAndHealthPaths()
+    {
+        $entrypoint = file_get_contents(LEGACY_ROOT . '/docker/render/entrypoint.sh');
+        $webhook = file_get_contents(
+            LEGACY_ROOT . '/modules/boardintake/missiveWebhook.php'
+        );
+        $protectedLocationPattern = '#^/(?!render-health\.txt$|modules/boardintake/missiveWebhook\.php$)#';
+
+        $this->assertStringContainsString(
+            '<LocationMatch "^/(?!render-health\\.txt$|modules/boardintake/missiveWebhook\\.php$)">',
+            $entrypoint
+        );
+        $this->assertSame(0, preg_match($protectedLocationPattern, '/render-health.txt'));
+        $this->assertSame(
+            0,
+            preg_match($protectedLocationPattern, '/modules/boardintake/missiveWebhook.php')
+        );
+        $this->assertSame(1, preg_match($protectedLocationPattern, '/index.php'));
+        $this->assertSame(1, preg_match($protectedLocationPattern, '/modules/boardintake/'));
+        $this->assertSame(
+            1,
+            preg_match($protectedLocationPattern, '/modules/boardintake/missiveWebhook.php/extra')
+        );
+        $this->assertStringContainsString('validateWebhookRequest(', $webhook);
+        $this->assertStringContainsString("if (empty(\$validation['ok']))", $webhook);
+    }
+
     public function testMigrationIsAdditiveAndDoesNotDisableAnExistingApproval()
     {
         $migration = file_get_contents(LEGACY_ROOT . '/db/nesp_board_intake_scheduler_additive.sql');
@@ -103,6 +138,11 @@ class NESPBoardIntakeSchedulerTest extends TestCase
         $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `nesp_board_intake_run`', $migration);
         $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `nesp_board_intake_checkpoint`', $migration);
         $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS `nesp_board_intake_event`', $migration);
+        $this->assertStringContainsString('scan_high_water_epoch', $migration);
+        $this->assertStringContainsString('conversation_page_json', $migration);
+        $this->assertStringContainsString('message_until_epoch', $migration);
+        $this->assertStringContainsString('retry_not_before_epoch', $migration);
+        $this->assertStringContainsString('ADD COLUMN IF NOT EXISTS', $migration);
         $this->assertStringContainsString('NESP_BOARD_INTAKE_AUTO_IMPORT_ENABLED', $migration);
         $this->assertStringNotContainsString('`is_enabled` = 0', $migration);
         $this->assertStringContainsString('DROP TABLE IF EXISTS `nesp_board_intake_event`', $rollback);

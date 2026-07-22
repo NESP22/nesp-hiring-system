@@ -30,17 +30,61 @@ class NESPBoardIntakeSchedulerFakeInbox
 {
     private $messages = array();
     private $discoveryResult = array('ok' => true, 'events' => array());
+    private $conversationPageResults = array();
+    private $messagePageResults = array();
     public $lastSinceEpoch = null;
+    public $conversationPageCalls = array();
+    public $messagePageCalls = array();
 
     public function isConfigured()
     {
         return true;
     }
 
-    public function discoverRecentMessages($sinceEpoch = null)
+    public function discoverConversationPage($sinceEpoch = null, $untilEpoch = null)
     {
         $this->lastSinceEpoch = $sinceEpoch;
-        return $this->discoveryResult;
+        $this->conversationPageCalls[] = array(
+            'since' => $sinceEpoch,
+            'until' => $untilEpoch
+        );
+        if ($this->conversationPageResults)
+        {
+            return array_shift($this->conversationPageResults);
+        }
+        if (empty($this->discoveryResult['ok']))
+        {
+            return $this->discoveryResult;
+        }
+        return array(
+            'ok' => true,
+            'conversation_ids' => array(),
+            'next_until' => null,
+            'complete' => true
+        );
+    }
+
+    public function discoverConversationMessagePage(
+        $conversationID,
+        $sinceEpoch = null,
+        $untilEpoch = null
+    ) {
+        $this->messagePageCalls[] = array(
+            'conversation_id' => $conversationID,
+            'since' => $sinceEpoch,
+            'until' => $untilEpoch
+        );
+        if (isset($this->messagePageResults[$conversationID])
+            && $this->messagePageResults[$conversationID])
+        {
+            return array_shift($this->messagePageResults[$conversationID]);
+        }
+        return array(
+            'ok' => true,
+            'events' => array(),
+            'next_until' => null,
+            'complete' => true
+        );
     }
 
     public function fetchMessage($providerMessageID)
@@ -83,17 +127,48 @@ class NESPBoardIntakeSchedulerFakeInbox
     {
         $this->discoveryResult = $result;
     }
+
+    public function queueConversationPageResult($result)
+    {
+        $this->conversationPageResults[] = $result;
+    }
+
+    public function queueMessagePageResult($conversationID, $result)
+    {
+        if (!isset($this->messagePageResults[$conversationID]))
+        {
+            $this->messagePageResults[$conversationID] = array();
+        }
+        $this->messagePageResults[$conversationID][] = $result;
+    }
 }
 
 class NESPBoardIntakeSchedulerRecordingIntake extends \BoardApplicantIntake
 {
     public $lastFailure = '';
+    public $deliveryCapableImportCalls = 0;
+    public $noContactImportCalls = 0;
 
     public function importApprovedRows($actorUserID, $batchID)
     {
+        $this->deliveryCapableImportCalls++;
         try
         {
             return parent::importApprovedRows($actorUserID, $batchID);
+        }
+        catch (\Throwable $e)
+        {
+            $this->lastFailure = $e->getMessage();
+            throw $e;
+        }
+    }
+
+    public function importApprovedRowsWithoutApplicantContact($actorUserID, $batchID)
+    {
+        $this->noContactImportCalls++;
+        try
+        {
+            return parent::importApprovedRowsWithoutApplicantContact($actorUserID, $batchID);
         }
         catch (\Throwable $e)
         {
@@ -305,7 +380,7 @@ class NESPBoardIntakeSchedulerDatabaseTest extends DatabaseTestCase
         $this->assertSame(hash('sha256', 'payload-one'), $stored['payload_hash']);
     }
 
-    public function testDurableCheckpointAdvancesOnlyAfterCompleteReconciliation()
+    public function testDurableCheckpointRetainsActiveScanAfterReconciliationFailure()
     {
         $this->enableScheduler();
         $scheduledTime = $this->scheduledTime('2026-07-22 08:00:00');
@@ -328,11 +403,170 @@ class NESPBoardIntakeSchedulerDatabaseTest extends DatabaseTestCase
         );
         $this->assertSame('failed', $failed['status']);
         $this->assertSame('missive_request_failed', $failed['reason']);
-        $unchanged = $this->fetchOne(
-            'SELECT high_water_epoch, last_run_id FROM nesp_board_intake_checkpoint '
+        $activeScan = $this->fetchOne(
+            'SELECT high_water_epoch, scan_high_water_epoch, last_run_id '
+            . 'FROM nesp_board_intake_checkpoint '
             . 'WHERE provider_key = "missive"'
         );
-        $this->assertSame($checkpoint, $unchanged);
+        $this->assertSame($checkpoint['high_water_epoch'], $activeScan['high_water_epoch']);
+        $this->assertSame(
+            (string) $this->scheduledTime('2026-07-22 18:00:00')->getTimestamp(),
+            $activeScan['scan_high_water_epoch']
+        );
+        $this->assertSame((string) $failed['run_id'], $activeScan['last_run_id']);
+    }
+
+    public function testCompletedPagePersistsAndLaterPageFailureResumesExactly()
+    {
+        $this->enableScheduler();
+        $firstEventID = 'reconciled-page-one-application';
+        $secondEventID = 'reconciled-page-two-application';
+        $this->inbox->addMessage($firstEventID, $this->applicationMessage(
+            '<reconciled-page-one@example.invalid>',
+            'reconciled-page-one-external'
+        ));
+        $this->inbox->addMessage($secondEventID, $this->applicationMessage(
+            '<reconciled-page-two@example.invalid>',
+            'reconciled-page-two-external'
+        ));
+        $this->inbox->queueConversationPageResult(array(
+            'ok' => true,
+            'conversation_ids' => array('conversation-one', 'conversation-two'),
+            'next_until' => null,
+            'complete' => true
+        ));
+        $this->inbox->queueMessagePageResult('conversation-one', array(
+            'ok' => true,
+            'events' => array($this->reconciledEvent($firstEventID)),
+            'next_until' => null,
+            'complete' => true
+        ));
+        $this->inbox->queueMessagePageResult('conversation-two', array(
+            'ok' => false,
+            'error' => 'missive_request_failed'
+        ));
+
+        $firstTime = $this->scheduledTime('2026-07-22 08:00:00');
+        $first = $this->scheduler->runScheduledSlot(1, $firstTime);
+
+        $this->assertSame('degraded', $first['status']);
+        $this->assertSame('missive_request_failed', $first['reason']);
+        $this->assertSame(1, $first['counts']['review']);
+        $checkpoint = $this->fetchOne(
+            'SELECT high_water_epoch, scan_high_water_epoch, conversation_page_json, '
+            . 'conversation_page_index, message_until_epoch '
+            . 'FROM nesp_board_intake_checkpoint WHERE provider_key = "missive"'
+        );
+        $this->assertSame('0', $checkpoint['high_water_epoch']);
+        $this->assertSame((string) $firstTime->getTimestamp(), $checkpoint['scan_high_water_epoch']);
+        $this->assertSame(
+            array('conversation-one', 'conversation-two'),
+            json_decode($checkpoint['conversation_page_json'], true)
+        );
+        $this->assertSame('1', $checkpoint['conversation_page_index']);
+        $this->assertNull($checkpoint['message_until_epoch']);
+
+        $this->inbox->queueMessagePageResult('conversation-two', array(
+            'ok' => true,
+            'events' => array($this->reconciledEvent($secondEventID)),
+            'next_until' => null,
+            'complete' => true
+        ));
+        $second = $this->scheduler->runScheduledSlot(
+            1,
+            $this->scheduledTime('2026-07-22 18:00:00')
+        );
+
+        $this->assertSame('completed', $second['status']);
+        $this->assertSame(1, $second['counts']['review']);
+        $this->assertCount(1, $this->inbox->conversationPageCalls);
+        $this->assertSame(
+            array('conversation-one', 'conversation-two', 'conversation-two'),
+            array_column($this->inbox->messagePageCalls, 'conversation_id')
+        );
+        $completed = $this->fetchOne(
+            'SELECT high_water_epoch, scan_high_water_epoch, conversation_page_json, '
+            . 'conversation_page_index FROM nesp_board_intake_checkpoint '
+            . 'WHERE provider_key = "missive"'
+        );
+        $this->assertSame((string) $firstTime->getTimestamp(), $completed['high_water_epoch']);
+        $this->assertSame('0', $completed['scan_high_water_epoch']);
+        $this->assertSame('[]', $completed['conversation_page_json']);
+        $this->assertSame('0', $completed['conversation_page_index']);
+    }
+
+    public function testLongRateLimitBackoffPersistsMessageCursorAndPacesResume()
+    {
+        $this->enableScheduler();
+        $providerMessageID = 'reconciled-before-long-backoff';
+        $this->inbox->addMessage($providerMessageID, $this->applicationMessage(
+            '<reconciled-before-long-backoff@example.invalid>',
+            'reconciled-before-long-backoff-external'
+        ));
+        $this->inbox->queueConversationPageResult(array(
+            'ok' => true,
+            'conversation_ids' => array('rate-limited-conversation'),
+            'next_until' => null,
+            'complete' => true
+        ));
+        $this->inbox->queueMessagePageResult('rate-limited-conversation', array(
+            'ok' => true,
+            'events' => array($this->reconciledEvent($providerMessageID)),
+            'next_until' => 5000,
+            'complete' => false
+        ));
+        $this->inbox->queueMessagePageResult('rate-limited-conversation', array(
+            'ok' => false,
+            'error' => 'missive_rate_limited',
+            'retry_after_seconds' => 60
+        ));
+        $this->inbox->queueMessagePageResult('rate-limited-conversation', array(
+            'ok' => true,
+            'events' => array(),
+            'next_until' => null,
+            'complete' => true
+        ));
+
+        $start = $this->scheduledTime('2026-07-22 08:00:00');
+        $first = $this->scheduler->runScheduledSlot(1, $start);
+
+        $this->assertSame('degraded', $first['status']);
+        $this->assertSame('missive_rate_limited', $first['reason']);
+        $this->assertCount(2, $this->inbox->messagePageCalls);
+        $paused = $this->fetchOne(
+            'SELECT message_until_epoch, retry_not_before_epoch, scan_high_water_epoch '
+            . 'FROM nesp_board_intake_checkpoint WHERE provider_key = "missive"'
+        );
+        $this->assertSame('5000', $paused['message_until_epoch']);
+        $this->assertSame((string) ($start->getTimestamp() + 60), $paused['retry_not_before_epoch']);
+        $this->assertSame((string) $start->getTimestamp(), $paused['scan_high_water_epoch']);
+
+        $paced = $this->scheduler->runScheduledSlot(
+            1,
+            $start->modify('+30 seconds'),
+            true
+        );
+        $this->assertSame('failed', $paced['status']);
+        $this->assertSame('missive_rate_limited', $paced['reason']);
+        $this->assertCount(2, $this->inbox->messagePageCalls);
+
+        $resumed = $this->scheduler->runScheduledSlot(
+            1,
+            $start->modify('+61 seconds'),
+            true
+        );
+        $this->assertSame('completed', $resumed['status']);
+        $this->assertCount(3, $this->inbox->messagePageCalls);
+        $this->assertSame(5000, $this->inbox->messagePageCalls[2]['until']);
+        $completed = $this->fetchOne(
+            'SELECT high_water_epoch, scan_high_water_epoch, message_until_epoch, '
+            . 'retry_not_before_epoch FROM nesp_board_intake_checkpoint '
+            . 'WHERE provider_key = "missive"'
+        );
+        $this->assertSame((string) $start->getTimestamp(), $completed['high_water_epoch']);
+        $this->assertSame('0', $completed['scan_high_water_epoch']);
+        $this->assertNull($completed['message_until_epoch']);
+        $this->assertSame('0', $completed['retry_not_before_epoch']);
     }
 
     public function testVerifiedNotificationStopsForManualReviewWhileAutoImportIsOff()
@@ -487,6 +721,8 @@ class NESPBoardIntakeSchedulerDatabaseTest extends DatabaseTestCase
             'event_type IN ("screening_questionnaire_auto_email_attempt_started", '
             . '"screening_questionnaire_auto_email_sent", "screening_questionnaire_auto_email_failed")'
         ));
+        $this->assertSame(0, $this->intake->deliveryCapableImportCalls);
+        $this->assertSame(1, $this->intake->noContactImportCalls);
 
         $run = $this->fetchOne(sprintf(
             'SELECT status_key, queued_count, imported_count, review_count, failed_count '
@@ -687,6 +923,19 @@ class NESPBoardIntakeSchedulerDatabaseTest extends DatabaseTestCase
             'signature_verified_at' => '2026-07-22 12:00:00',
             'approved_rule_verified_at' => '2026-07-22 12:00:00',
             'received_at' => '2026-07-22 12:00:01'
+        );
+    }
+
+    private function reconciledEvent($providerMessageID)
+    {
+        return array(
+            'provider_message_id' => $providerMessageID,
+            'email_message_id' => '<' . $providerMessageID . '@example.invalid>',
+            'payload_hash' => hash('sha256', 'reconciled|' . $providerMessageID),
+            'subject_hash' => hash('sha256', 'subject|' . $providerMessageID),
+            'sender_hash' => hash('sha256', 'notifications@indeed.com'),
+            'verification_key' => \NESPBoardInboxIntegration::VERIFICATION_SHARED_LABEL_ONLY,
+            'received_at' => '2026-07-22 12:00:00'
         );
     }
 

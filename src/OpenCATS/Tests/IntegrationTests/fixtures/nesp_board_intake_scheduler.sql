@@ -23,6 +23,13 @@ CREATE TABLE `nesp_board_intake_run` (
 CREATE TABLE `nesp_board_intake_checkpoint` (
   `provider_key` VARCHAR(32) COLLATE utf8mb4_bin NOT NULL,
   `high_water_epoch` BIGINT UNSIGNED NOT NULL DEFAULT '0',
+  `scan_high_water_epoch` BIGINT UNSIGNED NOT NULL DEFAULT '0',
+  `conversation_until_epoch` BIGINT UNSIGNED,
+  `conversation_page_json` VARCHAR(8192) COLLATE utf8mb4_bin NOT NULL DEFAULT '[]',
+  `conversation_page_index` INT UNSIGNED NOT NULL DEFAULT '0',
+  `conversation_page_complete` TINYINT(1) NOT NULL DEFAULT '0',
+  `message_until_epoch` BIGINT UNSIGNED,
+  `retry_not_before_epoch` BIGINT UNSIGNED NOT NULL DEFAULT '0',
   `last_run_id` BIGINT UNSIGNED,
   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',

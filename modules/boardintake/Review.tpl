@@ -5,7 +5,7 @@
     <?php TemplateUtility::printQuickSearch(); ?>
     <div id="contents">
         <h2>Bring Board Applicants Into NESP</h2>
-        <p>Use this page for Indeed, LinkedIn, MassHire, and other board applications. Staging or reviewing an application does not contact anyone. A completed automatic import sends one role-specific questionnaire only when the separately approved applicant-email feature is already enabled.</p>
+        <p>Use this page for Indeed, LinkedIn, MassHire, and other board applications. Staging or reviewing an application does not contact anyone. A scheduled import prepares the role-specific questionnaire link but never sends it; applicant contact remains a separate human-approved action.</p>
         <div class="noticeBox">
             <h3>Automatic board inbox check</h3>
             <?php if (!empty($this->schedulerStatus['feature_enabled']) && !empty($this->schedulerStatus['provider_configured'])): ?>

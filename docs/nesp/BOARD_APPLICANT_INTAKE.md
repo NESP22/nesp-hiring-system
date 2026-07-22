@@ -28,16 +28,15 @@ Missive connection is complete:
 6. Incomplete, ambiguous, shared-label-recovered, or unauthenticated
    notifications stop in **Needs attention**. They never auto-import or contact
    an applicant.
-7. If the separately approved applicant-email feature is already enabled, an
-   eligible successful import may send the one role-specific questionnaire
-   email. The inbox scheduler does not enable mail itself.
+7. Scheduled imports prepare the role-specific questionnaire link but never
+   deliver it, even when applicant email is enabled. Applicant contact remains
+   a separate later human-approved action.
 
-The reconciliation checkpoint is a dedicated durable provider high-water mark,
-initialized to the beginning of available history. Conversation and message
-pages continue until the provider's documented end condition or the prior
-checkpoint is reached. The checkpoint advances only after the complete scan has
-been queued. A request, cursor, queue, or checkpoint-write failure leaves it
-unchanged and makes the run report an error instead of silently skipping mail.
+The reconciliation checkpoint stores the durable provider high-water mark plus
+the active conversation page, message cursor, and provider backoff time.
+Successfully queued pages are checkpointed before the next request. A later
+request failure or long rate-limit delay therefore resumes from the saved page
+instead of repeating the scan or silently skipping mail.
 
 This integration checks the approved hiring inbox; it does not scrape job
 boards or sign into board accounts.
@@ -119,8 +118,7 @@ validation for every write action.
 The web and cron services require Render-only values for the Missive API token,
 webhook secret, approved rule ID, approved shared-label ID, and a valid
 OpenCATS administrator system-user ID. The cron service is a separate paid
-Render service and must receive the already-approved mail settings too if
-questionnaire delivery is expected from cron imports.
+Render service and does not deliver questionnaires from scheduled imports.
 
 Keep both scheduler and auto-import feature flags off until the migration,
 Missive rule, webhook, service secrets, encrypted backup, and one protected

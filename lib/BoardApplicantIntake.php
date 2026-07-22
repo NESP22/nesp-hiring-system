@@ -574,6 +574,28 @@ class BoardApplicantIntake
 
     public function importApprovedRows($actorUserID, $batchID)
     {
+        return $this->importApprovedRowsWithQuestionnaireDelivery(
+            $actorUserID,
+            $batchID,
+            true
+        );
+    }
+
+    public function importApprovedRowsWithoutApplicantContact($actorUserID, $batchID)
+    {
+        return $this->importApprovedRowsWithQuestionnaireDelivery(
+            $actorUserID,
+            $batchID,
+            false
+        );
+    }
+
+    private function importApprovedRowsWithQuestionnaireDelivery(
+        $actorUserID,
+        $batchID,
+        $allowQuestionnaireDelivery
+    )
+    {
         $batch = $this->getBatch($batchID);
         if (empty($batch) || $batch['status_key'] !== 'review' || empty($batch['previewed_at']) || empty($batch['approved_at']) || empty($batch['previewed_by_user_id']) || empty($batch['approved_by_user_id']))
         {
@@ -747,25 +769,28 @@ class BoardApplicantIntake
         }
 
         $questionnaireFailures = 0;
-        foreach ($questionnairesToPrepare as $target)
+        if ($allowQuestionnaireDelivery)
         {
-            $workflow = new NESPWorkflow($this->_db);
-            if (!$workflow->deliverPreparedQuestionnaireForHumanReview(
-                $target['prepared'],
-                $target['candidate_id'],
-                $target['joborder_id'],
-                $actorUserID,
-                $target['summary']
-            ))
+            foreach ($questionnairesToPrepare as $target)
             {
-                $questionnaireFailures++;
-                $workflow->logAuditEvent(
-                    $actorUserID,
-                    'board_intake_questionnaire_prepare_failed',
-                    'candidate_workflow',
+                $workflow = new NESPWorkflow($this->_db);
+                if (!$workflow->deliverPreparedQuestionnaireForHumanReview(
+                    $target['prepared'],
                     $target['candidate_id'],
-                    array('joborder_id' => $target['joborder_id'], 'batch_id' => (int) $batchID)
-                );
+                    $target['joborder_id'],
+                    $actorUserID,
+                    $target['summary']
+                ))
+                {
+                    $questionnaireFailures++;
+                    $workflow->logAuditEvent(
+                        $actorUserID,
+                        'board_intake_questionnaire_prepare_failed',
+                        'candidate_workflow',
+                        $target['candidate_id'],
+                        array('joborder_id' => $target['joborder_id'], 'batch_id' => (int) $batchID)
+                    );
+                }
             }
         }
 
@@ -773,7 +798,10 @@ class BoardApplicantIntake
             'imported' => $imported,
             'skipped' => 0,
             'failed' => 0,
-            'questionnaire_failed' => $questionnaireFailures
+            'questionnaire_failed' => $questionnaireFailures,
+            'questionnaire_delivery_deferred' => $allowQuestionnaireDelivery
+                ? 0
+                : count($questionnairesToPrepare)
         );
     }
 
