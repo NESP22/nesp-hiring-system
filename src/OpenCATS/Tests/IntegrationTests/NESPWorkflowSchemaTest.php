@@ -405,6 +405,26 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             $profileID,
             $jobOrderID
         ));
+        $this->mySQLQueryLocal(
+            "INSERT INTO user (user_name, password, access_level, can_change_password, is_test_user, email, first_name, last_name, categories, can_see_eeo_info)
+             VALUES ('nesp.shared.booking.fixture', 'hash', 100, 1, 0, 'shared-booking@example.test', 'Shared', 'Reviewer', 'nesp_interviewer', 0)"
+        );
+        $sharedUserID = $this->lastInsertID();
+        $this->mySQLQueryLocal(sprintf(
+            "INSERT INTO nesp_interviewer_profile
+                (user_id, display_name, email, role_key, is_active, account_state_key, availability_status_key, koalendar_booking_url, date_created, date_modified)
+             VALUES
+                (%d, 'Shared Reviewer', 'shared-booking@example.test', 'interviewer', 1, 'active', 'open', '', NOW(), NOW())",
+            $sharedUserID
+        ));
+        $sharedProfileID = $this->lastInsertID();
+        $this->mySQLQueryLocal(sprintf(
+            "INSERT INTO nesp_interviewer_job_role
+                (interviewer_profile_id, joborder_id, role_key, is_active, date_created, date_modified)
+             VALUES (%d, %d, 'staff_photographer', 1, NOW(), NOW())",
+            $sharedProfileID,
+            $jobOrderID
+        ));
 
         $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
         $this->assertNotFalse($workflow->ensureCandidateWorkflowRow($candidateID, $jobOrderID, 1));
@@ -418,10 +438,17 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             'https://koalendar.com/login',
             1
         )['ok']);
-        $this->assertNotFalse($workflow->createCandidateGrant($profileID, $candidateID, $jobOrderID, 1));
+        $this->assertTrue($workflow->updateInterviewerKoalendarBookingURL(
+            $sharedProfileID,
+            'https://koalendar.com/e/shared-reviewer',
+            1
+        )['ok']);
+        $primaryGrantID = $workflow->createCandidateGrant($profileID, $candidateID, $jobOrderID, 1);
+        $this->assertNotFalse($primaryGrantID);
 
         $workflow->ensureDefaultQuestionSetsSeeded(1);
         $questionnaire = $workflow->requestQuestionnaire($candidateID, $jobOrderID, 1);
+        $questionnaireID = (int) $questionnaire['questionnaire_id'];
         $this->mySQLQueryLocal(sprintf(
             "UPDATE nesp_screening_questionnaire
              SET status_key = 'completed',
@@ -432,31 +459,98 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
                  active_candidate_job_key = NULL
              WHERE screening_questionnaire_id = %d",
             $profileID,
-            (int) $questionnaire['questionnaire_id']
+            $questionnaireID
         ));
 
-        $dashboardRow = array();
-        foreach ($workflow->getDashboardCandidateRows(250) as $row)
+        $findDashboardRow = function () use ($workflow, $candidateID, $jobOrderID)
         {
-            if ((int) $row['candidate_id'] === $candidateID && (int) $row['joborder_id'] === $jobOrderID)
+            foreach ($workflow->getDashboardCandidateRows(250) as $row)
             {
-                $dashboardRow = $row;
-                break;
+                if ((int) $row['candidate_id'] === $candidateID && (int) $row['joborder_id'] === $jobOrderID)
+                {
+                    return $row;
+                }
             }
-        }
+            return array();
+        };
+
+        $dashboardRow = $findDashboardRow();
         $this->assertNotEmpty($dashboardRow);
         $this->assertSame('Booking Interviewer', $dashboardRow['booking_interviewer_name']);
         $this->assertSame('https://koalendar.com/e/booking-interviewer', $dashboardRow['koalendar_booking_url']);
+        $this->assertSame('complete', $dashboardRow['questionnaire_review_status_key']);
         $this->assertNotEmpty($dashboardRow['questionnaire_review_completed_at']);
 
         $assignments = $workflow->getAssignedCandidatesForUser($userID);
         $this->assertCount(1, $assignments);
         $this->assertSame('https://koalendar.com/e/booking-interviewer', $assignments[0]['koalendar_booking_url']);
+        $this->assertSame('complete', $assignments[0]['questionnaire_review_status_key']);
         $this->assertNotEmpty($assignments[0]['questionnaire_review_completed_at']);
 
         $assignedCandidate = $workflow->getAssignedCandidateDetail($userID, $candidateID, $jobOrderID);
         $this->assertSame('https://koalendar.com/e/booking-interviewer', $assignedCandidate['koalendar_booking_url']);
+        $this->assertSame('complete', $assignedCandidate['questionnaire_review_status_key']);
         $this->assertNotEmpty($assignedCandidate['questionnaire_review_completed_at']);
+
+        $questionnaireDetail = $workflow->getQuestionnaireDetail($questionnaireID);
+        $this->assertSame((int) $primaryGrantID, (int) $questionnaireDetail['booking_owner_grant_id']);
+        $this->assertSame('Booking Interviewer', $questionnaireDetail['booking_interviewer_name']);
+        $this->assertSame('https://koalendar.com/e/booking-interviewer', $questionnaireDetail['reviewer_koalendar_booking_url']);
+
+        $sharedGrantID = $workflow->createCandidateGrant($sharedProfileID, $candidateID, $jobOrderID, 1);
+        $this->assertNotFalse($sharedGrantID);
+        $dashboardRow = $findDashboardRow();
+        $this->assertSame('Booking Interviewer', $dashboardRow['booking_interviewer_name']);
+        $this->assertSame('https://koalendar.com/e/booking-interviewer', $dashboardRow['koalendar_booking_url']);
+        $sharedAssignments = $workflow->getAssignedCandidatesForUser($sharedUserID);
+        $this->assertCount(1, $sharedAssignments);
+        $this->assertSame('', $sharedAssignments[0]['koalendar_booking_url']);
+        $this->assertNull($sharedAssignments[0]['questionnaire_review_status_key']);
+
+        $this->assertTrue($workflow->assignQuestionnaireReviewer($questionnaireID, $sharedProfileID, 1));
+        $dashboardRow = $findDashboardRow();
+        $this->assertNull($dashboardRow['koalendar_booking_url']);
+        $this->assertNull($dashboardRow['questionnaire_review_status_key']);
+        $questionnaireDetail = $workflow->getQuestionnaireDetail($questionnaireID);
+        $this->assertSame('assigned', $questionnaireDetail['review_status_key']);
+        $this->assertNull($questionnaireDetail['reviewer_koalendar_booking_url']);
+
+        $this->assertTrue($workflow->saveQuestionnaireReview($questionnaireID, 1, '', true));
+        $dashboardRow = $findDashboardRow();
+        $this->assertSame('Shared Reviewer', $dashboardRow['booking_interviewer_name']);
+        $this->assertSame('https://koalendar.com/e/shared-reviewer', $dashboardRow['koalendar_booking_url']);
+        $this->assertSame('complete', $dashboardRow['questionnaire_review_status_key']);
+        $assignments = $workflow->getAssignedCandidatesForUser($userID);
+        $this->assertSame('', $assignments[0]['koalendar_booking_url']);
+        $sharedAssignments = $workflow->getAssignedCandidatesForUser($sharedUserID);
+        $this->assertSame('https://koalendar.com/e/shared-reviewer', $sharedAssignments[0]['koalendar_booking_url']);
+
+        $this->assertTrue($workflow->saveQuestionnaireReview($questionnaireID, 1, '', false));
+        $dashboardRow = $findDashboardRow();
+        $this->assertNull($dashboardRow['koalendar_booking_url']);
+        $this->assertNull($dashboardRow['questionnaire_review_status_key']);
+        $this->assertNotEmpty($this->fetchSingleValue(sprintf(
+            "SELECT review_completed_at FROM nesp_screening_questionnaire WHERE screening_questionnaire_id = %d",
+            $questionnaireID
+        )));
+        $questionnaireDetail = $workflow->getQuestionnaireDetail($questionnaireID);
+        $this->assertSame('in_review', $questionnaireDetail['review_status_key']);
+        $this->assertNull($questionnaireDetail['reviewer_koalendar_booking_url']);
+        $sharedAssignments = $workflow->getAssignedCandidatesForUser($sharedUserID);
+        $this->assertSame('', $sharedAssignments[0]['koalendar_booking_url']);
+
+        $this->assertTrue($workflow->saveQuestionnaireReview($questionnaireID, 1, '', true));
+        $this->assertTrue($workflow->revokeCandidateGrant($sharedGrantID, 1));
+        $dashboardRow = $findDashboardRow();
+        $this->assertNull($dashboardRow['koalendar_booking_url']);
+        $this->assertNull($dashboardRow['booking_interviewer_name']);
+        $this->assertNull($dashboardRow['questionnaire_review_status_key']);
+        $questionnaireDetail = $workflow->getQuestionnaireDetail($questionnaireID);
+        $this->assertEmpty($questionnaireDetail['booking_owner_grant_id']);
+        $this->assertNull($questionnaireDetail['reviewer_koalendar_booking_url']);
+        $assignments = $workflow->getAssignedCandidatesForUser($userID);
+        $this->assertSame('', $assignments[0]['koalendar_booking_url']);
+        $this->assertNull($assignments[0]['questionnaire_review_status_key']);
 
         $auditPayload = $this->fetchSingleValue(sprintf(
             "SELECT metadata_json

@@ -302,17 +302,25 @@ class NESPWorkflowTest extends TestCase
         $assignments = file_get_contents(LEGACY_ROOT . '/modules/nesp/AssignedCandidates.tpl');
         $candidate = file_get_contents(LEGACY_ROOT . '/modules/nesp/AssignedCandidate.tpl');
 
-        $this->assertStringContainsString('ip.koalendar_booking_url', $workflow);
-        $this->assertStringContainsString('questionnaire_review_completed_at', $workflow);
+        $this->assertStringContainsString('canonicalBookingOwnerJoinSQL', $workflow);
+        $this->assertStringContainsString('booking_questionnaire.review_status_key = "complete"', $workflow);
+        $this->assertStringContainsString('current_grant.interviewer_profile_id = booking_questionnaire.reviewer_profile_id', $workflow);
+        $this->assertStringContainsString('current_grant.date_revoked IS NULL', $workflow);
+        $this->assertStringContainsString('booking_owner_profile.is_active = 1', $workflow);
         $this->assertStringContainsString("case 'updateInterviewerKoalendarLink':", $ui);
         $this->assertStringContainsString('$this->requirePostCSRF();', $ui);
         $this->assertStringContainsString('You can edit only your own Koalendar booking link.', $ui);
         $this->assertStringContainsString('Reviewed next action', $dashboard);
-        $this->assertStringContainsString('review_completed_at', $questionnaire);
+        $this->assertStringContainsString("questionnaire_review_status_key'] === 'complete'", $dashboard);
+        $this->assertStringContainsString("booking_owner_grant_id']", $dashboard);
+        $this->assertStringContainsString("review_status_key'] === 'complete'", $questionnaire);
+        $this->assertStringContainsString("booking_owner_grant_id']", $questionnaire);
         $this->assertStringContainsString('it does not send it or create a booking', $availability);
         $this->assertStringContainsString('questionnaire_review_completed_at', $assignments);
+        $this->assertStringContainsString("questionnaire_review_status_key'] === 'complete'", $assignments);
         $this->assertStringContainsString("candidate['koalendar_booking_url']", $assignments);
         $this->assertStringContainsString('Open My Booking Page', $candidate);
+        $this->assertStringContainsString("questionnaire_review_status_key'] === 'complete'", $candidate);
         $this->assertStringNotContainsString('sendKoalendar', $ui);
         $this->assertStringNotContainsString('globalKoalendar', $workflow);
     }

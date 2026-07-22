@@ -30,7 +30,7 @@
                 </div>
             </div>
 
-            <?php if (!empty($this->candidate['questionnaire_review_completed_at'])): ?>
+            <?php if (isset($this->candidate['questionnaire_review_status_key']) && $this->candidate['questionnaire_review_status_key'] === 'complete' && !empty($this->candidate['questionnaire_review_completed_at'])): ?>
             <div class="nesp-panel">
                 <h3>Applicant Scheduling Handoff</h3>
                 <?php if (!empty($this->candidate['koalendar_booking_url'])): ?>

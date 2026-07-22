@@ -2977,6 +2977,33 @@ class NESPWorkflow
         return $queues;
     }
 
+    private function canonicalBookingOwnerJoinSQL($candidateIDExpression, $jobOrderIDExpression)
+    {
+        return '
+            LEFT JOIN nesp_screening_questionnaire booking_questionnaire
+                ON booking_questionnaire.screening_questionnaire_id = (
+                    SELECT MAX(current_questionnaire.screening_questionnaire_id)
+                    FROM nesp_screening_questionnaire current_questionnaire
+                    WHERE current_questionnaire.candidate_id = ' . $candidateIDExpression . '
+                      AND current_questionnaire.joborder_id = ' . $jobOrderIDExpression . '
+                )
+            LEFT JOIN nesp_interviewer_candidate_grant booking_owner_grant
+                ON booking_owner_grant.grant_id = (
+                    SELECT MAX(current_grant.grant_id)
+                    FROM nesp_interviewer_candidate_grant current_grant
+                    WHERE current_grant.candidate_id = ' . $candidateIDExpression . '
+                      AND current_grant.joborder_id = ' . $jobOrderIDExpression . '
+                      AND current_grant.interviewer_profile_id = booking_questionnaire.reviewer_profile_id
+                      AND current_grant.date_revoked IS NULL
+                )
+                AND booking_questionnaire.status_key = "completed"
+                AND booking_questionnaire.review_status_key = "complete"
+                AND booking_questionnaire.review_completed_at IS NOT NULL
+            LEFT JOIN nesp_interviewer_profile booking_owner_profile
+                ON booking_owner_profile.interviewer_profile_id = booking_owner_grant.interviewer_profile_id
+                AND booking_owner_profile.is_active = 1';
+    }
+
     public function getDashboardCandidateRows($limit)
     {
         $limit = max(1, min(250, (int) $limit));
@@ -3014,37 +3041,20 @@ class NESPWorkflow
                           AND assigned_grant.joborder_id = cw.joborder_id
                           AND assigned_grant.date_revoked IS NULL
                     ) AS assigned_interviewer_names,
-                    (
-                        SELECT assigned_ip.display_name
-                        FROM nesp_interviewer_candidate_grant assigned_grant
-                        INNER JOIN nesp_interviewer_profile assigned_ip
-                            ON assigned_ip.interviewer_profile_id = assigned_grant.interviewer_profile_id
-                        WHERE assigned_grant.candidate_id = cw.candidate_id
-                          AND assigned_grant.joborder_id = cw.joborder_id
-                          AND assigned_grant.date_revoked IS NULL
-                          AND assigned_ip.is_active = 1
-                        ORDER BY assigned_grant.grant_id DESC
-                        LIMIT 1
-                    ) AS booking_interviewer_name,
-                    (
-                        SELECT assigned_ip.koalendar_booking_url
-                        FROM nesp_interviewer_candidate_grant assigned_grant
-                        INNER JOIN nesp_interviewer_profile assigned_ip
-                            ON assigned_ip.interviewer_profile_id = assigned_grant.interviewer_profile_id
-                        WHERE assigned_grant.candidate_id = cw.candidate_id
-                          AND assigned_grant.joborder_id = cw.joborder_id
-                          AND assigned_grant.date_revoked IS NULL
-                          AND assigned_ip.is_active = 1
-                        ORDER BY assigned_grant.grant_id DESC
-                        LIMIT 1
-                    ) AS koalendar_booking_url,
-                    (
-                        SELECT MAX(questionnaire.review_completed_at)
-                        FROM nesp_screening_questionnaire questionnaire
-                        WHERE questionnaire.candidate_id = cw.candidate_id
-                          AND questionnaire.joborder_id = cw.joborder_id
-                          AND questionnaire.status_key = "completed"
-                    ) AS questionnaire_review_completed_at,
+                    booking_owner_grant.grant_id AS booking_owner_grant_id,
+                    booking_owner_profile.interviewer_profile_id AS booking_interviewer_profile_id,
+                    booking_owner_profile.display_name AS booking_interviewer_name,
+                    booking_owner_profile.koalendar_booking_url,
+                    CASE
+                        WHEN booking_owner_grant.grant_id IS NOT NULL
+                        THEN booking_questionnaire.review_status_key
+                        ELSE NULL
+                    END AS questionnaire_review_status_key,
+                    CASE
+                        WHEN booking_owner_grant.grant_id IS NOT NULL
+                        THEN booking_questionnaire.review_completed_at
+                        ELSE NULL
+                    END AS questionnaire_review_completed_at,
                     sr.status_key AS scorecard_status_key,
                     sr.overall_recommendation
                 FROM
@@ -3055,6 +3065,7 @@ class NESPWorkflow
                     ON jo.joborder_id = cw.joborder_id
                 INNER JOIN nesp_workflow_stage ws
                     ON ws.workflow_stage_id = cw.workflow_stage_id
+                ' . $this->canonicalBookingOwnerJoinSQL('cw.candidate_id', 'cw.joborder_id') . '
                 LEFT JOIN nesp_interview i
                     ON i.interview_id = (
                         SELECT MAX(i2.interview_id)
@@ -5661,7 +5672,11 @@ class NESPWorkflow
                     cg.grant_id,
                     cg.candidate_id,
                     cg.joborder_id,
-                    ip.koalendar_booking_url,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_owner_profile.koalendar_booking_url
+                        ELSE ""
+                    END AS koalendar_booking_url,
                     CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
                     jo.title AS role_title,
                     ws.display_name AS stage_name,
@@ -5673,14 +5688,17 @@ class NESPWorkflow
                     i.scheduled_start,
                     i.scheduled_end,
                     i.status_key AS interview_status_key,
-                    sr.status_key AS scorecard_status_key
-                    , (
-                        SELECT MAX(questionnaire.review_completed_at)
-                        FROM nesp_screening_questionnaire questionnaire
-                        WHERE questionnaire.candidate_id = cg.candidate_id
-                          AND questionnaire.joborder_id = cg.joborder_id
-                          AND questionnaire.status_key = "completed"
-                    ) AS questionnaire_review_completed_at
+                    sr.status_key AS scorecard_status_key,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_questionnaire.review_status_key
+                        ELSE NULL
+                    END AS questionnaire_review_status_key,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_questionnaire.review_completed_at
+                        ELSE NULL
+                    END AS questionnaire_review_completed_at
                 FROM
                     nesp_interviewer_profile ip
                 INNER JOIN nesp_interviewer_candidate_grant cg
@@ -5690,6 +5708,7 @@ class NESPWorkflow
                     ON c.candidate_id = cg.candidate_id
                 INNER JOIN joborder jo
                     ON jo.joborder_id = cg.joborder_id
+                ' . $this->canonicalBookingOwnerJoinSQL('cg.candidate_id', 'cg.joborder_id') . '
                 LEFT JOIN nesp_candidate_workflow cw
                     ON cw.candidate_id = cg.candidate_id
                     AND cw.joborder_id = cg.joborder_id
@@ -5731,7 +5750,11 @@ class NESPWorkflow
                 cg.candidate_id,
                 cg.joborder_id,
                 ip.display_name AS interviewer_name,
-                ip.koalendar_booking_url,
+                CASE
+                    WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                    THEN booking_owner_profile.koalendar_booking_url
+                    ELSE ""
+                END AS koalendar_booking_url,
                 CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
                 jo.title AS role_title,
                 ws.display_name AS stage_name,
@@ -5743,13 +5766,16 @@ class NESPWorkflow
                 i.scheduled_end,
                 i.status_key AS interview_status_key,
                 sr.status_key AS scorecard_status_key,
-                (
-                    SELECT MAX(questionnaire.review_completed_at)
-                    FROM nesp_screening_questionnaire questionnaire
-                    WHERE questionnaire.candidate_id = cg.candidate_id
-                      AND questionnaire.joborder_id = cg.joborder_id
-                      AND questionnaire.status_key = "completed"
-                ) AS questionnaire_review_completed_at
+                CASE
+                    WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                    THEN booking_questionnaire.review_status_key
+                    ELSE NULL
+                END AS questionnaire_review_status_key,
+                CASE
+                    WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                    THEN booking_questionnaire.review_completed_at
+                    ELSE NULL
+                END AS questionnaire_review_completed_at
              FROM
                 nesp_interviewer_candidate_grant cg
              INNER JOIN nesp_interviewer_profile ip
@@ -5758,6 +5784,7 @@ class NESPWorkflow
                 ON c.candidate_id = cg.candidate_id
              INNER JOIN joborder jo
                 ON jo.joborder_id = cg.joborder_id
+             ' . $this->canonicalBookingOwnerJoinSQL('cg.candidate_id', 'cg.joborder_id') . '
              LEFT JOIN nesp_candidate_workflow cw
                 ON cw.candidate_id = cg.candidate_id
                 AND cw.joborder_id = cg.joborder_id
@@ -5807,7 +5834,11 @@ class NESPWorkflow
                     cg.can_add_notes,
                     cg.can_submit_scorecard,
                     ip.interviewer_profile_id,
-                    ip.koalendar_booking_url,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_owner_profile.koalendar_booking_url
+                        ELSE ""
+                    END AS koalendar_booking_url,
                     CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
                     c.email1,
                     c.phone_cell,
@@ -5819,13 +5850,16 @@ class NESPWorkflow
                     cw.summary,
                     cw.waiting_on_key,
                     cw.date_modified AS last_activity,
-                    (
-                        SELECT MAX(questionnaire.review_completed_at)
-                        FROM nesp_screening_questionnaire questionnaire
-                        WHERE questionnaire.candidate_id = cg.candidate_id
-                          AND questionnaire.joborder_id = cg.joborder_id
-                          AND questionnaire.status_key = "completed"
-                    ) AS questionnaire_review_completed_at
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_questionnaire.review_status_key
+                        ELSE NULL
+                    END AS questionnaire_review_status_key,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_questionnaire.review_completed_at
+                        ELSE NULL
+                    END AS questionnaire_review_completed_at
                 FROM
                     nesp_interviewer_profile ip
                 INNER JOIN nesp_interviewer_candidate_grant cg
@@ -5835,6 +5869,7 @@ class NESPWorkflow
                     ON c.candidate_id = cg.candidate_id
                 INNER JOIN joborder jo
                     ON jo.joborder_id = cg.joborder_id
+                ' . $this->canonicalBookingOwnerJoinSQL('cg.candidate_id', 'cg.joborder_id') . '
                 LEFT JOIN nesp_candidate_workflow cw
                     ON cw.candidate_id = cg.candidate_id
                     AND cw.joborder_id = cg.joborder_id
@@ -8268,12 +8303,32 @@ class NESPWorkflow
                     CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
                     c.email1,
                     jo.title AS role_title,
-                    ip.display_name AS reviewer_name,
-                    ip.koalendar_booking_url AS reviewer_koalendar_booking_url
+                    reviewer_profile.display_name AS reviewer_name,
+                    CASE
+                        WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
+                        THEN booking_owner_grant.grant_id
+                        ELSE NULL
+                    END AS booking_owner_grant_id,
+                    CASE
+                        WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
+                        THEN booking_owner_profile.interviewer_profile_id
+                        ELSE NULL
+                    END AS booking_owner_profile_id,
+                    CASE
+                        WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
+                        THEN booking_owner_profile.display_name
+                        ELSE NULL
+                    END AS booking_interviewer_name,
+                    CASE
+                        WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
+                        THEN booking_owner_profile.koalendar_booking_url
+                        ELSE ""
+                    END AS reviewer_koalendar_booking_url
                  FROM nesp_screening_questionnaire q
                  INNER JOIN candidate c ON c.candidate_id = q.candidate_id
                  INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id
-                 LEFT JOIN nesp_interviewer_profile ip ON ip.interviewer_profile_id = q.reviewer_profile_id
+                 LEFT JOIN nesp_interviewer_profile reviewer_profile ON reviewer_profile.interviewer_profile_id = q.reviewer_profile_id
+                 ' . $this->canonicalBookingOwnerJoinSQL('q.candidate_id', 'q.joborder_id') . '
                  WHERE q.screening_questionnaire_id = %s
                  LIMIT 1',
                 $this->_db->makeQueryInteger($questionnaireID)
@@ -10417,8 +10472,11 @@ class NESPWorkflow
             'scheduled_end' => $row['scheduled_end'],
             'interviewer_name' => $row['interviewer_name'],
             'assigned_interviewer_names' => isset($row['assigned_interviewer_names']) ? trim($row['assigned_interviewer_names']) : '',
+            'booking_owner_grant_id' => isset($row['booking_owner_grant_id']) ? (int) $row['booking_owner_grant_id'] : 0,
+            'booking_interviewer_profile_id' => isset($row['booking_interviewer_profile_id']) ? (int) $row['booking_interviewer_profile_id'] : 0,
             'booking_interviewer_name' => isset($row['booking_interviewer_name']) ? trim($row['booking_interviewer_name']) : '',
             'koalendar_booking_url' => isset($row['koalendar_booking_url']) ? trim($row['koalendar_booking_url']) : '',
+            'questionnaire_review_status_key' => isset($row['questionnaire_review_status_key']) ? trim($row['questionnaire_review_status_key']) : '',
             'questionnaire_review_completed_at' => isset($row['questionnaire_review_completed_at']) ? $row['questionnaire_review_completed_at'] : null,
             'interview_status_key' => $row['interview_status_key'],
             'interview_status_label' => isset($statusLabels[$row['interview_status_key']]) ? $statusLabels[$row['interview_status_key']] : $row['interview_status_key'],
