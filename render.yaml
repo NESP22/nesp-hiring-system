@@ -179,3 +179,70 @@ services:
         sync: false
       - key: OPENCATS_MAIL_FROM_ADDRESS
         sync: false
+
+  # Candidate UTC hours cover 09:00 America/New_York in standard and daylight
+  # time. The CLI accepts only the matching local hour.
+  - type: cron
+    name: nesp-questionnaire-reminders
+    runtime: docker
+    plan: starter
+    region: virginia
+    branch: master
+    autoDeployTrigger: checksPass
+    schedule: "0 13,14 * * *"
+    dockerfilePath: ./docker/render/Dockerfile
+    dockerContext: .
+    dockerCommand: php scripts/nesp_questionnaire_reminders.php
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_TIMEZONE
+        value: America/New_York
+      - key: NESP_SERVICE_ROLE
+        value: cron
+      - key: APP_BASIC_AUTH
+        value: 0
+      - key: NESP_QUESTIONNAIRE_REMINDERS_ENABLED
+        sync: false
+      - key: NESP_QUESTIONNAIRE_REMINDER_SYSTEM_USER_ID
+        sync: false
+      - key: DB_NAME
+        value: cats
+      - key: DB_USER
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          envVarKey: MARIADB_USER
+      - key: DB_PASSWORD
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          envVarKey: MARIADB_PASSWORD
+      - key: DB_HOST
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          property: host
+      - key: DB_PORT
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          property: port
+      - key: OPENCATS_MAIL_ENABLED
+        sync: false
+      - key: OPENCATS_MAIL_MAILER
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_HOST
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_PORT
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_AUTH
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_USER
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_PASS
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_SECURE
+        sync: false
+      - key: OPENCATS_MAIL_FROM_ADDRESS
+        sync: false

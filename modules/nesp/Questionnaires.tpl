@@ -34,10 +34,16 @@
                 <?php endforeach; ?>
             </div>
 
+            <?php if (!empty($this->closureMessage)): ?>
+                <div class="nesp-success" role="status"><?php $this->_($this->closureMessage); ?></div>
+            <?php endif; ?>
+
             <?php
                 $queueLabels = array(
                     'ready' => 'Questionnaire Links Ready',
                     'waiting' => 'Waiting for Questionnaire',
+                    'reminder_review' => 'Reminder Delivery Review',
+                    'close_review_due' => 'Close Review Due',
                     'completed' => 'Completed Questionnaires',
                     'human_follow_up' => 'Human Follow-Up Requested',
                     'revoked_expired' => 'Revoked or Expired'
@@ -63,6 +69,7 @@
                         <th>Role</th>
                         <th>Status</th>
                         <th>Reviewer</th>
+                        <th>Reminder</th>
                         <th>Submitted</th>
                         <th>Action</th>
                     </tr>
@@ -72,13 +79,22 @@
                         <td data-label="Role"><?php $this->_($questionnaire['role_title']); ?></td>
                         <td data-label="Status"><?php $this->_($questionnaire['status_label']); ?></td>
                         <td data-label="Reviewer"><?php $this->_($questionnaire['reviewer_name']); ?></td>
+                        <td data-label="Reminder"><?php $this->_($questionnaire['reminder_status_label']); ?></td>
                         <td data-label="Submitted"><?php $this->_(empty($questionnaire['submitted_at']) ? 'Not submitted' : $questionnaire['submitted_at']); ?></td>
-                        <td data-label="Action"><a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=reviewQuestionnaire&amp;questionnaireID=<?php echo((int) $questionnaire['screening_questionnaire_id']); ?>">Review</a></td>
+                        <td data-label="Action">
+                            <?php if ($queueKey === 'reminder_review'): ?>
+                                <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmQuestionnaireReminderReview&amp;questionnaireID=<?php echo((int) $questionnaire['screening_questionnaire_id']); ?>">Review Delivery</a>
+                            <?php elseif ($queueKey === 'close_review_due'): ?>
+                                <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=confirmQuestionnaireNonresponseClosure&amp;questionnaireID=<?php echo((int) $questionnaire['screening_questionnaire_id']); ?>">Review Closure</a>
+                            <?php else: ?>
+                                <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=reviewQuestionnaire&amp;questionnaireID=<?php echo((int) $questionnaire['screening_questionnaire_id']); ?>">Review</a>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                     <?php if (!count($this->questionnaireQueues[$queueKey])): ?>
                     <tr>
-                        <td data-label="Queue" colspan="6">No items in this queue.</td>
+                        <td data-label="Queue" colspan="7">No items in this queue.</td>
                     </tr>
                     <?php endif; ?>
                 </table>

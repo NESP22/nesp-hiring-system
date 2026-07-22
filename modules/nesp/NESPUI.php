@@ -282,6 +282,28 @@ class NESPUI extends UserInterface
                 $this->sendBulkQuestionnaireEmails();
                 break;
 
+            case 'confirmQuestionnaireNonresponseClosure':
+                $this->adminOnly();
+                $this->confirmQuestionnaireNonresponseClosure();
+                break;
+
+            case 'closeQuestionnaireNonresponse':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->closeQuestionnaireNonresponse();
+                break;
+
+            case 'confirmQuestionnaireReminderReview':
+                $this->adminOnly();
+                $this->confirmQuestionnaireReminderReview();
+                break;
+
+            case 'resolveQuestionnaireReminderReview':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->resolveQuestionnaireReminderReview();
+                break;
+
             case 'reviewQuestionnaire':
                 $this->reviewQuestionnaire();
                 break;
@@ -1070,6 +1092,10 @@ class NESPUI extends UserInterface
         $this->_template->assign('dashboardNavigation', NESPWorkflow::getDashboardNavigation());
         $this->_template->assign('questionnaireQueues', $this->_workflow->getQuestionnaireQueues());
         $this->_template->assign('questionnaires', $this->_workflow->getQuestionnaireSummaries(100));
+        $closureMessage = isset($_SESSION['NESP_QUESTIONNAIRE_CLOSURE_MESSAGE'])
+            ? $_SESSION['NESP_QUESTIONNAIRE_CLOSURE_MESSAGE'] : '';
+        unset($_SESSION['NESP_QUESTIONNAIRE_CLOSURE_MESSAGE']);
+        $this->_template->assign('closureMessage', $closureMessage);
         $this->_template->display('./modules/nesp/Questionnaires.tpl');
     }
 
@@ -1343,6 +1369,92 @@ class NESPUI extends UserInterface
         );
         $_SESSION['NESP_BULK_QUESTIONNAIRE_ITEMS'] = isset($result['items']) ? $result['items'] : array();
         CATSUtility::transferRelativeURI('m=nesp');
+    }
+
+    private function confirmQuestionnaireNonresponseClosure()
+    {
+        $questionnaireID = isset($_GET['questionnaireID']) ? (int) $_GET['questionnaireID'] : 0;
+        $context = $this->_workflow->getQuestionnaireCloseReviewContext($questionnaireID);
+        if (empty($context))
+        {
+            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'This questionnaire is not due for no-response closure review.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Questionnaires');
+        $this->_template->assign('questionnaire', $context);
+        $this->_template->display('./modules/nesp/QuestionnaireNonresponseClosure.tpl');
+    }
+
+    private function closeQuestionnaireNonresponse()
+    {
+        $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
+        $reason = isset($_POST['reason']) ? trim((string) $_POST['reason']) : '';
+        if (!isset($_POST['confirmClose']) || $_POST['confirmClose'] !== 'confirm')
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Confirm the human-reviewed no-response closure.');
+        }
+        $result = $this->_workflow->closeQuestionnaireForNonresponse(
+            $questionnaireID,
+            $this->_userID,
+            $reason
+        );
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(
+                COMMONERROR_BADFIELDS,
+                $this,
+                isset($result['error']) ? $result['error'] : 'Unable to close the review.'
+            );
+        }
+
+        $_SESSION['NESP_QUESTIONNAIRE_CLOSURE_MESSAGE'] = 'Review closed by a person after no questionnaire response. No message was sent.';
+        CATSUtility::transferRelativeURI('m=nesp&a=questionnaires');
+    }
+
+    private function confirmQuestionnaireReminderReview()
+    {
+        $questionnaireID = isset($_GET['questionnaireID']) ? (int) $_GET['questionnaireID'] : 0;
+        $context = $this->_workflow->getQuestionnaireReminderReviewContext($questionnaireID);
+        if (empty($context))
+        {
+            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'This questionnaire does not need reminder delivery review.');
+        }
+
+        $this->_template->assign('active', $this);
+        $this->_template->assign('subActive', 'Questionnaires');
+        $this->_template->assign('questionnaire', $context);
+        $this->_template->display('./modules/nesp/QuestionnaireReminderReview.tpl');
+    }
+
+    private function resolveQuestionnaireReminderReview()
+    {
+        $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
+        $decision = isset($_POST['decision']) ? trim((string) $_POST['decision']) : '';
+        $reason = isset($_POST['reason']) ? trim((string) $_POST['reason']) : '';
+        if (!isset($_POST['confirmReview']) || $_POST['confirmReview'] !== 'confirm')
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Confirm the human-reviewed reminder delivery decision.');
+        }
+        $result = $this->_workflow->resolveQuestionnaireReminderReview(
+            $questionnaireID,
+            $this->_userID,
+            $decision,
+            $reason
+        );
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(
+                COMMONERROR_BADFIELDS,
+                $this,
+                isset($result['error']) ? $result['error'] : 'Unable to resolve the reminder review.'
+            );
+        }
+
+        $_SESSION['NESP_QUESTIONNAIRE_CLOSURE_MESSAGE'] = $decision === 'confirm_sent'
+            ? 'Reminder delivery confirmed by a person. No message was sent by this action.'
+            : 'Reminder delivery was left unconfirmed and the applicant remains active. No message was sent.';
+        CATSUtility::transferRelativeURI('m=nesp&a=questionnaires');
     }
 
     private function reviewQuestionnaire()

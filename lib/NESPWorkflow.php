@@ -16,7 +16,9 @@ class NESPWorkflow
 {
     private $_db;
 
-    const APPLICANT_EMAIL_FEATURE_DESCRIPTION = 'When deliberately enabled with a configured sender, automatically sends one secure role-specific questionnaire email after a new applicant has a valid email and linked job, and allows an administrator to send one to an existing reviewed applicant.';
+    const APPLICANT_EMAIL_FEATURE_DESCRIPTION = 'When deliberately enabled with a configured sender, automatically sends one secure role-specific questionnaire email after a new applicant has a valid email and linked job, allows an administrator to send one to an existing reviewed applicant, and can send one four-day reminder when the separate reminder scheduler is enabled.';
+    const QUESTIONNAIRE_REMINDER_AFTER_DAYS = 4;
+    const QUESTIONNAIRE_CLOSE_REVIEW_AFTER_DAYS = 4;
 
     public function __construct($db = null)
     {
@@ -2471,7 +2473,7 @@ class NESPWorkflow
 
         return array(
             'status_key' => 'enabled',
-            'message' => 'Questionnaire email delivery is active. New eligible applicants receive one role-specific secure questionnaire email, and an administrator can send one to an existing reviewed applicant. No reminders or other applicant messages are sent.'
+            'message' => 'Questionnaire email delivery is active. New eligible applicants receive one role-specific secure questionnaire email, an administrator can send one to an existing reviewed applicant, and the separately enabled scheduler can send one four-day reminder. No other applicant messages are sent.'
         );
     }
 
@@ -4327,6 +4329,740 @@ class NESPWorkflow
         catch (\Throwable $exception)
         {
             return false;
+        }
+    }
+
+    public static function isQuestionnaireReminderSchedulerEnabled()
+    {
+        return trim((string) getenv('NESP_QUESTIONNAIRE_REMINDERS_ENABLED')) === '1';
+    }
+
+    public static function buildQuestionnaireReminderCopy($firstName, $roleTitle, $link)
+    {
+        $firstName = trim((string) $firstName);
+        $roleTitle = trim((string) $roleTitle);
+        if ($firstName === '')
+        {
+            $firstName = 'there';
+        }
+        if ($roleTitle === '')
+        {
+            $roleTitle = 'NESP position';
+        }
+
+        return 'Hi ' . $firstName . ', this is a reminder to complete your New England Sports Photo screening questionnaire for the '
+            . $roleTitle . ' position. Please submit it within 4 days if you would like to remain in the active applicant pool. '
+            . 'Use the fresh secure link below; it replaces the link in the original email. Your answers are reviewed by a person, '
+            . 'and no automated hiring decision will be made.' . "\n\n" . $link;
+    }
+
+    public static function getQuestionnaireReminderTiming($initialSentAt, $reminderSentAt = '', $nowUTC = '')
+    {
+        try
+        {
+            $zone = new DateTimeZone('UTC');
+            $now = trim((string) $nowUTC) === ''
+                ? new DateTimeImmutable('now', $zone)
+                : new DateTimeImmutable((string) $nowUTC, $zone);
+            $initial = trim((string) $initialSentAt) === ''
+                ? null : new DateTimeImmutable((string) $initialSentAt, $zone);
+            $reminder = trim((string) $reminderSentAt) === ''
+                ? null : new DateTimeImmutable((string) $reminderSentAt, $zone);
+        }
+        catch (Exception $exception)
+        {
+            return array('reminder_due' => false, 'close_review_due' => false);
+        }
+
+        $reminderDue = $initial !== null
+            && $reminder === null
+            && $now >= $initial->modify('+' . self::QUESTIONNAIRE_REMINDER_AFTER_DAYS . ' days');
+        $closeReviewDue = $reminder !== null
+            && $now >= $reminder->modify('+' . self::QUESTIONNAIRE_CLOSE_REVIEW_AFTER_DAYS . ' days');
+
+        return array(
+            'reminder_due' => $reminderDue,
+            'close_review_due' => $closeReviewDue
+        );
+    }
+
+    public function sendDueQuestionnaireReminders($actorUserID = null, $limit = 100, $nowUTC = '')
+    {
+        $limit = max(1, min(200, (int) $limit));
+        if (!self::isQuestionnaireReminderSchedulerEnabled())
+        {
+            return array('sent' => 0, 'skipped' => 0, 'failed' => 0, 'error' => 'Questionnaire reminder scheduler is disabled.');
+        }
+        $deliveryStatus = $this->getApplicantEmailDeliveryStatus();
+        if ($deliveryStatus['status_key'] !== 'enabled')
+        {
+            return array('sent' => 0, 'skipped' => 0, 'failed' => 0, 'error' => 'Applicant email delivery is not ready.');
+        }
+
+        $now = $this->normalizeQuestionnaireReminderNow($nowUTC);
+        if ($now === '')
+        {
+            return array('sent' => 0, 'skipped' => 0, 'failed' => 0, 'error' => 'Reminder time is invalid.');
+        }
+
+        $query = sprintf(
+            'SELECT q.screening_questionnaire_id
+             FROM nesp_screening_questionnaire q
+             INNER JOIN candidate c ON c.candidate_id = q.candidate_id AND c.is_active = 1
+             INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id AND jo.status = "Active"
+             INNER JOIN nesp_candidate_workflow cw
+                ON cw.candidate_id = q.candidate_id AND cw.joborder_id = q.joborder_id
+             INNER JOIN nesp_workflow_stage ws
+                ON ws.workflow_stage_id = cw.workflow_stage_id
+               AND ws.stage_key = "applicant_clarification_requested"
+             WHERE q.status_key = "waiting"
+               AND q.auto_email_status_key = "sent"
+               AND q.auto_email_sent_at IS NOT NULL
+               AND q.auto_email_sent_at <= DATE_SUB(%s, INTERVAL %s DAY)
+               AND q.submitted_at IS NULL
+               AND q.started_at IS NULL
+               AND q.token_revoked_at IS NULL
+               AND NOT EXISTS (
+                    SELECT 1 FROM nesp_screening_questionnaire_activity qa
+                    WHERE qa.screening_questionnaire_id = q.screening_questionnaire_id
+                      AND qa.activity_key IN ("reminder_email_attempt_started", "reminder_email_sent")
+               )
+             ORDER BY q.auto_email_sent_at ASC, q.screening_questionnaire_id ASC
+             LIMIT %s',
+            $this->_db->makeQueryString($now),
+            $this->_db->makeQueryInteger(self::QUESTIONNAIRE_REMINDER_AFTER_DAYS),
+            $this->_db->makeQueryInteger($limit)
+        );
+        if ($this->_db->query($query) === false)
+        {
+            return array(
+                'sent' => 0,
+                'skipped' => 0,
+                'failed' => 1,
+                'error' => 'Unable to load due questionnaire reminders safely.'
+            );
+        }
+        $rows = $this->_db->getAllAssoc();
+
+        $result = array('sent' => 0, 'skipped' => 0, 'failed' => 0, 'error' => '');
+        foreach ($rows as $row)
+        {
+            $delivery = $this->sendQuestionnaireReminder(
+                (int) $row['screening_questionnaire_id'],
+                $actorUserID,
+                $now
+            );
+            if (!empty($delivery['sent']))
+            {
+                $result['sent']++;
+            }
+            elseif (!empty($delivery['failed']))
+            {
+                $result['failed']++;
+            }
+            else
+            {
+                $result['skipped']++;
+            }
+        }
+
+        return $result;
+    }
+
+    private function sendQuestionnaireReminder($questionnaireID, $actorUserID, $nowUTC)
+    {
+        $questionnaireID = (int) $questionnaireID;
+        if ($questionnaireID <= 0 || !$this->_db->beginTransaction())
+        {
+            return array('sent' => false, 'failed' => true);
+        }
+
+        $row = $this->_db->getAssoc(sprintf(
+            'SELECT q.*, c.first_name, c.email1, jo.title AS role_title
+             FROM nesp_screening_questionnaire q
+             INNER JOIN candidate c ON c.candidate_id = q.candidate_id AND c.is_active = 1
+             INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id AND jo.status = "Active"
+             INNER JOIN nesp_candidate_workflow cw
+                ON cw.candidate_id = q.candidate_id AND cw.joborder_id = q.joborder_id
+             INNER JOIN nesp_workflow_stage ws
+                ON ws.workflow_stage_id = cw.workflow_stage_id
+               AND ws.stage_key = "applicant_clarification_requested"
+             WHERE q.screening_questionnaire_id = %s
+             FOR UPDATE',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+
+        $attempt = $this->_db->getAssoc(sprintf(
+            'SELECT questionnaire_activity_id
+             FROM nesp_screening_questionnaire_activity
+             WHERE screening_questionnaire_id = %s
+               AND activity_key IN ("reminder_email_attempt_started", "reminder_email_sent")
+             LIMIT 1',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        $timing = self::getQuestionnaireReminderTiming(
+            isset($row['auto_email_sent_at']) ? $row['auto_email_sent_at'] : '',
+            '',
+            $nowUTC
+        );
+        $email = self::validateApplicantContactEmail(isset($row['email1']) ? $row['email1'] : '');
+        $eligible = !empty($row)
+            && $row['status_key'] === 'waiting'
+            && $row['auto_email_status_key'] === 'sent'
+            && empty($row['submitted_at'])
+            && empty($row['started_at'])
+            && empty($row['token_revoked_at'])
+            && empty($attempt)
+            && !empty($timing['reminder_due'])
+            && !empty($email['ok']);
+        if (!$eligible)
+        {
+            $this->_db->rollbackTransaction();
+            return array('sent' => false, 'failed' => false);
+        }
+
+        $token = self::generateQuestionnaireToken();
+        $tokenHash = self::questionnaireTokenHash($token);
+        $link = self::getQuestionnaireLink($token);
+        $body = self::buildQuestionnaireReminderCopy($row['first_name'], $row['role_title'], $link);
+        $oldTokenHashSQL = $this->_db->makeQueryString((string) $row['token_hash']);
+        $oldTokenExpiresAtSQL = empty($row['token_expires_at'])
+            ? 'NULL' : $this->_db->makeQueryString($row['token_expires_at']);
+        $oldTokenUsedAtSQL = empty($row['token_used_at'])
+            ? 'NULL' : $this->_db->makeQueryString($row['token_used_at']);
+        $oldLinkCreatedAtSQL = empty($row['link_created_at'])
+            ? 'NULL' : $this->_db->makeQueryString($row['link_created_at']);
+        $tokenUpdated = $this->_db->query(sprintf(
+            'UPDATE nesp_screening_questionnaire
+             SET token_hash = %s,
+                 token_expires_at = DATE_ADD(%s, INTERVAL %s HOUR),
+                 token_used_at = NULL,
+                 link_created_at = %s,
+                 date_modified = NOW()
+             WHERE screening_questionnaire_id = %s
+               AND status_key = "waiting"
+               AND submitted_at IS NULL
+               AND started_at IS NULL',
+            $this->_db->makeQueryString($tokenHash),
+            $this->_db->makeQueryString($nowUTC),
+            $this->_db->makeQueryInteger(self::getQuestionnaireDefaultExpirationHours()),
+            $this->_db->makeQueryString($nowUTC),
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        if ($tokenUpdated === false || $this->_db->getAffectedRows() !== 1)
+        {
+            $this->_db->rollbackTransaction();
+            return array('sent' => false, 'failed' => false);
+        }
+
+        $activitySaved = $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'reminder_email_attempt_started', array(
+            'recipient_fingerprint' => self::applicantEmailFingerprint($email['email']),
+            'original_token_hash' => (string) $row['token_hash'],
+            'original_token_expires_at' => empty($row['token_expires_at']) ? null : $row['token_expires_at'],
+            'original_link_created_at' => empty($row['link_created_at']) ? null : $row['link_created_at']
+        ));
+        $auditSaved = $this->logAuditEvent(
+            $actorUserID,
+            'screening_questionnaire_reminder_email_attempt_started',
+            'screening_questionnaire',
+            $questionnaireID,
+            array(
+                'candidate_id' => (int) $row['candidate_id'],
+                'joborder_id' => (int) $row['joborder_id'],
+                'recipient_fingerprint' => self::applicantEmailFingerprint($email['email'])
+            )
+        );
+        if (!$activitySaved || !$auditSaved || !$this->_db->commitTransaction())
+        {
+            $this->_db->rollbackTransaction();
+            return array('sent' => false, 'failed' => true);
+        }
+
+        $subject = 'Reminder: complete your NESP questionnaire';
+        $sent = $this->deliverQuestionnaireEmailMessage(
+            $actorUserID,
+            $email['email'],
+            trim((string) $row['first_name']),
+            $subject,
+            $body
+        );
+        if (!$sent)
+        {
+            if (!$this->_db->beginTransaction())
+            {
+                return array('sent' => false, 'failed' => true);
+            }
+            $restoreLocked = $this->_db->getAssoc(sprintf(
+                'SELECT screening_questionnaire_id
+                 FROM nesp_screening_questionnaire
+                 WHERE screening_questionnaire_id = %s
+                   AND token_hash = %s
+                 FOR UPDATE',
+                $this->_db->makeQueryInteger($questionnaireID),
+                $this->_db->makeQueryString($tokenHash)
+            ));
+            $restored = !empty($restoreLocked) && $this->_db->query(sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET token_hash = %s,
+                     token_expires_at = %s,
+                     token_used_at = %s,
+                     link_created_at = %s,
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND token_hash = %s
+                   AND submitted_at IS NULL
+                   AND started_at IS NULL',
+                $oldTokenHashSQL,
+                $oldTokenExpiresAtSQL,
+                $oldTokenUsedAtSQL,
+                $oldLinkCreatedAtSQL,
+                $this->_db->makeQueryInteger($questionnaireID),
+                $this->_db->makeQueryString($tokenHash)
+            )) !== false && $this->_db->getAffectedRows() === 1;
+            if (!$restored || !$this->_db->commitTransaction())
+            {
+                $this->_db->rollbackTransaction();
+                return array('sent' => false, 'failed' => true);
+            }
+
+            if (!$this->_db->beginTransaction())
+            {
+                return array('sent' => false, 'failed' => true);
+            }
+            $failureActivitySaved = $this->logQuestionnaireActivity(
+                $questionnaireID,
+                $tokenHash,
+                'reminder_email_failed',
+                array()
+            );
+            $failureAuditSaved = $this->logAuditEvent($actorUserID, 'screening_questionnaire_reminder_email_failed', 'screening_questionnaire', $questionnaireID, array(
+                'candidate_id' => (int) $row['candidate_id'],
+                'joborder_id' => (int) $row['joborder_id'],
+                'original_link_preserved' => true
+            ));
+            if (!$failureActivitySaved || !$failureAuditSaved || !$this->_db->commitTransaction())
+            {
+                $this->_db->rollbackTransaction();
+                return array('sent' => false, 'failed' => true);
+            }
+            return array('sent' => false, 'failed' => true);
+        }
+
+        if (!$this->_db->beginTransaction())
+        {
+            return array('sent' => false, 'failed' => true);
+        }
+        $sentActivitySaved = $this->logQuestionnaireActivity($questionnaireID, $tokenHash, 'reminder_email_sent', array());
+        $sentAuditSaved = $this->logAuditEvent(
+            $actorUserID,
+            'screening_questionnaire_reminder_email_sent',
+            'screening_questionnaire',
+            $questionnaireID,
+            array(
+                'candidate_id' => (int) $row['candidate_id'],
+                'joborder_id' => (int) $row['joborder_id']
+            )
+        );
+        $workflowUpdated = $this->_db->query(sprintf(
+            'UPDATE nesp_candidate_workflow
+             SET waiting_on_key = "Applicant",
+                 summary = "Questionnaire reminder sent. Waiting four more days for a response.",
+                 next_action_label = "Wait for questionnaire",
+                 due_at = DATE_ADD(%s, INTERVAL %s DAY),
+                 date_modified = NOW()
+             WHERE candidate_id = %s AND joborder_id = %s',
+            $this->_db->makeQueryString($nowUTC),
+            $this->_db->makeQueryInteger(self::QUESTIONNAIRE_CLOSE_REVIEW_AFTER_DAYS),
+            $this->_db->makeQueryInteger($row['candidate_id']),
+            $this->_db->makeQueryInteger($row['joborder_id'])
+        ));
+        if (!$sentActivitySaved || !$sentAuditSaved || $workflowUpdated === false || !$this->_db->commitTransaction())
+        {
+            $this->_db->rollbackTransaction();
+            return array('sent' => false, 'failed' => true);
+        }
+
+        return array('sent' => true, 'failed' => false);
+    }
+
+    public function getQuestionnaireCloseReviewContext($questionnaireID, $nowUTC = '')
+    {
+        $detail = $this->getQuestionnaireDetail((int) $questionnaireID);
+        if (empty($detail)
+            || !in_array($detail['status_key'], array('waiting', 'expired'), true)
+            || !empty($detail['started_at']))
+        {
+            return array();
+        }
+
+        $workflowStage = $this->_db->getAssoc(sprintf(
+            'SELECT ws.stage_key
+             FROM nesp_candidate_workflow cw
+             INNER JOIN nesp_workflow_stage ws ON ws.workflow_stage_id = cw.workflow_stage_id
+             INNER JOIN candidate c ON c.candidate_id = cw.candidate_id AND c.is_active = 1
+             INNER JOIN joborder jo ON jo.joborder_id = cw.joborder_id AND jo.status = "Active"
+             WHERE cw.candidate_id = %s AND cw.joborder_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($detail['candidate_id']),
+            $this->_db->makeQueryInteger($detail['joborder_id'])
+        ));
+        if (empty($workflowStage) || $workflowStage['stage_key'] !== 'applicant_clarification_requested')
+        {
+            return array();
+        }
+
+        $reminder = $this->_db->getAssoc(sprintf(
+            'SELECT MAX(date_created) AS reminder_sent_at
+             FROM nesp_screening_questionnaire_activity
+             WHERE screening_questionnaire_id = %s
+               AND activity_key = "reminder_email_sent"',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        $timing = self::getQuestionnaireReminderTiming(
+            isset($detail['auto_email_sent_at']) ? $detail['auto_email_sent_at'] : '',
+            isset($reminder['reminder_sent_at']) ? $reminder['reminder_sent_at'] : '',
+            $nowUTC
+        );
+        if (empty($timing['close_review_due']) || !empty($detail['submitted_at']))
+        {
+            return array();
+        }
+        $detail['reminder_sent_at'] = $reminder['reminder_sent_at'];
+        $detail['close_review_due'] = true;
+        return $detail;
+    }
+
+    public function getQuestionnaireReminderReviewContext($questionnaireID)
+    {
+        $detail = $this->getQuestionnaireDetail((int) $questionnaireID);
+        if (empty($detail)
+            || !in_array($detail['status_key'], array('waiting', 'expired'), true)
+            || !empty($detail['started_at'])
+            || !empty($detail['submitted_at']))
+        {
+            return array();
+        }
+
+        $workflowStage = $this->_db->getAssoc(sprintf(
+            'SELECT ws.stage_key
+             FROM nesp_candidate_workflow cw
+             INNER JOIN nesp_workflow_stage ws ON ws.workflow_stage_id = cw.workflow_stage_id
+             INNER JOIN candidate c ON c.candidate_id = cw.candidate_id AND c.is_active = 1
+             INNER JOIN joborder jo ON jo.joborder_id = cw.joborder_id AND jo.status = "Active"
+             WHERE cw.candidate_id = %s AND cw.joborder_id = %s
+             LIMIT 1',
+            $this->_db->makeQueryInteger($detail['candidate_id']),
+            $this->_db->makeQueryInteger($detail['joborder_id'])
+        ));
+        if (empty($workflowStage) || $workflowStage['stage_key'] !== 'applicant_clarification_requested')
+        {
+            return array();
+        }
+
+        $activity = $this->_db->getAssoc(sprintf(
+            'SELECT
+                MAX(CASE WHEN activity_key = "reminder_email_attempt_started" THEN date_created END) AS attempted_at,
+                MAX(CASE WHEN activity_key = "reminder_email_sent" THEN date_created END) AS sent_at,
+                MAX(CASE WHEN activity_key = "reminder_email_failed" THEN date_created END) AS failed_at,
+                MAX(CASE WHEN activity_key = "reminder_email_review_kept_active" THEN date_created END) AS kept_active_at
+             FROM nesp_screening_questionnaire_activity
+             WHERE screening_questionnaire_id = %s',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        if (empty($activity['attempted_at'])
+            || !empty($activity['sent_at'])
+            || !empty($activity['failed_at'])
+            || !empty($activity['kept_active_at']))
+        {
+            return array();
+        }
+
+        $detail['reminder_attempted_at'] = $activity['attempted_at'];
+        return $detail;
+    }
+
+    public function resolveQuestionnaireReminderReview($questionnaireID, $actorUserID, $decision, $reason)
+    {
+        $decision = trim((string) $decision);
+        $reason = trim((string) $reason);
+        if (!in_array($decision, array('confirm_sent', 'keep_active'), true))
+        {
+            return array('ok' => false, 'error' => 'Choose how the reminder delivery should be resolved.');
+        }
+        if (strlen($reason) < 10)
+        {
+            return array('ok' => false, 'error' => 'Enter a short reason for the reminder review decision.');
+        }
+        if (!$this->_db->beginTransaction())
+        {
+            return array('ok' => false, 'error' => 'Unable to start the reminder review safely.');
+        }
+
+        $locked = $this->_db->getAssoc(sprintf(
+            'SELECT q.screening_questionnaire_id,
+                    q.token_hash,
+                    cw.candidate_workflow_id,
+                    cw.workflow_stage_id
+             FROM nesp_screening_questionnaire q
+             INNER JOIN candidate c ON c.candidate_id = q.candidate_id AND c.is_active = 1
+             INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id AND jo.status = "Active"
+             INNER JOIN nesp_candidate_workflow cw
+                ON cw.candidate_id = q.candidate_id AND cw.joborder_id = q.joborder_id
+             INNER JOIN nesp_workflow_stage ws
+                ON ws.workflow_stage_id = cw.workflow_stage_id
+               AND ws.stage_key = "applicant_clarification_requested"
+             WHERE q.screening_questionnaire_id = %s
+               AND q.status_key = "waiting"
+               AND q.submitted_at IS NULL
+               AND q.started_at IS NULL
+             FOR UPDATE',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        $context = empty($locked)
+            ? array()
+            : $this->getQuestionnaireReminderReviewContext((int) $questionnaireID);
+        if (empty($context))
+        {
+            $this->_db->rollbackTransaction();
+            return array('ok' => false, 'error' => 'This reminder no longer needs delivery review.');
+        }
+
+        $attempt = $this->_db->getAssoc(sprintf(
+            'SELECT token_hash, metadata_json
+             FROM nesp_screening_questionnaire_activity
+             WHERE screening_questionnaire_id = %s
+               AND activity_key = "reminder_email_attempt_started"
+             ORDER BY questionnaire_activity_id DESC
+             LIMIT 1',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        if (empty($attempt) || !hash_equals((string) $locked['token_hash'], (string) $attempt['token_hash']))
+        {
+            $this->_db->rollbackTransaction();
+            return array('ok' => false, 'error' => 'The questionnaire link changed after the reminder attempt. Nothing was changed.');
+        }
+
+        $activityKey = $decision === 'confirm_sent'
+            ? 'reminder_email_sent' : 'reminder_email_review_kept_active';
+        $eventType = $decision === 'confirm_sent'
+            ? 'screening_questionnaire_reminder_delivery_confirmed_by_human'
+            : 'screening_questionnaire_reminder_kept_active_by_human';
+        $activitySaved = $this->logQuestionnaireActivity(
+            $questionnaireID,
+            (string) $locked['token_hash'],
+            $activityKey,
+            array('human_reviewed' => true)
+        );
+        $auditSaved = $this->logAuditEvent(
+            $actorUserID,
+            $eventType,
+            'screening_questionnaire',
+            $questionnaireID,
+            array(
+                'candidate_id' => (int) $context['candidate_id'],
+                'joborder_id' => (int) $context['joborder_id'],
+                'reason' => $reason,
+                'message_sent_by_action' => false
+            )
+        );
+
+        if ($decision === 'confirm_sent')
+        {
+            $questionnaireUpdated = true;
+            $workflowUpdated = $this->_db->query(sprintf(
+                'UPDATE nesp_candidate_workflow
+                 SET waiting_on_key = "Applicant",
+                     summary = "Questionnaire reminder delivery confirmed by human review.",
+                     next_action_label = "Wait for questionnaire",
+                     due_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s DAY),
+                     date_modified = NOW()
+                 WHERE candidate_workflow_id = %s
+                   AND workflow_stage_id = %s',
+                $this->_db->makeQueryInteger(self::QUESTIONNAIRE_CLOSE_REVIEW_AFTER_DAYS),
+                $this->_db->makeQueryInteger($locked['candidate_workflow_id']),
+                $this->_db->makeQueryInteger($locked['workflow_stage_id'])
+            ));
+        }
+        else
+        {
+            $attemptMetadata = json_decode((string) $attempt['metadata_json'], true);
+            $originalTokenHash = is_array($attemptMetadata) && isset($attemptMetadata['original_token_hash'])
+                ? trim((string) $attemptMetadata['original_token_hash']) : '';
+            if (!preg_match('/^[a-f0-9]{64}$/', $originalTokenHash))
+            {
+                $this->_db->rollbackTransaction();
+                return array('ok' => false, 'error' => 'The original questionnaire link could not be restored safely. Nothing was changed.');
+            }
+            $questionnaireUpdated = $this->_db->query(sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET token_hash = %s,
+                     token_expires_at = DATE_ADD(UTC_TIMESTAMP(), INTERVAL %s DAY),
+                     token_revoked_at = NULL,
+                     token_used_at = NULL,
+                     link_created_at = UTC_TIMESTAMP(),
+                     date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND token_hash = %s
+                   AND status_key = "waiting"
+                   AND submitted_at IS NULL
+                   AND started_at IS NULL',
+                $this->_db->makeQueryString($originalTokenHash),
+                $this->_db->makeQueryInteger(self::QUESTIONNAIRE_CLOSE_REVIEW_AFTER_DAYS),
+                $this->_db->makeQueryInteger($questionnaireID),
+                $this->_db->makeQueryString($attempt['token_hash'])
+            )) !== false && $this->_db->getAffectedRows() === 1;
+            $workflowUpdated = $this->_db->query(sprintf(
+                'UPDATE nesp_candidate_workflow
+                 SET waiting_on_key = "Craig",
+                     summary = "Reminder delivery unconfirmed. Applicant kept active for manual follow-up.",
+                     next_action_label = "Review questionnaire invitation",
+                     due_at = NULL,
+                     date_modified = NOW()
+                 WHERE candidate_workflow_id = %s
+                   AND workflow_stage_id = %s',
+                $this->_db->makeQueryInteger($locked['candidate_workflow_id']),
+                $this->_db->makeQueryInteger($locked['workflow_stage_id'])
+            ));
+        }
+
+        if (!$questionnaireUpdated || !$activitySaved || !$auditSaved || $workflowUpdated === false || !$this->_db->commitTransaction())
+        {
+            $this->_db->rollbackTransaction();
+            return array('ok' => false, 'error' => 'The reminder review did not save safely. Nothing was changed.');
+        }
+        return array('ok' => true, 'decision' => $decision);
+    }
+
+    public function closeQuestionnaireForNonresponse($questionnaireID, $actorUserID, $reason, $nowUTC = '')
+    {
+        $reason = trim((string) $reason);
+        if (strlen($reason) < 10)
+        {
+            return array('ok' => false, 'error' => 'Enter a short reason before closing this review.');
+        }
+        if (!$this->_db->beginTransaction())
+        {
+            return array('ok' => false, 'error' => 'Unable to start the closure safely.');
+        }
+
+        $locked = $this->_db->getAssoc(sprintf(
+            'SELECT q.screening_questionnaire_id,
+                    cw.candidate_workflow_id,
+                    cw.workflow_stage_id
+             FROM nesp_screening_questionnaire q
+             INNER JOIN candidate c ON c.candidate_id = q.candidate_id AND c.is_active = 1
+             INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id AND jo.status = "Active"
+             INNER JOIN nesp_candidate_workflow cw
+                ON cw.candidate_id = q.candidate_id AND cw.joborder_id = q.joborder_id
+             INNER JOIN nesp_workflow_stage ws
+                ON ws.workflow_stage_id = cw.workflow_stage_id
+               AND ws.stage_key = "applicant_clarification_requested"
+             WHERE q.screening_questionnaire_id = %s
+               AND q.status_key IN ("waiting", "expired")
+               AND q.submitted_at IS NULL
+               AND q.started_at IS NULL
+             FOR UPDATE',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        $context = empty($locked)
+            ? array()
+            : $this->getQuestionnaireCloseReviewContext((int) $questionnaireID, $nowUTC);
+        if (empty($context))
+        {
+            $this->_db->rollbackTransaction();
+            return array('ok' => false, 'error' => 'This questionnaire is not due for a human-confirmed no-response closure.');
+        }
+
+        $notSelectedStage = $this->_db->getAssoc(sprintf(
+            'SELECT workflow_stage_id
+             FROM nesp_workflow_stage
+             WHERE stage_key = %s
+             LIMIT 1',
+            $this->_db->makeQueryString('not_selected')
+        ));
+        if (empty($notSelectedStage))
+        {
+            $this->_db->rollbackTransaction();
+            return array('ok' => false, 'error' => 'The closure stage is unavailable. Nothing was changed.');
+        }
+
+        $questionnaireUpdated = $this->_db->query(sprintf(
+            'UPDATE nesp_screening_questionnaire
+             SET status_key = "revoked",
+                 token_revoked_at = UTC_TIMESTAMP(),
+                 active_candidate_job_key = NULL,
+                 date_modified = NOW()
+             WHERE screening_questionnaire_id = %s
+               AND status_key IN ("waiting", "expired")
+               AND submitted_at IS NULL
+               AND started_at IS NULL',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        $questionnaireChanged = $questionnaireUpdated !== false && $this->_db->getAffectedRows() === 1;
+        $workflowUpdated = $this->_db->query(sprintf(
+            'UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = %s,
+                 waiting_on_key = "Craig",
+                 summary = "Human-confirmed closure after no questionnaire response.",
+                 next_action_label = "Open record",
+                 date_modified = NOW()
+             WHERE candidate_workflow_id = %s
+               AND workflow_stage_id = %s',
+            $this->_db->makeQueryInteger($notSelectedStage['workflow_stage_id']),
+            $this->_db->makeQueryInteger($locked['candidate_workflow_id']),
+            $this->_db->makeQueryInteger($locked['workflow_stage_id'])
+        ));
+        $workflowChanged = $workflowUpdated !== false && $this->_db->getAffectedRows() === 1;
+        $stageAuditSaved = $this->logAuditEvent(
+            $actorUserID,
+            'candidate_workflow_stage_changed',
+            'candidate_workflow',
+            (int) $locked['candidate_workflow_id'],
+            array(
+                'candidate_id' => (int) $context['candidate_id'],
+                'joborder_id' => (int) $context['joborder_id'],
+                'stage_key' => 'not_selected'
+            )
+        );
+        $closureAuditSaved = $this->logAuditEvent(
+                $actorUserID,
+                'screening_questionnaire_nonresponse_closed_by_human',
+                'screening_questionnaire',
+                (int) $questionnaireID,
+                array(
+                    'candidate_id' => (int) $context['candidate_id'],
+                    'joborder_id' => (int) $context['joborder_id'],
+                    'reason' => $reason,
+                    'automatic_decision' => false
+                )
+            );
+        if (!$questionnaireChanged || !$workflowChanged || !$stageAuditSaved || !$closureAuditSaved)
+        {
+            $this->_db->rollbackTransaction();
+            return array('ok' => false, 'error' => 'The closure did not save safely. Nothing was changed.');
+        }
+
+        if (!$this->_db->commitTransaction())
+        {
+            $this->_db->rollbackTransaction();
+            return array('ok' => false, 'error' => 'The closure did not finish safely.');
+        }
+        return array('ok' => true);
+    }
+
+    private function normalizeQuestionnaireReminderNow($nowUTC)
+    {
+        try
+        {
+            $zone = new DateTimeZone('UTC');
+            $now = trim((string) $nowUTC) === ''
+                ? new DateTimeImmutable('now', $zone)
+                : new DateTimeImmutable((string) $nowUTC, $zone);
+            return $now->format('Y-m-d H:i:s');
+        }
+        catch (Exception $exception)
+        {
+            return '';
         }
     }
 
@@ -8328,23 +9064,46 @@ class NESPWorkflow
                     q.candidate_id,
                     q.joborder_id,
                     CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
+                    c.is_active AS candidate_is_active,
                     jo.title AS role_title,
+                    jo.status AS job_status,
+                    ws.stage_key AS workflow_stage_key,
                     q.status_key,
                     q.question_set_key,
                     q.token_expires_at,
                     q.token_revoked_at,
                     q.link_created_at,
                     q.invitation_copied_at,
+                    q.auto_email_sent_at,
                     q.started_at,
                     q.submitted_at,
                     q.review_status_key,
                     q.reviewer_profile_id,
                     ip.display_name AS reviewer_name,
+                    (SELECT MAX(reminder_activity.date_created)
+                     FROM nesp_screening_questionnaire_activity reminder_activity
+                     WHERE reminder_activity.screening_questionnaire_id = q.screening_questionnaire_id
+                       AND reminder_activity.activity_key = "reminder_email_attempt_started") AS reminder_email_attempted_at,
+                    (SELECT MAX(reminder_activity.date_created)
+                     FROM nesp_screening_questionnaire_activity reminder_activity
+                     WHERE reminder_activity.screening_questionnaire_id = q.screening_questionnaire_id
+                       AND reminder_activity.activity_key = "reminder_email_sent") AS reminder_email_sent_at,
+                    (SELECT MAX(reminder_activity.date_created)
+                     FROM nesp_screening_questionnaire_activity reminder_activity
+                     WHERE reminder_activity.screening_questionnaire_id = q.screening_questionnaire_id
+                       AND reminder_activity.activity_key = "reminder_email_failed") AS reminder_email_failed_at,
+                    (SELECT MAX(reminder_activity.date_created)
+                     FROM nesp_screening_questionnaire_activity reminder_activity
+                     WHERE reminder_activity.screening_questionnaire_id = q.screening_questionnaire_id
+                       AND reminder_activity.activity_key = "reminder_email_review_kept_active") AS reminder_email_kept_active_at,
                     q.date_created,
                     q.date_modified
                  FROM nesp_screening_questionnaire q
                  INNER JOIN candidate c ON c.candidate_id = q.candidate_id
                  INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id
+                 LEFT JOIN nesp_candidate_workflow cw
+                    ON cw.candidate_id = q.candidate_id AND cw.joborder_id = q.joborder_id
+                 LEFT JOIN nesp_workflow_stage ws ON ws.workflow_stage_id = cw.workflow_stage_id
                  LEFT JOIN nesp_interviewer_profile ip ON ip.interviewer_profile_id = q.reviewer_profile_id
                  ORDER BY q.date_modified DESC, q.screening_questionnaire_id DESC
                  LIMIT %s',
@@ -8360,6 +9119,8 @@ class NESPWorkflow
         $queues = array(
             'ready' => array(),
             'waiting' => array(),
+            'reminder_review' => array(),
+            'close_review_due' => array(),
             'completed' => array(),
             'human_follow_up' => array(),
             'revoked_expired' => array()
@@ -8370,7 +9131,15 @@ class NESPWorkflow
             {
                 $queues['ready'][] = $row;
             }
-            if ($row['status_key'] === 'waiting' || $row['status_key'] === 'in_progress')
+            if (!empty($row['reminder_review_required']))
+            {
+                $queues['reminder_review'][] = $row;
+            }
+            elseif (!empty($row['close_review_due']))
+            {
+                $queues['close_review_due'][] = $row;
+            }
+            elseif ($row['status_key'] === 'waiting' || $row['status_key'] === 'in_progress')
             {
                 $queues['waiting'][] = $row;
             }
@@ -8382,7 +9151,10 @@ class NESPWorkflow
             {
                 $queues['human_follow_up'][] = $row;
             }
-            if ($row['status_key'] === 'revoked' || $row['status_key'] === 'expired')
+            if ($row['status_key'] === 'revoked'
+                || ($row['status_key'] === 'expired'
+                    && empty($row['close_review_due'])
+                    && empty($row['reminder_review_required'])))
             {
                 $queues['revoked_expired'][] = $row;
             }
@@ -8400,7 +9172,10 @@ class NESPWorkflow
                     c.last_name,
                     CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
                     c.email1,
+                    c.is_active AS candidate_is_active,
                     jo.title AS role_title,
+                    jo.status AS job_status,
+                    ws.stage_key AS workflow_stage_key,
                     reviewer_profile.display_name AS reviewer_name,
                     CASE
                         WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
@@ -8425,6 +9200,9 @@ class NESPWorkflow
                  FROM nesp_screening_questionnaire q
                  INNER JOIN candidate c ON c.candidate_id = q.candidate_id
                  INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id
+                 LEFT JOIN nesp_candidate_workflow cw
+                    ON cw.candidate_id = q.candidate_id AND cw.joborder_id = q.joborder_id
+                 LEFT JOIN nesp_workflow_stage ws ON ws.workflow_stage_id = cw.workflow_stage_id
                  LEFT JOIN nesp_interviewer_profile reviewer_profile ON reviewer_profile.interviewer_profile_id = q.reviewer_profile_id
                  ' . $this->canonicalBookingOwnerJoinSQL('q.candidate_id', 'q.joborder_id') . '
                  WHERE q.screening_questionnaire_id = %s
@@ -10017,6 +10795,65 @@ class NESPWorkflow
         }
         $labels = self::getQuestionnaireStatusLabels();
         $row['status_label'] = isset($labels[$row['status_key']]) ? $labels[$row['status_key']] : $row['status_key'];
+        $timing = self::getQuestionnaireReminderTiming(
+            isset($row['auto_email_sent_at']) ? $row['auto_email_sent_at'] : '',
+            isset($row['reminder_email_sent_at']) ? $row['reminder_email_sent_at'] : ''
+        );
+        $hasWorkflowState = array_key_exists('candidate_is_active', $row)
+            && array_key_exists('job_status', $row)
+            && array_key_exists('workflow_stage_key', $row);
+        $reminderWorkflowActive = !$hasWorkflowState || (
+            (int) $row['candidate_is_active'] === 1
+            && $row['job_status'] === 'Active'
+            && $row['workflow_stage_key'] === 'applicant_clarification_requested'
+        );
+        $row['reminder_due'] = $reminderWorkflowActive
+            && $row['status_key'] === 'waiting'
+            && empty($row['started_at'])
+            && empty($row['submitted_at'])
+            && !empty($timing['reminder_due'])
+            && empty($row['reminder_email_attempted_at']);
+        $row['close_review_due'] = $reminderWorkflowActive
+            && in_array($row['status_key'], array('waiting', 'expired'), true)
+            && empty($row['started_at'])
+            && empty($row['submitted_at'])
+            && !empty($timing['close_review_due']);
+        $row['reminder_review_required'] = $reminderWorkflowActive
+            && in_array($row['status_key'], array('waiting', 'expired'), true)
+            && empty($row['started_at'])
+            && empty($row['submitted_at'])
+            && !empty($row['reminder_email_attempted_at'])
+            && empty($row['reminder_email_sent_at'])
+            && empty($row['reminder_email_failed_at'])
+            && empty($row['reminder_email_kept_active_at']);
+        if (!empty($row['close_review_due']))
+        {
+            $row['reminder_status_label'] = 'Close review due';
+        }
+        elseif (!empty($row['reminder_email_sent_at']))
+        {
+            $row['reminder_status_label'] = 'Reminder sent';
+        }
+        elseif (!empty($row['reminder_email_failed_at']))
+        {
+            $row['reminder_status_label'] = 'Reminder failed - review needed';
+        }
+        elseif (!empty($row['reminder_email_kept_active_at']))
+        {
+            $row['reminder_status_label'] = 'Kept active after delivery review';
+        }
+        elseif (!empty($row['reminder_email_attempted_at']))
+        {
+            $row['reminder_status_label'] = 'Reminder status needs review';
+        }
+        elseif (!empty($row['reminder_due']))
+        {
+            $row['reminder_status_label'] = 'Reminder due';
+        }
+        else
+        {
+            $row['reminder_status_label'] = 'Not due';
+        }
         $set = self::getQuestionnaireSetForRole(isset($row['role_title']) ? $row['role_title'] : '');
         if (empty($row['question_set_key']))
         {
@@ -10113,7 +10950,7 @@ class NESPWorkflow
         {
             $metadataJSON = '{}';
         }
-        $this->_db->query(
+        return $this->_db->query(
             sprintf(
                 'INSERT INTO nesp_screening_questionnaire_activity
                     (screening_questionnaire_id, token_hash, activity_key, ip_hash, user_agent_hash, metadata_json, date_created)
@@ -10126,7 +10963,7 @@ class NESPWorkflow
                 $this->_db->makeQueryString(hash('sha256', isset($_SERVER['HTTP_USER_AGENT']) ? substr($_SERVER['HTTP_USER_AGENT'], 0, 255) : '')),
                 $this->_db->makeQueryString($metadataJSON)
             )
-        );
+        ) !== false;
     }
 
     private function publicRequestIPHash()

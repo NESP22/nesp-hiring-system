@@ -6,6 +6,62 @@ use DatabaseConnection;
 
 class DatabaseConnectionTest extends DatabaseTestCase
 {
+    function testFailedCommitKeepsTransactionOpenForRollback()
+    {
+        $db = new class extends DatabaseConnection {
+            public $failCommit = true;
+            public $failRollback = false;
+
+            public function __construct()
+            {
+                $this->setInTransaction(false);
+            }
+
+            public function query($query, $ignoreErrors = false)
+            {
+                if ($query === 'COMMIT' && $this->failCommit)
+                {
+                    return false;
+                }
+                if ($query === 'ROLLBACK' && $this->failRollback)
+                {
+                    return false;
+                }
+                return true;
+            }
+        };
+
+        $this->assertTrue($db->beginTransaction());
+        $this->assertFalse($db->commitTransaction());
+        $this->assertTrue($db->rollbackTransaction());
+    }
+
+    function testFailedRollbackKeepsTransactionOpenForRetry()
+    {
+        $db = new class extends DatabaseConnection {
+            public $failRollback = true;
+
+            public function __construct()
+            {
+                $this->setInTransaction(false);
+            }
+
+            public function query($query, $ignoreErrors = false)
+            {
+                if ($query === 'ROLLBACK' && $this->failRollback)
+                {
+                    return false;
+                }
+                return true;
+            }
+        };
+
+        $this->assertTrue($db->beginTransaction());
+        $this->assertFalse($db->rollbackTransaction());
+        $db->failRollback = false;
+        $this->assertTrue($db->rollbackTransaction());
+    }
+
     function testMakeQueryString()
     {
         $db = DatabaseConnection::getInstance();
@@ -343,6 +399,22 @@ class DatabaseConnectionTest extends DatabaseTestCase
             (int) $secondInsertId,
             'Second insert should return auto-increment ID 2.'
         );
+    }
+
+    function testTransactionMethodsReportSuccessfulDatabaseOperations()
+    {
+        $db = DatabaseConnection::getInstance();
+
+        $this->assertTrue($db->beginTransaction());
+        $this->assertNotFalse($db->query('INSERT INTO installtest (id) VALUES (501)'));
+        $this->assertTrue($db->commitTransaction());
+
+        $this->assertTrue($db->beginTransaction());
+        $this->assertNotFalse($db->query('INSERT INTO installtest (id) VALUES (502)'));
+        $this->assertTrue($db->rollbackTransaction());
+
+        $row = $db->getAssoc('SELECT COUNT(*) AS totalRows FROM installtest WHERE id IN (501, 502)');
+        $this->assertSame('1', $row['totalRows']);
     }
 
 }
