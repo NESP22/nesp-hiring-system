@@ -2415,6 +2415,11 @@ class NESPWorkflow
             isset($mailer['fromAddress']) ? $mailer['fromAddress'] : ''
         );
 
+        return self::getApplicantEmailDeliveryStatusForReadiness($enabled, $ready);
+    }
+
+    public static function getApplicantEmailDeliveryStatusForReadiness($enabled, $ready)
+    {
         if (!$enabled)
         {
             return array(

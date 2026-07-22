@@ -113,6 +113,20 @@ class NESPWorkflowTest extends TestCase
         $this->assertTrue(NESPWorkflow::isApplicantEmailFeatureExplicitlyEnabled('1'));
     }
 
+    public function testApplicantQuestionnaireEmailDeliveryStatusAlwaysIncludesExplanation()
+    {
+        $disabled = NESPWorkflow::getApplicantEmailDeliveryStatusForReadiness(false, false);
+        $notConfigured = NESPWorkflow::getApplicantEmailDeliveryStatusForReadiness(true, false);
+        $enabled = NESPWorkflow::getApplicantEmailDeliveryStatusForReadiness(true, true);
+
+        $this->assertSame('disabled', $disabled['status_key']);
+        $this->assertStringContainsString('no automatic questionnaire email', $disabled['message']);
+        $this->assertSame('not_configured', $notConfigured['status_key']);
+        $this->assertStringContainsString('No email will be sent.', $notConfigured['message']);
+        $this->assertSame('enabled', $enabled['status_key']);
+        $this->assertStringContainsString('Automatic delivery is active', $enabled['message']);
+    }
+
     public function testZoomParticipantLinkValidationRejectsHostLinks()
     {
         $valid = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?pwd=abc');
