@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       html2text \
       libfreetype6-dev \
       libjpeg62-turbo-dev \
+      libcurl4-openssl-dev \
       libldap2-dev \
       libmcrypt-dev \
       libonig-dev \
@@ -24,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       unrtf \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-configure ldap \
-    && docker-php-ext-install -j"$(nproc)" gd ldap mbstring mysqli soap zip \
+    && docker-php-ext-install -j"$(nproc)" curl gd ldap mbstring mysqli soap zip \
     && curl --retry 6 --retry-all-errors --retry-delay 5 --connect-timeout 15 --max-time 120 -fsSL \
          -o /tmp/mcrypt-1.0.9.tgz \
          https://pecl.php.net/get/mcrypt-1.0.9.tgz \

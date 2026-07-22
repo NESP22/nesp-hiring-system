@@ -222,9 +222,12 @@ if (file_put_contents($path, $config, LOCK_EX) === false) {
     exit(1);
 }
 
-// The legacy mailer reads its From address from the persistent settings table,
-// not config.php. There is no supported From-name field in this OpenCATS mailer.
-updateMailerSettings($mailEnabled, $fromAddress);
+// The web service owns persistent mail settings. Cron containers may load the
+// same mail constants for questionnaire delivery, but must never rewrite the
+// shared settings table during startup.
+if (mailEnv('NESP_SERVICE_ROLE') !== 'cron') {
+    updateMailerSettings($mailEnabled, $fromAddress);
+}
 PHP
 
 # Password-protect the full site during installation and private testing.

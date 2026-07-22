@@ -37,6 +37,8 @@ class NESPWorkflow
             array('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0),
             array('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0),
             array('NESP_APPLICANT_EMAIL_ENABLED', 'Applicant Questionnaire Email', self::APPLICANT_EMAIL_FEATURE_DESCRIPTION, 0),
+            array('NESP_BOARD_INTAKE_SCHEDULER_ENABLED', 'Board Inbox Scheduler', 'Twice-daily reconciliation and manual-review queue for approved-label job-board notifications.', 0),
+            array('NESP_BOARD_INTAKE_AUTO_IMPORT_ENABLED', 'Board Inbox Auto-Import', 'Allows signed notifications carrying the configured approved-rule proof to create candidates in Needs Craig. Shared-label recovery remains manual review.', 0),
             NESPGoogleCalendarFreeBusy::getDefaultFeatureFlag()
         );
     }
@@ -55,6 +57,8 @@ class NESPWorkflow
             'NESP_STAFFING_FORECAST_ENABLED',
             'NESP_STAFFING_DRIVE_IMPORT_ENABLED',
             'NESP_APPLICANT_EMAIL_ENABLED',
+            'NESP_BOARD_INTAKE_SCHEDULER_ENABLED',
+            'NESP_BOARD_INTAKE_AUTO_IMPORT_ENABLED',
             NESPGoogleCalendarFreeBusy::FEATURE_FLAG
         );
     }
@@ -2315,7 +2319,7 @@ class NESPWorkflow
             FROM
                 nesp_feature_flag
             WHERE
-                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_INTERVIEWER_AVAILABILITY_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_INTERVIEWER_ZOOM_LINKS_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED", "NESP_APPLICANT_EMAIL_ENABLED", "NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED")
+                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_INTERVIEWER_AVAILABILITY_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_INTERVIEWER_ZOOM_LINKS_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED", "NESP_APPLICANT_EMAIL_ENABLED", "NESP_BOARD_INTAKE_SCHEDULER_ENABLED", "NESP_BOARD_INTAKE_AUTO_IMPORT_ENABLED", "NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED")
             ORDER BY
                 display_name'
         );
@@ -2439,6 +2443,16 @@ class NESPWorkflow
             isset($mailer['configured']) ? $mailer['configured'] : '0',
             isset($mailer['fromAddress']) ? $mailer['fromAddress'] : ''
         );
+        // The cron container has its own runtime secrets. Shared database
+        // settings can say the web sender is configured even when the cron
+        // service has no SMTP credentials. Fail before reserving an attempt.
+        if ($enabled && !self::isApplicantEmailRuntimeReady(
+            getenv('NESP_SERVICE_ROLE'),
+            getenv('OPENCATS_MAIL_ENABLED')
+        ))
+        {
+            $ready = false;
+        }
 
         if (!$enabled)
         {
@@ -2459,6 +2473,12 @@ class NESPWorkflow
             'status_key' => 'enabled',
             'message' => 'Questionnaire email delivery is active. New eligible applicants receive one role-specific secure questionnaire email, and an administrator can send one to an existing reviewed applicant. No reminders or other applicant messages are sent.'
         );
+    }
+
+    public static function isApplicantEmailRuntimeReady($serviceRole, $mailEnabled)
+    {
+        return trim((string) $serviceRole) !== 'cron'
+            || trim((string) $mailEnabled) === '1';
     }
 
     public function getGoogleCalendarConfigurationStatus()
@@ -3698,6 +3718,34 @@ class NESPWorkflow
      */
     public function prepareQuestionnaireForHumanReview($candidateID, $jobOrderID, $actorUserID, $summary, $stageKey = 'new')
     {
+        $prepared = $this->prepareQuestionnaireRecordForHumanReview(
+            $candidateID,
+            $jobOrderID,
+            $actorUserID,
+            $summary,
+            $stageKey
+        );
+        if (empty($prepared['ok']))
+        {
+            return false;
+        }
+
+        return $this->deliverPreparedQuestionnaireForHumanReview(
+            $prepared,
+            $candidateID,
+            $jobOrderID,
+            $actorUserID,
+            $summary
+        );
+    }
+
+    /**
+     * Create the questionnaire and route the applicant without contacting them.
+     * When called inside an existing transaction, these records commit or roll
+     * back with the candidate import. Delivery is always a separate step.
+     */
+    public function prepareQuestionnaireRecordForHumanReview($candidateID, $jobOrderID, $actorUserID, $summary, $stageKey = 'new')
+    {
         // requestQuestionnaire() stores only a hash and reuses an active row.
         // Delivery is intentionally deferred until after the candidate workflow
         // row has been written. A sender must never email a link for an applicant
@@ -3709,7 +3757,7 @@ class NESPWorkflow
             $questionnaireStatus = isset($questionnaireDetail['status_key']) ? $questionnaireDetail['status_key'] : '';
             if (in_array($questionnaireStatus, array('waiting', 'in_progress')))
             {
-                return $this->setCandidateWorkflowStage(
+                $routed = $this->setCandidateWorkflowStage(
                     $candidateID,
                     $jobOrderID,
                     'applicant_clarification_requested',
@@ -3717,6 +3765,13 @@ class NESPWorkflow
                     $summary . ' The secure questionnaire link was shared and is awaiting completion.',
                     'Wait for questionnaire',
                     $actorUserID
+                );
+                return array(
+                    'ok' => $routed,
+                    'questionnaire_id' => (int) $questionnaire['questionnaire_id'],
+                    'one_time_invitation_copy' => '',
+                    'link_generated' => false,
+                    'already_waiting' => true
                 );
             }
 
@@ -3730,34 +3785,21 @@ class NESPWorkflow
                 $actorUserID
             ))
             {
-                return false;
+                return array('ok' => false);
             }
 
-            // The candidate, job link, workflow row, and questionnaire are now
-            // durable. Only a newly generated link may attempt the opted-in send.
-            $delivery = $this->sendNewQuestionnaireEmail(
-                $questionnaireDetail,
-                isset($questionnaire['one_time_invitation_copy']) ? $questionnaire['one_time_invitation_copy'] : '',
-                !empty($questionnaire['link_generated']),
-                $actorUserID
+            return array(
+                'ok' => true,
+                'questionnaire_id' => (int) $questionnaire['questionnaire_id'],
+                'one_time_invitation_copy' => isset($questionnaire['one_time_invitation_copy'])
+                    ? $questionnaire['one_time_invitation_copy']
+                    : '',
+                'link_generated' => !empty($questionnaire['link_generated']),
+                'already_waiting' => false
             );
-            if (!empty($delivery['sent']))
-            {
-                return $this->setCandidateWorkflowStage(
-                    $candidateID,
-                    $jobOrderID,
-                    'applicant_clarification_requested',
-                    'Applicant',
-                    $summary . ' The secure questionnaire link was emailed and is awaiting completion.',
-                    'Wait for questionnaire',
-                    $actorUserID
-                );
-            }
-
-            return true;
         }
 
-        return $this->setCandidateWorkflowStage(
+        $routed = $this->setCandidateWorkflowStage(
             $candidateID,
             $jobOrderID,
             $stageKey,
@@ -3766,6 +3808,62 @@ class NESPWorkflow
             'Review application',
             $actorUserID
         );
+        return array(
+            'ok' => $routed,
+            'questionnaire_id' => 0,
+            'one_time_invitation_copy' => '',
+            'link_generated' => false,
+            'already_waiting' => false
+        );
+    }
+
+    /**
+     * Attempt the separately approved email only after the caller's database
+     * transaction has committed. A failed or disabled sender leaves the secure
+     * questionnaire visible for the existing manual-send workflow.
+     */
+    public function deliverPreparedQuestionnaireForHumanReview(
+        $prepared,
+        $candidateID,
+        $jobOrderID,
+        $actorUserID,
+        $summary
+    ) {
+        if (empty($prepared['ok']))
+        {
+            return false;
+        }
+        if (empty($prepared['questionnaire_id']) || !empty($prepared['already_waiting']))
+        {
+            return true;
+        }
+
+        $questionnaireDetail = $this->getQuestionnaireDetail((int) $prepared['questionnaire_id']);
+        if (empty($questionnaireDetail))
+        {
+            return false;
+        }
+
+        $delivery = $this->sendNewQuestionnaireEmail(
+            $questionnaireDetail,
+            isset($prepared['one_time_invitation_copy']) ? $prepared['one_time_invitation_copy'] : '',
+            !empty($prepared['link_generated']),
+            $actorUserID
+        );
+        if (!empty($delivery['sent']))
+        {
+            return $this->setCandidateWorkflowStage(
+                $candidateID,
+                $jobOrderID,
+                'applicant_clarification_requested',
+                'Applicant',
+                $summary . ' The secure questionnaire link was emailed and is awaiting completion.',
+                'Wait for questionnaire',
+                $actorUserID
+            );
+        }
+
+        return true;
     }
 
     public function sendQuestionnaireEmailForReview($questionnaireID, $actorUserID, $preparedQuestionnaire = array(), $reviewedEmailFingerprint = '', $reviewedQuestionnaireFingerprint = '')

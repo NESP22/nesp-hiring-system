@@ -5,7 +5,60 @@
     <?php TemplateUtility::printQuickSearch(); ?>
     <div id="contents">
         <h2>Bring Board Applicants Into NESP</h2>
-        <p>Use this page for Indeed, LinkedIn, MassHire, and other board exports. Nothing is public and no applicant is contacted from this page.</p>
+        <p>Use this page for Indeed, LinkedIn, MassHire, and other board applications. Staging or reviewing an application does not contact anyone. A completed automatic import sends one role-specific questionnaire only when the separately approved applicant-email feature is already enabled.</p>
+        <div class="noticeBox">
+            <h3>Automatic board inbox check</h3>
+            <?php if (!empty($this->schedulerStatus['feature_enabled']) && !empty($this->schedulerStatus['provider_configured'])): ?>
+                <p><strong>On.</strong> The approved Missive inbox is reconciled at approximately <strong>8:00 AM</strong> and <strong>6:00 PM Eastern</strong>.</p>
+                <?php if (!empty($this->schedulerStatus['auto_import_enabled'])): ?>
+                    <p><strong>Auto-import is separately approved.</strong> Only notifications with the signed configured-rule proof can enter <strong>Needs Craig</strong> exactly once. Label-only recovery, incomplete, or uncertain notifications stop in <strong>Needs attention</strong>.</p>
+                <?php else: ?>
+                    <p><strong>Auto-import is off.</strong> Recovered and signed notifications stop in <strong>Needs attention</strong> for manual review; this check creates no candidates and contacts no applicants.</p>
+                <?php endif; ?>
+                <p>Next check: <strong><?php $this->_($this->schedulerStatus['next_check_at']); ?></strong></p>
+                <?php if (!empty($this->schedulerStatus['last_run'])): ?>
+                    <p>Last check: <?php $this->_($this->schedulerStatus['last_run']['completed_at']); ?> &mdash;
+                        <?php echo (int) $this->schedulerStatus['last_run']['imported_count']; ?> imported,
+                        <?php echo (int) $this->schedulerStatus['last_run']['review_count']; ?> needs attention,
+                        <?php echo (int) $this->schedulerStatus['last_run']['duplicate_count']; ?> duplicates,
+                        <?php echo (int) $this->schedulerStatus['last_run']['failed_count']; ?> errors.
+                    </p>
+                    <?php if (!empty($this->schedulerStatus['last_run']['error_code'])): ?>
+                        <p><strong>Last check warning:</strong> <?php $this->_(str_replace('_', ' ', $this->schedulerStatus['last_run']['error_code'])); ?>.</p>
+                    <?php endif; ?>
+                <?php endif; ?>
+                <p>Waiting now: <?php echo (int) $this->schedulerStatus['pending_count']; ?> queued,
+                    <?php echo (int) $this->schedulerStatus['review_count']; ?> needs attention,
+                    <?php echo (int) $this->schedulerStatus['error_count']; ?> errors.</p>
+                <form action="<?php echo CATSUtility::getIndexName(); ?>?m=boardintake&amp;a=runScheduledIntakeNow" method="post" onsubmit="return confirm('Reconcile the approved inbox and process queued notifications now? Current feature approvals will be enforced.');">
+                    <input type="hidden" name="csrfToken" value="<?php echo Template::escapeAttr($_SESSION['CATS']->getCSRFToken()); ?>" />
+                    <button type="submit">Process New Applications Now</button>
+                </form>
+                <?php if (!empty($this->schedulerAttentionItems)): ?>
+                    <h4>Needs attention</h4>
+                    <table class="searchTable" width="100%">
+                        <tr><th>Received</th><th>Board</th><th>Role</th><th>Reason</th></tr>
+                        <?php foreach ($this->schedulerAttentionItems as $item): ?>
+                            <tr>
+                                <td><?php $this->_($item['provider_received_at']); ?></td>
+                                <td><?php $this->_($item['platform_key'] !== '' ? ucfirst($item['platform_key']) : 'Unmatched'); ?></td>
+                                <td><?php echo !empty($item['joborder_id']) ? (int) $item['joborder_id'] : '-'; ?></td>
+                                <td><?php $this->_(str_replace('_', ' ', $item['error_code'])); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </table>
+                    <p>Use the matching message in Missive to supply missing details through the manual intake form below. The scheduler never guesses.</p>
+                <?php endif; ?>
+            <?php elseif (!empty($this->schedulerStatus['feature_enabled'])): ?>
+                <p><strong>Setup required.</strong> The scheduler is enabled, but the approved inbox connection is incomplete. No automatic import will run.</p>
+            <?php else: ?>
+                <p><strong>Off.</strong> Manual CSV and notification review remain available below. Enabling the scheduler requires the approved inbox connection and a separate production activation.</p>
+            <?php endif; ?>
+            <p>This service does not scrape or sign in to job boards. A sender address or shared label alone never authorizes automatic candidate creation.</p>
+        </div>
+        <?php if (!empty($this->schedulerRunCompleted)): ?>
+            <p><strong>Inbox check <?php echo $_GET['schedulerRun'] === 'degraded' ? 'completed with a warning' : 'completed'; ?>:</strong> <?php echo (int) $_GET['imported']; ?> imported, <?php echo (int) $_GET['review']; ?> needs attention, <?php echo (int) $_GET['duplicates']; ?> duplicates, <?php echo (int) $_GET['failed']; ?> errors.</p>
+        <?php endif; ?>
         <div class="noticeBox">
             <strong>Three simple steps:</strong>
             <ol>

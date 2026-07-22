@@ -91,7 +91,91 @@ services:
         sync: false
       - key: OPENCATS_MAIL_FROM_ADDRESS
         sync: false
+      - key: NESP_BOARD_INTAKE_MISSIVE_API_TOKEN
+        sync: false
+      - key: NESP_BOARD_INTAKE_MISSIVE_WEBHOOK_SECRET
+        sync: false
+      - key: NESP_BOARD_INTAKE_MISSIVE_RULE_ID
+        sync: false
+      - key: NESP_BOARD_INTAKE_MISSIVE_SHARED_LABEL_ID
+        sync: false
+      - key: NESP_BOARD_INTAKE_SYSTEM_USER_ID
+        sync: false
     disk:
       name: nesp-hiring-files
       mountPath: /var/data
       sizeGB: 10
+
+  # Render schedules in UTC. These four candidate hours cover 08:00 and 18:00
+  # America/New_York in both standard and daylight time; the CLI applies the
+  # matching local-hour gate before processing.
+  - type: cron
+    name: nesp-board-intake-scheduler
+    runtime: docker
+    plan: starter
+    region: virginia
+    branch: master
+    autoDeployTrigger: checksPass
+    schedule: "0 12,13,22,23 * * *"
+    dockerfilePath: ./docker/render/Dockerfile
+    dockerContext: .
+    dockerCommand: php scripts/nesp_board_intake_scheduler.php
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_TIMEZONE
+        value: America/New_York
+      - key: APP_BASIC_AUTH
+        value: 0
+      - key: NESP_SERVICE_ROLE
+        value: cron
+      - key: DB_NAME
+        value: cats
+      - key: DB_USER
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          envVarKey: MARIADB_USER
+      - key: DB_PASSWORD
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          envVarKey: MARIADB_PASSWORD
+      - key: DB_HOST
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          property: host
+      - key: DB_PORT
+        fromService:
+          name: nesp-hiring-db
+          type: pserv
+          property: port
+      - key: NESP_BOARD_INTAKE_MISSIVE_API_TOKEN
+        sync: false
+      - key: NESP_BOARD_INTAKE_MISSIVE_WEBHOOK_SECRET
+        sync: false
+      - key: NESP_BOARD_INTAKE_MISSIVE_RULE_ID
+        sync: false
+      - key: NESP_BOARD_INTAKE_MISSIVE_SHARED_LABEL_ID
+        sync: false
+      - key: NESP_BOARD_INTAKE_SYSTEM_USER_ID
+        sync: false
+      - key: OPENCATS_MAIL_ENABLED
+        sync: false
+      - key: OPENCATS_MAIL_MAILER
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_HOST
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_PORT
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_AUTH
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_USER
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_PASS
+        sync: false
+      - key: OPENCATS_MAIL_SMTP_SECURE
+        sync: false
+      - key: OPENCATS_MAIL_FROM_ADDRESS
+        sync: false

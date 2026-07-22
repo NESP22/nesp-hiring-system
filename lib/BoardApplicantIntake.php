@@ -452,15 +452,15 @@ class BoardApplicantIntake
 
             $duplicateID = 0;
             $duplicateStatus = isset($batchDuplicateIDs[(int) $row['intake_row_id']]) ? 'batch_duplicate' : 'none';
-            if ($duplicateStatus === 'none')
-            {
-                $duplicateID = $this->findDuplicateCandidate($row);
-                $duplicateStatus = $duplicateID ? 'candidate_duplicate' : 'none';
-            }
             if ($duplicateStatus === 'none' && $row['external_id'] !== null && $row['external_id'] !== '')
             {
                 $duplicateID = $this->findImportedIdempotencyCandidate($row['platform_key'], $row['external_id']);
                 $duplicateStatus = $duplicateID ? 'already_imported' : 'none';
+            }
+            if ($duplicateStatus === 'none')
+            {
+                $duplicateID = $this->findDuplicateCandidate($row);
+                $duplicateStatus = $duplicateID ? 'candidate_duplicate' : 'none';
             }
 
             $sql = sprintf(
@@ -469,7 +469,10 @@ class BoardApplicantIntake
                 $duplicateID ? $this->_db->makeQueryInteger($duplicateID) : 'NULL',
                 $this->_db->makeQueryInteger($row['intake_row_id'])
             );
-            $this->_db->query($sql);
+            if (!$this->_db->query($sql))
+            {
+                throw new RuntimeException('Duplicate review could not be completed safely.');
+            }
         }
     }
 
@@ -585,6 +588,7 @@ class BoardApplicantIntake
 
         $transactionStarted = $this->_db->beginTransaction();
         $imported = 0;
+        $questionnairesToPrepare = array();
         try
         {
             foreach ($rows as $row)
@@ -675,22 +679,31 @@ class BoardApplicantIntake
                     throw new RuntimeException('Workflow routing failed.');
                 }
 
-                // An approved board record with contact details can be prepared
-                // for Craig's review immediately. The link is always hashed;
-                // delivery occurs only when the separately confirmed applicant
-                // email feature and configured sender are both active.
+                // Create the role-specific questionnaire inside this transaction
+                // so a committed candidate can never be left without the next
+                // step. Actual delivery remains deferred until after commit.
                 if (!$contactDetailsRequired)
                 {
-                    if (!$workflow->prepareQuestionnaireForHumanReview(
+                    $questionnaireSummary = 'New approved ' . $batch['platform_key']
+                        . ' application. A role-specific secure questionnaire link is ready for human sending.';
+                    $preparedQuestionnaire = $workflow->prepareQuestionnaireRecordForHumanReview(
                         $candidateID,
                         (int) $batch['joborder_id'],
                         $actorUserID,
-                        'New approved ' . $batch['platform_key'] . ' application. A role-specific secure questionnaire link is ready for human sending.',
+                        $questionnaireSummary,
                         'new'
-                    ))
+                    );
+                    if (empty($preparedQuestionnaire['ok'])
+                        || empty($preparedQuestionnaire['questionnaire_id']))
                     {
-                        throw new RuntimeException('Questionnaire review routing failed.');
+                        throw new RuntimeException('Questionnaire preparation failed.');
                     }
+                    $questionnairesToPrepare[] = array(
+                        'candidate_id' => $candidateID,
+                        'joborder_id' => (int) $batch['joborder_id'],
+                        'summary' => $questionnaireSummary,
+                        'prepared' => $preparedQuestionnaire
+                    );
                 }
 
                 $sql = sprintf(
@@ -733,7 +746,78 @@ class BoardApplicantIntake
             throw $e;
         }
 
-        return array('imported' => $imported, 'skipped' => 0, 'failed' => 0);
+        $questionnaireFailures = 0;
+        foreach ($questionnairesToPrepare as $target)
+        {
+            $workflow = new NESPWorkflow($this->_db);
+            if (!$workflow->deliverPreparedQuestionnaireForHumanReview(
+                $target['prepared'],
+                $target['candidate_id'],
+                $target['joborder_id'],
+                $actorUserID,
+                $target['summary']
+            ))
+            {
+                $questionnaireFailures++;
+                $workflow->logAuditEvent(
+                    $actorUserID,
+                    'board_intake_questionnaire_prepare_failed',
+                    'candidate_workflow',
+                    $target['candidate_id'],
+                    array('joborder_id' => $target['joborder_id'], 'batch_id' => (int) $batchID)
+                );
+            }
+        }
+
+        return array(
+            'imported' => $imported,
+            'skipped' => 0,
+            'failed' => 0,
+            'questionnaire_failed' => $questionnaireFailures
+        );
+    }
+
+    public function closeDuplicateBatch($batchID)
+    {
+        $batchID = (int) $batchID;
+        if ($batchID <= 0)
+        {
+            throw new RuntimeException('Choose a valid duplicate intake batch.');
+        }
+
+        $transactionStarted = $this->_db->beginTransaction();
+        try
+        {
+            $rowSQL = sprintf(
+                'UPDATE nesp_board_intake_row
+                    SET review_status = "duplicate", first_name = "", last_name = "",
+                        email = "", phone = "", pii_redacted_at = NOW(), date_modified = NOW()
+                 WHERE batch_id = %s AND duplicate_status <> "none"',
+                $this->_db->makeQueryInteger($batchID)
+            );
+            $batchSQL = sprintf(
+                'UPDATE nesp_board_intake_batch
+                    SET status_key = "duplicate", imported_count = 0, date_modified = NOW()
+                 WHERE batch_id = %s AND status_key = "review"',
+                $this->_db->makeQueryInteger($batchID)
+            );
+            if (!$this->_db->query($rowSQL) || !$this->_db->query($batchSQL))
+            {
+                throw new RuntimeException('Duplicate intake cleanup failed.');
+            }
+            if ($transactionStarted)
+            {
+                $this->_db->commitTransaction();
+            }
+        }
+        catch (Throwable $e)
+        {
+            if ($transactionStarted)
+            {
+                $this->_db->rollbackTransaction();
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -1125,7 +1209,7 @@ class BoardApplicantIntake
              ORDER BY candidate_id ASC LIMIT 1',
             $emailClause, $first, $last
         );
-        return (int) $this->_db->getColumn($sql, 0, 0);
+        return (int) $this->scalarColumn($this->_db->getColumn($sql, 0, 0));
     }
 
     private function findImportedIdempotencyCandidate($platform, $externalID)
@@ -1135,6 +1219,15 @@ class BoardApplicantIntake
             $this->_db->makeQueryString($platform),
             $this->_db->makeQueryString($externalID)
         );
-        return (int) $this->_db->getColumn($sql, 0, 0);
+        return (int) $this->scalarColumn($this->_db->getColumn($sql, 0, 0));
+    }
+
+    private function scalarColumn($value)
+    {
+        if (is_array($value))
+        {
+            return array_key_exists(0, $value) ? $value[0] : null;
+        }
+        return $value;
     }
 }

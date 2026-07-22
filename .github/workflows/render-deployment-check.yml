@@ -75,11 +75,14 @@ jobs:
 
           database = services.get('nesp-hiring-db')
           web = services.get('nesp-hiring-web')
+          board_scheduler = services.get('nesp-board-intake-scheduler')
 
           if database is None:
               errors.append('Missing nesp-hiring-db service.')
           if web is None:
               errors.append('Missing nesp-hiring-web service.')
+          if board_scheduler is None:
+              errors.append('Missing nesp-board-intake-scheduler service.')
 
           if database:
               if database.get('type') != 'pserv':
@@ -130,6 +133,16 @@ jobs:
                   if env.get(key, {}).get('sync') is not False:
                       errors.append(f'{key} must be a Render-only secret placeholder.')
 
+              for key in (
+                  'NESP_BOARD_INTAKE_MISSIVE_API_TOKEN',
+                  'NESP_BOARD_INTAKE_MISSIVE_WEBHOOK_SECRET',
+                  'NESP_BOARD_INTAKE_MISSIVE_RULE_ID',
+                  'NESP_BOARD_INTAKE_MISSIVE_SHARED_LABEL_ID',
+                  'NESP_BOARD_INTAKE_SYSTEM_USER_ID',
+              ):
+                  if env.get(key, {}).get('sync') is not False:
+                      errors.append(f'{key} must be a Render-only web secret placeholder.')
+
               db_host = env.get('DB_HOST', {}).get('fromService', {})
               if db_host.get('name') != 'nesp-hiring-db' or db_host.get('property') != 'host':
                   errors.append('Web service must use the private MariaDB host reference.')
@@ -137,6 +150,43 @@ jobs:
               db_password = env.get('DB_PASSWORD', {}).get('fromService', {})
               if db_password.get('envVarKey') != 'MARIADB_PASSWORD':
                   errors.append('Web service must receive the generated MariaDB password by reference.')
+
+          if board_scheduler:
+              if board_scheduler.get('type') != 'cron' or board_scheduler.get('runtime') != 'docker':
+                  errors.append('Board intake scheduler must be a Docker cron service.')
+              if board_scheduler.get('schedule') != '0 12,13,22,23 * * *':
+                  errors.append('Board intake scheduler must cover 08:00 and 18:00 New York across DST.')
+              if board_scheduler.get('dockerCommand') != 'php scripts/nesp_board_intake_scheduler.php':
+                  errors.append('Unexpected board intake scheduler command.')
+              if board_scheduler.get('autoDeployTrigger') != 'checksPass':
+                  errors.append('Board intake scheduler deploys must wait for passing CI checks.')
+
+              cron_items = [item for item in board_scheduler.get('envVars', []) if item.get('key')]
+              cron_keys = [item['key'] for item in cron_items]
+              duplicate_keys = sorted({key for key in cron_keys if cron_keys.count(key) > 1})
+              if duplicate_keys:
+                  errors.append(f'Duplicate board scheduler environment keys: {duplicate_keys}')
+              cron_env = {item['key']: item for item in cron_items}
+              if cron_env.get('NESP_SERVICE_ROLE', {}).get('value') != 'cron':
+                  errors.append('Board intake scheduler must use the isolated cron service role.')
+              if cron_env.get('APP_TIMEZONE', {}).get('value') != 'America/New_York':
+                  errors.append('Board intake scheduler must use the New York timezone gate.')
+              for key in (
+                  'NESP_BOARD_INTAKE_MISSIVE_API_TOKEN',
+                  'NESP_BOARD_INTAKE_MISSIVE_WEBHOOK_SECRET',
+                  'NESP_BOARD_INTAKE_MISSIVE_RULE_ID',
+                  'NESP_BOARD_INTAKE_MISSIVE_SHARED_LABEL_ID',
+                  'NESP_BOARD_INTAKE_SYSTEM_USER_ID',
+              ):
+                  if cron_env.get(key, {}).get('sync') is not False:
+                      errors.append(f'{key} must be a Render-only scheduler secret placeholder.')
+
+              cron_db_host = cron_env.get('DB_HOST', {}).get('fromService', {})
+              if cron_db_host.get('name') != 'nesp-hiring-db' or cron_db_host.get('property') != 'host':
+                  errors.append('Board intake scheduler must use the private MariaDB host reference.')
+              cron_db_password = cron_env.get('DB_PASSWORD', {}).get('fromService', {})
+              if cron_db_password.get('envVarKey') != 'MARIADB_PASSWORD':
+                  errors.append('Board intake scheduler must receive the generated MariaDB password by reference.')
 
           if errors:
               raise SystemExit('\n'.join(f'ERROR: {error}' for error in errors))
