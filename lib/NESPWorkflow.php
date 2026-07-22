@@ -4668,6 +4668,11 @@ class NESPWorkflow
             return false;
         }
 
+        if ($this->interviewerProfileEmailIsInUse($email))
+        {
+            return array('ok' => false, 'error' => 'An interviewer profile already uses this email address. Edit that profile instead of creating another one.');
+        }
+
         $columns = array('user_id', 'display_name', 'email', 'role_key', 'is_active', 'can_view_resume', 'can_add_notes', 'can_submit_scorecard', 'date_created', 'date_modified');
         $values = array(
             'NULL',
@@ -4790,7 +4795,12 @@ class NESPWorkflow
         }
         if (isset($settings['email']))
         {
-            $sets[] = 'email = ' . $this->_db->makeQueryString(trim($settings['email']));
+            $requestedEmail = trim($settings['email']);
+            if ($this->interviewerProfileEmailIsInUse($requestedEmail, $interviewerProfileID))
+            {
+                return array('ok' => false, 'error' => 'An interviewer profile already uses this email address.');
+            }
+            $sets[] = 'email = ' . $this->_db->makeQueryString($requestedEmail);
         }
         if (isset($settings['role_key']))
         {
@@ -4835,6 +4845,41 @@ class NESPWorkflow
             'ok' => true,
             'temporary_login_message' => isset($accountResult['temporary_login_message']) ? $accountResult['temporary_login_message'] : ''
         );
+    }
+
+    /**
+     * Profiles are human-managed records. Prevent an accidental second profile
+     * for the same mailbox while leaving blank legacy/profile-only addresses alone.
+     */
+    private function interviewerProfileEmailIsInUse($email, $excludeProfileID = 0)
+    {
+        $email = self::normalizeInterviewerProfileEmail($email);
+        if ($email === '')
+        {
+            return false;
+        }
+
+        $sql = sprintf(
+            'SELECT interviewer_profile_id
+             FROM nesp_interviewer_profile
+             WHERE LOWER(TRIM(email)) = %s',
+            $this->_db->makeQueryString($email)
+        );
+        if ((int) $excludeProfileID > 0)
+        {
+            $sql .= sprintf(
+                ' AND interviewer_profile_id <> %s',
+                $this->_db->makeQueryInteger($excludeProfileID)
+            );
+        }
+        $sql .= ' LIMIT 1';
+
+        return !empty($this->_db->getAssoc($sql));
+    }
+
+    public static function normalizeInterviewerProfileEmail($email)
+    {
+        return strtolower(trim((string) $email));
     }
 
     public function interviewerLoginLifecycleAction($interviewerProfileID, $action, $temporaryPassword, $actorUserID)
