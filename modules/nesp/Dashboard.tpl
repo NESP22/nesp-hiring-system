@@ -254,6 +254,15 @@
                                                     <?php if (!empty($card['assigned_interviewer_names'])): ?>
                                                         <p><strong>Assigned to:</strong> <?php $this->_($card['assigned_interviewer_names']); ?></p>
                                                         <p class="nesp-muted">This candidate is already visible to the assigned interviewer. Add another only when you intentionally want shared access.</p>
+                                                        <?php if ($card['questionnaire_review_status_key'] === 'complete' && !empty($card['booking_owner_grant_id']) && !empty($card['questionnaire_review_completed_at']) && !empty($card['koalendar_booking_url'])): ?>
+                                                            <div class="nesp-success">
+                                                                <strong>Reviewed next action</strong>
+                                                                <p>Use <?php $this->_($card['booking_interviewer_name']); ?>'s approved Koalendar page so the applicant can choose an interview time.</p>
+                                                                <a class="nesp-primary-action" href="<?php echo(htmlspecialchars($card['koalendar_booking_url'], ENT_QUOTES, 'UTF-8')); ?>" target="_blank" rel="noopener noreferrer">Open Booking Page</a>
+                                                            </div>
+                                                        <?php elseif ($card['questionnaire_review_status_key'] === 'complete' && !empty($card['booking_owner_grant_id']) && !empty($card['questionnaire_review_completed_at'])): ?>
+                                                            <div class="nesp-empty">Questionnaire review is complete. Add this interviewer's public Koalendar booking page in Interviewer Settings before sharing a scheduling link.</div>
+                                                        <?php endif; ?>
                                                     <?php else: ?>
                                                         <p class="nesp-muted">Choose an active interviewer approved for this role.</p>
                                                     <?php endif; ?>

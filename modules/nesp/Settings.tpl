@@ -189,6 +189,11 @@
                             <span class="nesp-help-text">Optional. Participant join link only; host/start URLs are rejected.</span>
                         </label>
                         <label>
+                            Public Koalendar booking page
+                            <input type="url" name="koalendarBookingURL" placeholder="https://koalendar.com/e/your-page" />
+                            <span class="nesp-help-text">Interviewer-specific public booking page. No link is sent automatically.</span>
+                        </label>
+                        <label>
                             Buffer minutes
                             <input type="text" name="bufferMinutes" value="15" />
                         </label>
@@ -436,6 +441,11 @@
                             Default Zoom participant link
                             <input type="url" name="defaultZoomJoinURL" value="<?php echo(htmlspecialchars($profile['default_zoom_join_url'], ENT_QUOTES, 'UTF-8')); ?>" placeholder="https://*.zoom.us/j/..." />
                             <span class="nesp-help-text">Optional. Used as a scheduling default only when NESP_INTERVIEWER_ZOOM_LINKS_ENABLED is enabled. Participant join link only; host/start URLs are rejected.</span>
+                        </label>
+                        <label>
+                            Public Koalendar booking page
+                            <input type="url" name="koalendarBookingURL" value="<?php echo(htmlspecialchars($profile['koalendar_booking_url'], ENT_QUOTES, 'UTF-8')); ?>" placeholder="https://koalendar.com/e/your-page" />
+                            <span class="nesp-help-text">Interviewer-specific public booking page. The reviewed handoff appears only after questionnaire review and assignment; nothing is sent automatically.</span>
                         </label>
                         <label>
                             Buffer minutes

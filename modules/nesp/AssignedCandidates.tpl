@@ -41,6 +41,13 @@
                             <dt>Scorecard</dt>
                             <dd><?php $this->_($candidate['scorecard_status_key'] ? $candidate['scorecard_status_key'] : 'Not started'); ?></dd>
                         </dl>
+                        <?php if (isset($candidate['questionnaire_review_status_key']) && $candidate['questionnaire_review_status_key'] === 'complete' && !empty($candidate['questionnaire_review_completed_at']) && !empty($candidate['koalendar_booking_url'])): ?>
+                            <div class="nesp-success">
+                                <strong>Booking handoff ready</strong>
+                                <p>The questionnaire is reviewed. Use the assigned interviewer's approved Koalendar page.</p>
+                                <a class="nesp-secondary-action" href="<?php echo(htmlspecialchars($candidate['koalendar_booking_url'], ENT_QUOTES, 'UTF-8')); ?>" target="_blank" rel="noopener noreferrer">Open Booking Page</a>
+                            </div>
+                        <?php endif; ?>
                         <?php if (!empty($this->isAdminAssignmentOverview)): ?>
                             <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=candidates&amp;a=show&amp;candidateID=<?php echo((int) $candidate['candidate_id']); ?>">Open candidate</a>
                         <?php else: ?>

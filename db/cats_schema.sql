@@ -1198,6 +1198,7 @@ CREATE TABLE `nesp_interviewer_profile` (
   `last_login_at` DATETIME,
   `email_warning` TEXT COLLATE utf8mb4_unicode_ci,
   `default_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `koalendar_booking_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
   PRIMARY KEY (`interviewer_profile_id`),

@@ -166,7 +166,8 @@ class NESPWorkflow
             'createCandidateGrant',
             'assignInterviewer',
             'revokeCandidateGrant',
-            'updateInterviewerZoomLink'
+            'updateInterviewerZoomLink',
+            'updateInterviewerKoalendarLink'
         )))
         {
             return 'NESP_INTERVIEWER_POOL_ENABLED';
@@ -347,6 +348,39 @@ class NESPWorkflow
         }
 
         return strtolower($parts['host']) . $path;
+    }
+
+    public static function validateKoalendarBookingURL($url)
+    {
+        $url = trim((string) $url);
+        if ($url === '')
+        {
+            return array('ok' => true, 'url' => '');
+        }
+        if (strlen($url) > 1000)
+        {
+            return array('ok' => false, 'error' => 'The Koalendar booking link is too long.');
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false || empty($parts['scheme']) || strtolower($parts['scheme']) !== 'https' || empty($parts['host']))
+        {
+            return array('ok' => false, 'error' => 'Use a secure https Koalendar booking link.');
+        }
+
+        $host = strtolower($parts['host']);
+        if (!in_array($host, array('koalendar.com', 'www.koalendar.com'), true))
+        {
+            return array('ok' => false, 'error' => 'Use an official Koalendar booking-page link.');
+        }
+
+        $path = isset($parts['path']) ? trim($parts['path']) : '';
+        if (!preg_match('#^/e/[A-Za-z0-9][A-Za-z0-9_-]*(?:/)?$#', $path))
+        {
+            return array('ok' => false, 'error' => 'Copy the public Koalendar booking page link. It should look like https://koalendar.com/e/your-page.');
+        }
+
+        return array('ok' => true, 'url' => $url);
     }
 
     public static function isInterviewerZoomLinksEnabledByDefault()
@@ -2219,6 +2253,7 @@ class NESPWorkflow
             array('nesp_candidate_workflow', 'next_action_label'),
             array('nesp_interviewer_profile', 'can_add_notes'),
             array('nesp_interviewer_profile', 'default_zoom_join_url'),
+            array('nesp_interviewer_profile', 'koalendar_booking_url'),
             array('nesp_interview', 'manual_zoom_join_url'),
             array('nesp_interview', 'timezone'),
             array('nesp_interview', 'invitation_status_key'),
@@ -2942,6 +2977,33 @@ class NESPWorkflow
         return $queues;
     }
 
+    private function canonicalBookingOwnerJoinSQL($candidateIDExpression, $jobOrderIDExpression)
+    {
+        return '
+            LEFT JOIN nesp_screening_questionnaire booking_questionnaire
+                ON booking_questionnaire.screening_questionnaire_id = (
+                    SELECT MAX(current_questionnaire.screening_questionnaire_id)
+                    FROM nesp_screening_questionnaire current_questionnaire
+                    WHERE current_questionnaire.candidate_id = ' . $candidateIDExpression . '
+                      AND current_questionnaire.joborder_id = ' . $jobOrderIDExpression . '
+                )
+            LEFT JOIN nesp_interviewer_candidate_grant booking_owner_grant
+                ON booking_owner_grant.grant_id = (
+                    SELECT MAX(current_grant.grant_id)
+                    FROM nesp_interviewer_candidate_grant current_grant
+                    WHERE current_grant.candidate_id = ' . $candidateIDExpression . '
+                      AND current_grant.joborder_id = ' . $jobOrderIDExpression . '
+                      AND current_grant.interviewer_profile_id = booking_questionnaire.reviewer_profile_id
+                      AND current_grant.date_revoked IS NULL
+                )
+                AND booking_questionnaire.status_key = "completed"
+                AND booking_questionnaire.review_status_key = "complete"
+                AND booking_questionnaire.review_completed_at IS NOT NULL
+            LEFT JOIN nesp_interviewer_profile booking_owner_profile
+                ON booking_owner_profile.interviewer_profile_id = booking_owner_grant.interviewer_profile_id
+                AND booking_owner_profile.is_active = 1';
+    }
+
     public function getDashboardCandidateRows($limit)
     {
         $limit = max(1, min(250, (int) $limit));
@@ -2979,6 +3041,20 @@ class NESPWorkflow
                           AND assigned_grant.joborder_id = cw.joborder_id
                           AND assigned_grant.date_revoked IS NULL
                     ) AS assigned_interviewer_names,
+                    booking_owner_grant.grant_id AS booking_owner_grant_id,
+                    booking_owner_profile.interviewer_profile_id AS booking_interviewer_profile_id,
+                    booking_owner_profile.display_name AS booking_interviewer_name,
+                    booking_owner_profile.koalendar_booking_url,
+                    CASE
+                        WHEN booking_owner_grant.grant_id IS NOT NULL
+                        THEN booking_questionnaire.review_status_key
+                        ELSE NULL
+                    END AS questionnaire_review_status_key,
+                    CASE
+                        WHEN booking_owner_grant.grant_id IS NOT NULL
+                        THEN booking_questionnaire.review_completed_at
+                        ELSE NULL
+                    END AS questionnaire_review_completed_at,
                     sr.status_key AS scorecard_status_key,
                     sr.overall_recommendation
                 FROM
@@ -2989,6 +3065,7 @@ class NESPWorkflow
                     ON jo.joborder_id = cw.joborder_id
                 INNER JOIN nesp_workflow_stage ws
                     ON ws.workflow_stage_id = cw.workflow_stage_id
+                ' . $this->canonicalBookingOwnerJoinSQL('cw.candidate_id', 'cw.joborder_id') . '
                 LEFT JOIN nesp_interview i
                     ON i.interview_id = (
                         SELECT MAX(i2.interview_id)
@@ -3100,7 +3177,8 @@ class NESPWorkflow
             'private_admin_notes' => '""',
             'last_login_at' => 'NULL',
             'email_warning' => '""',
-            'default_zoom_join_url' => '""'
+            'default_zoom_join_url' => '""',
+            'koalendar_booking_url' => '""'
         );
 
         foreach ($optionalColumns as $column => $fallback)
@@ -5103,6 +5181,15 @@ class NESPWorkflow
             }
             $extraDefaults['default_zoom_join_url'] = $zoomValidation['url'];
         }
+        if ($this->isColumnInstalled('nesp_interviewer_profile', 'koalendar_booking_url'))
+        {
+            $bookingValidation = self::validateKoalendarBookingURL($extraDefaults['koalendar_booking_url']);
+            if (empty($bookingValidation['ok']))
+            {
+                return array('ok' => false, 'error' => $bookingValidation['error']);
+            }
+            $extraDefaults['koalendar_booking_url'] = $bookingValidation['url'];
+        }
         foreach ($extraDefaults as $column => $value)
         {
             if ($this->isColumnInstalled('nesp_interviewer_profile', $column))
@@ -5185,6 +5272,15 @@ class NESPWorkflow
                 return array('ok' => false, 'error' => $zoomValidation['error']);
             }
             $normalized['default_zoom_join_url'] = $zoomValidation['url'];
+        }
+        if ($this->isColumnInstalled('nesp_interviewer_profile', 'koalendar_booking_url'))
+        {
+            $bookingValidation = self::validateKoalendarBookingURL($normalized['koalendar_booking_url']);
+            if (empty($bookingValidation['ok']))
+            {
+                return array('ok' => false, 'error' => $bookingValidation['error']);
+            }
+            $normalized['koalendar_booking_url'] = $bookingValidation['url'];
         }
         $sets = array();
         foreach ($normalized as $column => $value)
@@ -5440,6 +5536,61 @@ class NESPWorkflow
         return array('ok' => true);
     }
 
+    public function updateInterviewerKoalendarBookingURL($interviewerProfileID, $bookingURL, $actorUserID)
+    {
+        $interviewerProfileID = (int) $interviewerProfileID;
+        $bookingURL = trim((string) $bookingURL);
+        if ($interviewerProfileID <= 0 || !$this->isColumnInstalled('nesp_interviewer_profile', 'koalendar_booking_url'))
+        {
+            return array('ok' => false, 'error' => 'Unable to update the interviewer Koalendar booking link.');
+        }
+
+        $profile = $this->_db->getAssoc(
+            sprintf(
+                'SELECT interviewer_profile_id, koalendar_booking_url
+                 FROM nesp_interviewer_profile
+                 WHERE interviewer_profile_id = %s
+                 LIMIT 1',
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+        if (empty($profile))
+        {
+            return array('ok' => false, 'error' => 'Interviewer profile not found.');
+        }
+
+        $validation = self::validateKoalendarBookingURL($bookingURL);
+        if (empty($validation['ok']))
+        {
+            return array('ok' => false, 'error' => $validation['error']);
+        }
+        $bookingURL = $validation['url'];
+
+        $this->_db->query(
+            sprintf(
+                'UPDATE nesp_interviewer_profile
+                 SET koalendar_booking_url = %s,
+                     date_modified = NOW()
+                 WHERE interviewer_profile_id = %s',
+                $this->_db->makeQueryString($bookingURL),
+                $this->_db->makeQueryInteger($interviewerProfileID)
+            )
+        );
+
+        $this->logAuditEvent(
+            $actorUserID,
+            'interviewer_koalendar_booking_link_updated',
+            'interviewer_profile',
+            $interviewerProfileID,
+            array(
+                'previously_configured' => trim((string) $profile['koalendar_booking_url']) !== '',
+                'configured' => $bookingURL !== ''
+            )
+        );
+
+        return array('ok' => true);
+    }
+
     public function createInterviewerAvailabilityOverride($interviewerProfileID, $overrideDate, $overrideTypeKey, $startTime, $endTime, $timezone, $privateReason, $actorUserID)
     {
         if (!$this->isTableInstalled('nesp_interviewer_availability_override'))
@@ -5521,6 +5672,11 @@ class NESPWorkflow
                     cg.grant_id,
                     cg.candidate_id,
                     cg.joborder_id,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_owner_profile.koalendar_booking_url
+                        ELSE ""
+                    END AS koalendar_booking_url,
                     CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
                     jo.title AS role_title,
                     ws.display_name AS stage_name,
@@ -5532,7 +5688,17 @@ class NESPWorkflow
                     i.scheduled_start,
                     i.scheduled_end,
                     i.status_key AS interview_status_key,
-                    sr.status_key AS scorecard_status_key
+                    sr.status_key AS scorecard_status_key,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_questionnaire.review_status_key
+                        ELSE NULL
+                    END AS questionnaire_review_status_key,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_questionnaire.review_completed_at
+                        ELSE NULL
+                    END AS questionnaire_review_completed_at
                 FROM
                     nesp_interviewer_profile ip
                 INNER JOIN nesp_interviewer_candidate_grant cg
@@ -5542,6 +5708,7 @@ class NESPWorkflow
                     ON c.candidate_id = cg.candidate_id
                 INNER JOIN joborder jo
                     ON jo.joborder_id = cg.joborder_id
+                ' . $this->canonicalBookingOwnerJoinSQL('cg.candidate_id', 'cg.joborder_id') . '
                 LEFT JOIN nesp_candidate_workflow cw
                     ON cw.candidate_id = cg.candidate_id
                     AND cw.joborder_id = cg.joborder_id
@@ -5583,6 +5750,11 @@ class NESPWorkflow
                 cg.candidate_id,
                 cg.joborder_id,
                 ip.display_name AS interviewer_name,
+                CASE
+                    WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                    THEN booking_owner_profile.koalendar_booking_url
+                    ELSE ""
+                END AS koalendar_booking_url,
                 CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
                 jo.title AS role_title,
                 ws.display_name AS stage_name,
@@ -5593,7 +5765,17 @@ class NESPWorkflow
                 i.scheduled_start,
                 i.scheduled_end,
                 i.status_key AS interview_status_key,
-                sr.status_key AS scorecard_status_key
+                sr.status_key AS scorecard_status_key,
+                CASE
+                    WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                    THEN booking_questionnaire.review_status_key
+                    ELSE NULL
+                END AS questionnaire_review_status_key,
+                CASE
+                    WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                    THEN booking_questionnaire.review_completed_at
+                    ELSE NULL
+                END AS questionnaire_review_completed_at
              FROM
                 nesp_interviewer_candidate_grant cg
              INNER JOIN nesp_interviewer_profile ip
@@ -5602,6 +5784,7 @@ class NESPWorkflow
                 ON c.candidate_id = cg.candidate_id
              INNER JOIN joborder jo
                 ON jo.joborder_id = cg.joborder_id
+             ' . $this->canonicalBookingOwnerJoinSQL('cg.candidate_id', 'cg.joborder_id') . '
              LEFT JOIN nesp_candidate_workflow cw
                 ON cw.candidate_id = cg.candidate_id
                 AND cw.joborder_id = cg.joborder_id
@@ -5651,6 +5834,11 @@ class NESPWorkflow
                     cg.can_add_notes,
                     cg.can_submit_scorecard,
                     ip.interviewer_profile_id,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_owner_profile.koalendar_booking_url
+                        ELSE ""
+                    END AS koalendar_booking_url,
                     CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
                     c.email1,
                     c.phone_cell,
@@ -5661,7 +5849,17 @@ class NESPWorkflow
                     ws.stage_key,
                     cw.summary,
                     cw.waiting_on_key,
-                    cw.date_modified AS last_activity
+                    cw.date_modified AS last_activity,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_questionnaire.review_status_key
+                        ELSE NULL
+                    END AS questionnaire_review_status_key,
+                    CASE
+                        WHEN booking_owner_profile.interviewer_profile_id = ip.interviewer_profile_id
+                        THEN booking_questionnaire.review_completed_at
+                        ELSE NULL
+                    END AS questionnaire_review_completed_at
                 FROM
                     nesp_interviewer_profile ip
                 INNER JOIN nesp_interviewer_candidate_grant cg
@@ -5671,6 +5869,7 @@ class NESPWorkflow
                     ON c.candidate_id = cg.candidate_id
                 INNER JOIN joborder jo
                     ON jo.joborder_id = cg.joborder_id
+                ' . $this->canonicalBookingOwnerJoinSQL('cg.candidate_id', 'cg.joborder_id') . '
                 LEFT JOIN nesp_candidate_workflow cw
                     ON cw.candidate_id = cg.candidate_id
                     AND cw.joborder_id = cg.joborder_id
@@ -8104,11 +8303,32 @@ class NESPWorkflow
                     CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
                     c.email1,
                     jo.title AS role_title,
-                    ip.display_name AS reviewer_name
+                    reviewer_profile.display_name AS reviewer_name,
+                    CASE
+                        WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
+                        THEN booking_owner_grant.grant_id
+                        ELSE NULL
+                    END AS booking_owner_grant_id,
+                    CASE
+                        WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
+                        THEN booking_owner_profile.interviewer_profile_id
+                        ELSE NULL
+                    END AS booking_owner_profile_id,
+                    CASE
+                        WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
+                        THEN booking_owner_profile.display_name
+                        ELSE NULL
+                    END AS booking_interviewer_name,
+                    CASE
+                        WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
+                        THEN booking_owner_profile.koalendar_booking_url
+                        ELSE ""
+                    END AS reviewer_koalendar_booking_url
                  FROM nesp_screening_questionnaire q
                  INNER JOIN candidate c ON c.candidate_id = q.candidate_id
                  INNER JOIN joborder jo ON jo.joborder_id = q.joborder_id
-                 LEFT JOIN nesp_interviewer_profile ip ON ip.interviewer_profile_id = q.reviewer_profile_id
+                 LEFT JOIN nesp_interviewer_profile reviewer_profile ON reviewer_profile.interviewer_profile_id = q.reviewer_profile_id
+                 ' . $this->canonicalBookingOwnerJoinSQL('q.candidate_id', 'q.joborder_id') . '
                  WHERE q.screening_questionnaire_id = %s
                  LIMIT 1',
                 $this->_db->makeQueryInteger($questionnaireID)
@@ -10252,6 +10472,12 @@ class NESPWorkflow
             'scheduled_end' => $row['scheduled_end'],
             'interviewer_name' => $row['interviewer_name'],
             'assigned_interviewer_names' => isset($row['assigned_interviewer_names']) ? trim($row['assigned_interviewer_names']) : '',
+            'booking_owner_grant_id' => isset($row['booking_owner_grant_id']) ? (int) $row['booking_owner_grant_id'] : 0,
+            'booking_interviewer_profile_id' => isset($row['booking_interviewer_profile_id']) ? (int) $row['booking_interviewer_profile_id'] : 0,
+            'booking_interviewer_name' => isset($row['booking_interviewer_name']) ? trim($row['booking_interviewer_name']) : '',
+            'koalendar_booking_url' => isset($row['koalendar_booking_url']) ? trim($row['koalendar_booking_url']) : '',
+            'questionnaire_review_status_key' => isset($row['questionnaire_review_status_key']) ? trim($row['questionnaire_review_status_key']) : '',
+            'questionnaire_review_completed_at' => isset($row['questionnaire_review_completed_at']) ? $row['questionnaire_review_completed_at'] : null,
             'interview_status_key' => $row['interview_status_key'],
             'interview_status_label' => isset($statusLabels[$row['interview_status_key']]) ? $statusLabels[$row['interview_status_key']] : $row['interview_status_key'],
             'invitation_status_key' => isset($row['invitation_status_key']) ? $row['invitation_status_key'] : '',
@@ -10842,7 +11068,8 @@ class NESPWorkflow
             'may_recommend' => isset($options['may_recommend']) && (int) $options['may_recommend'] === 0 ? 0 : 1,
             'private_admin_notes' => isset($options['private_admin_notes']) ? trim($options['private_admin_notes']) : '',
             'email_warning' => isset($options['email_warning']) ? trim($options['email_warning']) : '',
-            'default_zoom_join_url' => isset($options['default_zoom_join_url']) ? trim($options['default_zoom_join_url']) : ''
+            'default_zoom_join_url' => isset($options['default_zoom_join_url']) ? trim($options['default_zoom_join_url']) : '',
+            'koalendar_booking_url' => isset($options['koalendar_booking_url']) ? trim($options['koalendar_booking_url']) : ''
         );
     }
 
@@ -10878,6 +11105,10 @@ class NESPWorkflow
         if (isset($row['default_zoom_join_url']))
         {
             $safe['default_zoom_join_url_masked'] = self::maskZoomURLForAudit($row['default_zoom_join_url']);
+        }
+        if (isset($row['koalendar_booking_url']))
+        {
+            $safe['koalendar_booking_url_configured'] = trim((string) $row['koalendar_booking_url']) !== '';
         }
 
         return $safe;

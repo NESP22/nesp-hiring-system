@@ -160,6 +160,11 @@ class NESPUI extends UserInterface
                 $this->updateInterviewerZoomLink();
                 break;
 
+            case 'updateInterviewerKoalendarLink':
+                $this->requirePostCSRF();
+                $this->updateInterviewerKoalendarLink();
+                break;
+
             case 'createInterviewerAvailabilityOverride':
                 $this->requirePostCSRF();
                 $this->createInterviewerAvailabilityOverride();
@@ -653,6 +658,7 @@ class NESPUI extends UserInterface
             'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
             'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
             'default_zoom_join_url' => isset($_POST['defaultZoomJoinURL']) ? $_POST['defaultZoomJoinURL'] : '',
+            'koalendar_booking_url' => isset($_POST['koalendarBookingURL']) ? $_POST['koalendarBookingURL'] : '',
             'temporary_password' => isset($_POST['temporaryPassword']) ? $_POST['temporaryPassword'] : ''
         );
 
@@ -697,6 +703,7 @@ class NESPUI extends UserInterface
             'private_admin_notes' => isset($_POST['privateAdminNotes']) ? $_POST['privateAdminNotes'] : '',
             'email_warning' => isset($_POST['emailWarning']) ? $_POST['emailWarning'] : '',
             'default_zoom_join_url' => isset($_POST['defaultZoomJoinURL']) ? $_POST['defaultZoomJoinURL'] : '',
+            'koalendar_booking_url' => isset($_POST['koalendarBookingURL']) ? $_POST['koalendarBookingURL'] : '',
             'approved_joborder_ids' => isset($_POST['approvedJobOrderIDs']) && is_array($_POST['approvedJobOrderIDs']) ? $_POST['approvedJobOrderIDs'] : array()
         );
 
@@ -819,6 +826,28 @@ class NESPUI extends UserInterface
         if (empty($result['ok']))
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to update Zoom participant link.');
+        }
+
+        CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');
+    }
+
+    private function updateInterviewerKoalendarLink()
+    {
+        $interviewerProfileID = isset($_POST['interviewerProfileID']) ? (int) $_POST['interviewerProfileID'] : 0;
+        if ($this->getUserAccessLevel('settings.administration') < ACCESS_LEVEL_SA)
+        {
+            $profile = $this->_workflow->getInterviewerProfileForUser($this->_userID);
+            if (empty($profile) || (int) $profile['interviewer_profile_id'] !== $interviewerProfileID)
+            {
+                CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You can edit only your own Koalendar booking link.');
+            }
+        }
+
+        $bookingURL = isset($_POST['koalendarBookingURL']) ? $_POST['koalendarBookingURL'] : '';
+        $result = $this->_workflow->updateInterviewerKoalendarBookingURL($interviewerProfileID, $bookingURL, $this->_userID);
+        if (empty($result['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, isset($result['error']) ? $result['error'] : 'Unable to update Koalendar booking link.');
         }
 
         CATSUtility::transferRelativeURI($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA ? 'm=nesp&a=settings' : 'm=nesp&a=myAvailability');

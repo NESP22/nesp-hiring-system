@@ -2111,6 +2111,7 @@ class CATSSchema
                   `can_add_notes` TINYINT(1) NOT NULL DEFAULT '1',
                   `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1',
                   `default_zoom_join_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+                  `koalendar_booking_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
                   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
                   PRIMARY KEY (`interviewer_profile_id`),
@@ -3226,6 +3227,10 @@ class CATSSchema
                     ADD COLUMN IF NOT EXISTS `participant_link_open_count` INT(11) NOT NULL DEFAULT \'0\' AFTER `participant_link_last_opened_at`,
                     ADD COLUMN IF NOT EXISTS `participant_link_revoked_at` DATETIME NULL AFTER `participant_link_open_count`,
                     ADD KEY IF NOT EXISTS `IDX_nesp_interview_participant_token` (`participant_link_token_hash`);
+            ',
+            '399' => '
+                ALTER TABLE `nesp_interviewer_profile`
+                    ADD COLUMN IF NOT EXISTS `koalendar_booking_url` VARCHAR(1000) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT \'\' AFTER `default_zoom_join_url`;
             ',
 
         );
