@@ -2432,7 +2432,7 @@ class NESPWorkflow
 
         return array(
             'status_key' => 'enabled',
-            'Automatic delivery is active: new applicants with a valid email and linked job receive one role-specific secure questionnaire email. No reminders or other applicant messages are sent.'
+            'message' => 'Automatic delivery is active: new applicants with a valid email and linked job receive one role-specific secure questionnaire email. No reminders or other applicant messages are sent.'
         );
     }
 
