@@ -3204,7 +3204,7 @@ class CATSSchema
                 INSERT INTO nesp_feature_flag
                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
                 VALUES
-                    (\'NESP_APPLICANT_EMAIL_ENABLED\', \'Applicant Questionnaire Email\', \'Sends one secure role-specific questionnaire email only after a new applicant has a valid email and linked job.\', 0, 1, NOW(), NOW())
+                    (\'NESP_APPLICANT_EMAIL_ENABLED\', \'Applicant Questionnaire Email\', \'When deliberately enabled with a configured sender, automatically sends one secure role-specific questionnaire email after a new applicant has a valid email and linked job.\', 0, 1, NOW(), NOW())
                 ON DUPLICATE KEY UPDATE
                     display_name = VALUES(display_name),
                     description = VALUES(description),

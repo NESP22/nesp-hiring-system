@@ -67,6 +67,26 @@ class NESPWorkflowTest extends TestCase
         $this->assertTrue(NESPWorkflow::isApplicantEmailDeliveryReady(true, '1', 'hiring@nesportsphoto.com'));
     }
 
+    public function testApplicantQuestionnaireEmailFirstEnablementRequiresExplicitConfirmation()
+    {
+        $this->assertTrue(NESPWorkflow::canEnableApplicantEmail(false, false, ''));
+        $this->assertFalse(NESPWorkflow::canEnableApplicantEmail(false, true, ''));
+        $this->assertFalse(NESPWorkflow::canEnableApplicantEmail(false, true, 'yes'));
+        $this->assertTrue(NESPWorkflow::canEnableApplicantEmail(false, true, 'confirm'));
+        $this->assertTrue(NESPWorkflow::canEnableApplicantEmail(true, true, ''));
+    }
+
+    public function testApplicantQuestionnaireEmailDescriptionStatesAutomaticBehavior()
+    {
+        $description = NESPWorkflow::getFeatureFlagDescription(
+            'NESP_APPLICANT_EMAIL_ENABLED',
+            'stale description'
+        );
+
+        $this->assertStringContainsString('automatically sends one secure role-specific questionnaire email', $description);
+        $this->assertSame('stored description', NESPWorkflow::getFeatureFlagDescription('NESP_WORKFLOW_ENABLED', 'stored description'));
+    }
+
     public function testZoomParticipantLinkValidationRejectsHostLinks()
     {
         $valid = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?pwd=abc');
