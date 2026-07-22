@@ -197,7 +197,8 @@ class BoardApplicantIntakeTest extends TestCase
 
         $this->assertStringContainsString('routeCareerPortalApplicationToNeedsCraig', $careers);
         $this->assertStringContainsString('ensureCandidateWorkflowRow', $intake);
-        $this->assertStringContainsString('prepareQuestionnaireForHumanReview', $intake);
+        $this->assertStringContainsString('prepareQuestionnaireRecordForHumanReview', $intake);
+        $this->assertStringContainsString('deliverPreparedQuestionnaireForHumanReview', $intake);
         $this->assertStringContainsString('ready for human sending', $intake);
         $this->assertStringContainsString('Contact details required before any questionnaire or outreach.', $intake);
     }

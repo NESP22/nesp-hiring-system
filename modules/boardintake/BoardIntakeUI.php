@@ -1,11 +1,13 @@
 <?php
 
 include_once(LEGACY_ROOT . '/lib/BoardApplicantIntake.php');
+include_once(LEGACY_ROOT . '/lib/NESPBoardIntakeScheduler.php');
 include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 
 class BoardIntakeUI extends UserInterface
 {
     private $_intake;
+    private $_scheduler;
 
     public function __construct()
     {
@@ -18,6 +20,7 @@ class BoardIntakeUI extends UserInterface
             'Review Intake' => CATSUtility::getIndexName() . '?m=boardintake*al=' . ACCESS_LEVEL_SA
         );
         $this->_intake = new BoardApplicantIntake();
+        $this->_scheduler = new NESPBoardIntakeScheduler();
         $this->_schema = array(
             1 => '
                 CREATE TABLE IF NOT EXISTS nesp_board_intake_batch (
@@ -121,6 +124,10 @@ class BoardIntakeUI extends UserInterface
             case 'repairImportedJobOrderLinks':
                 $this->requirePostCSRF();
                 $this->repairImportedJobOrderLinks();
+                break;
+            case 'runScheduledIntakeNow':
+                $this->requirePostCSRF();
+                $this->runScheduledIntakeNow();
                 break;
             default:
                 $this->review();
@@ -313,6 +320,33 @@ class BoardIntakeUI extends UserInterface
         );
     }
 
+    private function runScheduledIntakeNow()
+    {
+        $result = $this->_scheduler->runScheduledSlot($this->_userID, null, true);
+        if (!is_array($result) || !in_array($result['status'], array('completed', 'degraded'), true))
+        {
+            $reason = is_array($result) && isset($result['reason'])
+                ? str_replace('_', ' ', $result['reason'])
+                : (is_array($result) && isset($result['status'])
+                    ? str_replace('_', ' ', $result['status'])
+                    : 'the check did not complete');
+            $this->showError('Automatic board inbox check stopped safely: ' . $reason . '.');
+            return;
+        }
+
+        $counts = isset($result['counts']) && is_array($result['counts'])
+            ? $result['counts']
+            : array();
+        CATSUtility::transferRelativeURI(sprintf(
+            'm=boardintake&schedulerRun=%s&imported=%d&review=%d&duplicates=%d&failed=%d',
+            rawurlencode($result['status']),
+            isset($counts['imported']) ? (int) $counts['imported'] : 0,
+            isset($counts['review']) ? (int) $counts['review'] : 0,
+            isset($counts['duplicates']) ? (int) $counts['duplicates'] : 0,
+            isset($counts['failed']) ? (int) $counts['failed'] : 0
+        ));
+    }
+
     private function assignView($batch, $rows, $bulkImportSummary = null)
     {
         $this->_template->assign('active', $this);
@@ -324,6 +358,12 @@ class BoardIntakeUI extends UserInterface
         $this->_template->assign('jobOrders', BoardApplicantIntake::allowedJobOrders());
         $this->_template->assign('bulkImportSummary', $bulkImportSummary);
         $this->_template->assign('resumeUploaded', isset($_GET['resumeUploaded']) && $_GET['resumeUploaded'] === '1');
+        $this->_template->assign('schedulerStatus', $this->_scheduler->getStatusSummary());
+        $this->_template->assign('schedulerAttentionItems', $this->_scheduler->getAttentionItems());
+        $this->_template->assign(
+            'schedulerRunCompleted',
+            isset($_GET['schedulerRun']) && in_array($_GET['schedulerRun'], array('completed', 'degraded'), true)
+        );
         $this->_template->display('./modules/boardintake/Review.tpl');
     }
 
@@ -340,6 +380,9 @@ class BoardIntakeUI extends UserInterface
         $this->_template->assign('jobOrders', BoardApplicantIntake::allowedJobOrders());
         $this->_template->assign('bulkImportSummary', null);
         $this->_template->assign('resumeUploaded', false);
+        $this->_template->assign('schedulerStatus', $this->_scheduler->getStatusSummary());
+        $this->_template->assign('schedulerAttentionItems', $this->_scheduler->getAttentionItems());
+        $this->_template->assign('schedulerRunCompleted', false);
         $this->_template->display('./modules/boardintake/Review.tpl');
     }
 

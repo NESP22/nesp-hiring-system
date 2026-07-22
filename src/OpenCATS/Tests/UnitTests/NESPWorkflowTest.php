@@ -15,7 +15,7 @@ class NESPWorkflowTest extends TestCase
         $flags = NESPWorkflow::getDefaultFeatureFlags();
         $keys = array();
 
-        $this->assertCount(12, $flags);
+        $this->assertCount(14, $flags);
         foreach ($flags as $flag)
         {
             $keys[] = $flag[0];
@@ -65,6 +65,15 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse(NESPWorkflow::isApplicantEmailDeliveryReady(true, '0', 'hiring@nesportsphoto.com'));
         $this->assertFalse(NESPWorkflow::isApplicantEmailDeliveryReady(true, '1', 'not-an-email'));
         $this->assertTrue(NESPWorkflow::isApplicantEmailDeliveryReady(true, '1', 'hiring@nesportsphoto.com'));
+    }
+
+    public function testCronQuestionnaireEmailRequiresItsOwnEnabledMailRuntime()
+    {
+        $this->assertFalse(NESPWorkflow::isApplicantEmailRuntimeReady('cron', ''));
+        $this->assertFalse(NESPWorkflow::isApplicantEmailRuntimeReady('cron', '0'));
+        $this->assertTrue(NESPWorkflow::isApplicantEmailRuntimeReady('cron', '1'));
+        $this->assertTrue(NESPWorkflow::isApplicantEmailRuntimeReady('', ''));
+        $this->assertTrue(NESPWorkflow::isApplicantEmailRuntimeReady('web', '0'));
     }
 
     public function testApplicantQuestionnaireEmailFirstEnablementRequiresExplicitConfirmation()

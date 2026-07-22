@@ -222,9 +222,12 @@ if (file_put_contents($path, $config, LOCK_EX) === false) {
     exit(1);
 }
 
-// The legacy mailer reads its From address from the persistent settings table,
-// not config.php. There is no supported From-name field in this OpenCATS mailer.
-updateMailerSettings($mailEnabled, $fromAddress);
+// The web service owns persistent mail settings. Cron containers may load the
+// same constants, but scheduled board imports suppress questionnaire delivery
+// and must never rewrite the shared settings table during startup.
+if (mailEnv('NESP_SERVICE_ROLE') !== 'cron') {
+    updateMailerSettings($mailEnabled, $fromAddress);
+}
 PHP
 
 # Password-protect the full site during installation and private testing.
@@ -236,7 +239,7 @@ if [ "${APP_BASIC_AUTH:-1}" = "1" ]; then
   htpasswd -bc "$DATA_ROOT/.htpasswd" \
     "$INSTALL_ACCESS_USER" "$INSTALL_ACCESS_PASSWORD" >/dev/null
   cat > "$AUTH_CONF" <<'APACHE'
-<LocationMatch "^/(?!render-health\.txt$)">
+<LocationMatch "^/(?!render-health\.txt$|modules/boardintake/missiveWebhook\.php$)">
     AuthType Basic
     AuthName "NESP Hiring System Setup"
     AuthUserFile /var/data/.htpasswd

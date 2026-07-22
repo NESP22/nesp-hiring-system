@@ -6,11 +6,12 @@ This is the one-page daily guide for Craig. The Phase 2 dashboard is designed to
 
 ## Morning
 
-1. Open `NESP Hiring`.
-2. Start on `Needs Craig`.
-3. Review new applications and applications awaiting review.
-4. Review completed phone screens if any are waiting.
-5. Check `Interviews` for today and tomorrow.
+1. Open `Board Applicant Intake` and read the automatic inbox-check summary.
+2. Resolve any `Needs attention` items; do not guess missing applicant details.
+3. Open `NESP Hiring` and start on `Needs Craig`.
+4. Review new applications and applications awaiting review.
+5. Review completed phone screens if any are waiting.
+6. Check `Interviews` for today and tomorrow.
 
 ## For Each Candidate
 
@@ -100,4 +101,6 @@ Never label a link `sent` merely because it was generated or copied. Review the 
 
 - The dashboard does not hire, reject, rank, or message applicants automatically.
 - The interviewer-pool foundation and staffing-forecast shell are live, but no real interviewer accounts or staffing history have been added.
-- Vapi, Zoom, AI review, prescreening, outbound email, SMS, and Drive import remain disabled.
+- Only the separately approved role-specific applicant questionnaire email may
+  be enabled. Vapi, Zoom, AI review, SMS, automatic decisions, and Drive import
+  remain disabled unless each receives its own controlled approval.
