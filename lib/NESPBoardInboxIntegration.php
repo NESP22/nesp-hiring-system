@@ -641,6 +641,7 @@ class NESPBoardInboxIntegration
         $conversationIDs = array();
         $oldest = null;
         $boundaryReached = false;
+        $timestamps = array();
         foreach ($conversations as $conversation)
         {
             if (!is_array($conversation))
@@ -656,6 +657,7 @@ class NESPBoardInboxIntegration
                 return self::fetchError(502, 'reconciliation_cursor_missing');
             }
             $oldest = $oldest === null ? $activity : min($oldest, $activity);
+            $timestamps[$activity] = true;
             if ($activity < $sinceEpoch)
             {
                 $boundaryReached = true;
@@ -664,7 +666,7 @@ class NESPBoardInboxIntegration
             $conversationIDs[$conversationID] = true;
         }
 
-        $complete = $boundaryReached || count($conversations) < 50;
+        $complete = $boundaryReached || count($conversations) < 50 || count($timestamps) === 1;
         if (!$complete && $untilEpoch !== null && $oldest >= $untilEpoch)
         {
             return self::fetchError(502, 'reconciliation_cursor_stalled');
@@ -736,6 +738,7 @@ class NESPBoardInboxIntegration
         $events = array();
         $oldestDeliveredAt = null;
         $boundaryReached = false;
+        $timestamps = array();
         foreach ($messages as $rawMessage)
         {
             $deliveredAt = is_array($rawMessage) && isset($rawMessage['delivered_at'])
@@ -749,6 +752,7 @@ class NESPBoardInboxIntegration
             $oldestDeliveredAt = $oldestDeliveredAt === null
                 ? $deliveredAt
                 : min($oldestDeliveredAt, $deliveredAt);
+            $timestamps[$deliveredAt] = true;
             if ($deliveredAt < $sinceEpoch)
             {
                 $boundaryReached = true;
@@ -785,7 +789,7 @@ class NESPBoardInboxIntegration
             );
         }
 
-        $complete = $boundaryReached || count($messages) < 10;
+        $complete = $boundaryReached || count($messages) < 10 || count($timestamps) === 1;
         if (!$complete && $untilEpoch !== null && $oldestDeliveredAt >= $untilEpoch)
         {
             return self::fetchError(502, 'reconciliation_cursor_stalled');
@@ -1328,6 +1332,7 @@ class NESPBoardInboxIntegration
             {
                 return self::fetchError(502, 'missive_request_failed');
             }
+            $responseReceivedAt = time();
 
             $statusCode = is_array($response) && isset($response['status_code'])
                 ? (int) $response['status_code']
@@ -1345,14 +1350,16 @@ class NESPBoardInboxIntegration
             if ($attempt >= self::MAX_RATE_LIMIT_RETRIES)
             {
                 return self::fetchError(503, 'missive_rate_limited', array(
-                    'retry_after_seconds' => $retryDelay
+                    'retry_after_seconds' => $retryDelay,
+                    'rate_limited_at_epoch' => $responseReceivedAt
                 ));
             }
 
             if ($retryDelay > self::MAX_RATE_LIMIT_DELAY_SECONDS)
             {
                 return self::fetchError(503, 'missive_rate_limited', array(
-                    'retry_after_seconds' => $retryDelay
+                    'retry_after_seconds' => $retryDelay,
+                    'rate_limited_at_epoch' => $responseReceivedAt
                 ));
             }
             // Injected test clients advance immediately. Production honors a

@@ -646,7 +646,7 @@ class NESPBoardIntakeScheduler
                 );
                 if (empty($conversationPage['ok']))
                 {
-                    $this->persistProviderBackoff($conversationPage, $nowEpoch, $runID);
+                    $this->persistProviderBackoff($conversationPage, $runID);
                     return $conversationPage;
                 }
                 $conversationIDs = isset($conversationPage['conversation_ids'])
@@ -676,7 +676,7 @@ class NESPBoardIntakeScheduler
             );
             if (empty($messagePage['ok']))
             {
-                $this->persistProviderBackoff($messagePage, $nowEpoch, $runID);
+                $this->persistProviderBackoff($messagePage, $runID);
                 return $messagePage;
             }
             if (!isset($messagePage['events']) || !is_array($messagePage['events']))
@@ -810,7 +810,7 @@ class NESPBoardIntakeScheduler
         ));
     }
 
-    private function persistProviderBackoff($result, $nowEpoch, $runID)
+    private function persistProviderBackoff($result, $runID)
     {
         if (!isset($result['error']) || $result['error'] !== 'missive_rate_limited')
         {
@@ -819,11 +819,16 @@ class NESPBoardIntakeScheduler
         $delay = isset($result['retry_after_seconds'])
             ? max(1, min(86400, (int) $result['retry_after_seconds']))
             : 60;
+        $rateLimitedAt = isset($result['rate_limited_at_epoch'])
+            && is_numeric($result['rate_limited_at_epoch'])
+            && (int) $result['rate_limited_at_epoch'] > 0
+            ? (int) $result['rate_limited_at_epoch']
+            : time();
         if (!$this->writeCheckpoint(sprintf(
             'UPDATE nesp_board_intake_checkpoint
              SET retry_not_before_epoch = %s, last_run_id = %s, date_modified = NOW()
              WHERE provider_key = "missive" AND scan_high_water_epoch > 0',
-            $this->_db->makeQueryInteger((int) $nowEpoch + $delay),
+            $this->_db->makeQueryInteger($rateLimitedAt + $delay),
             $this->_db->makeQueryInteger((int) $runID)
         )))
         {

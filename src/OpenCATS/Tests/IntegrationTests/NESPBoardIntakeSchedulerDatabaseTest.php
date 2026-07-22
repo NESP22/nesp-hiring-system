@@ -498,6 +498,8 @@ class NESPBoardIntakeSchedulerDatabaseTest extends DatabaseTestCase
     public function testLongRateLimitBackoffPersistsMessageCursorAndPacesResume()
     {
         $this->enableScheduler();
+        $start = $this->scheduledTime('2026-07-22 08:00:00');
+        $rateLimitedAt = $start->modify('+45 seconds')->getTimestamp();
         $providerMessageID = 'reconciled-before-long-backoff';
         $this->inbox->addMessage($providerMessageID, $this->applicationMessage(
             '<reconciled-before-long-backoff@example.invalid>',
@@ -518,7 +520,8 @@ class NESPBoardIntakeSchedulerDatabaseTest extends DatabaseTestCase
         $this->inbox->queueMessagePageResult('rate-limited-conversation', array(
             'ok' => false,
             'error' => 'missive_rate_limited',
-            'retry_after_seconds' => 60
+            'retry_after_seconds' => 60,
+            'rate_limited_at_epoch' => $rateLimitedAt
         ));
         $this->inbox->queueMessagePageResult('rate-limited-conversation', array(
             'ok' => true,
@@ -527,7 +530,6 @@ class NESPBoardIntakeSchedulerDatabaseTest extends DatabaseTestCase
             'complete' => true
         ));
 
-        $start = $this->scheduledTime('2026-07-22 08:00:00');
         $first = $this->scheduler->runScheduledSlot(1, $start);
 
         $this->assertSame('degraded', $first['status']);
@@ -538,12 +540,12 @@ class NESPBoardIntakeSchedulerDatabaseTest extends DatabaseTestCase
             . 'FROM nesp_board_intake_checkpoint WHERE provider_key = "missive"'
         );
         $this->assertSame('5000', $paused['message_until_epoch']);
-        $this->assertSame((string) ($start->getTimestamp() + 60), $paused['retry_not_before_epoch']);
+        $this->assertSame((string) ($rateLimitedAt + 60), $paused['retry_not_before_epoch']);
         $this->assertSame((string) $start->getTimestamp(), $paused['scan_high_water_epoch']);
 
         $paced = $this->scheduler->runScheduledSlot(
             1,
-            $start->modify('+30 seconds'),
+            $start->modify('+90 seconds'),
             true
         );
         $this->assertSame('failed', $paced['status']);
@@ -552,7 +554,7 @@ class NESPBoardIntakeSchedulerDatabaseTest extends DatabaseTestCase
 
         $resumed = $this->scheduler->runScheduledSlot(
             1,
-            $start->modify('+61 seconds'),
+            $start->modify('+106 seconds'),
             true
         );
         $this->assertSame('completed', $resumed['status']);

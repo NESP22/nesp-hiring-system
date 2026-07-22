@@ -431,6 +431,7 @@ class NESPBoardInboxIntegrationTest extends TestCase
     public function testReconciliationDoesNotSleepThroughLongRateLimitWindow()
     {
         $attempts = 0;
+        $beforeRequest = time();
         $result = NESPBoardInboxIntegration::discoverRecentMessages(
             0,
             'api-token',
@@ -444,6 +445,8 @@ class NESPBoardInboxIntegrationTest extends TestCase
         $this->assertFalse($result['ok']);
         $this->assertSame('missive_rate_limited', $result['error']);
         $this->assertSame(60, $result['retry_after_seconds']);
+        $this->assertGreaterThanOrEqual($beforeRequest, $result['rate_limited_at_epoch']);
+        $this->assertLessThanOrEqual(time(), $result['rate_limited_at_epoch']);
         $this->assertSame(1, $attempts);
     }
 
@@ -539,6 +542,75 @@ class NESPBoardInboxIntegrationTest extends TestCase
         $this->assertSame(22, $messagePage);
         $this->assertCount(1, $result['events']);
         $this->assertSame('message-22-0', $result['events'][0]['provider_message_id']);
+    }
+
+    public function testFullConversationPageWithOneTimestampIsTerminal()
+    {
+        $calls = 0;
+        $result = NESPBoardInboxIntegration::discoverConversationPage(
+            1000,
+            5000,
+            'api-token',
+            'approved-label',
+            function () use (&$calls) {
+                $calls++;
+                $conversations = array();
+                for ($offset = 0; $offset < 50; $offset++)
+                {
+                    $conversations[] = array(
+                        'id' => 'terminal-conversation-' . $offset,
+                        'last_activity_at' => 5000
+                    );
+                }
+                return array(
+                    'status_code' => 200,
+                    'body' => array('conversations' => $conversations)
+                );
+            }
+        );
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['complete']);
+        $this->assertNull($result['next_until']);
+        $this->assertCount(50, $result['conversation_ids']);
+        $this->assertSame(1, $calls);
+    }
+
+    public function testFullMessagePageWithOneTimestampIsTerminal()
+    {
+        $calls = 0;
+        $result = NESPBoardInboxIntegration::discoverConversationMessagePage(
+            'terminal-message-conversation',
+            1000,
+            5000,
+            'api-token',
+            'approved-label',
+            function () use (&$calls) {
+                $calls++;
+                $messages = array();
+                for ($offset = 0; $offset < 10; $offset++)
+                {
+                    $messages[] = array(
+                        'id' => 'terminal-message-' . $offset,
+                        'type' => 'email',
+                        'delivered_at' => 5000,
+                        'email_message_id' => '<terminal-' . $offset . '@example.invalid>',
+                        'subject' => 'New application for Staff Photographer',
+                        'from_field' => array('address' => 'alerts@indeed.com')
+                    );
+                }
+                return array(
+                    'status_code' => 200,
+                    'body' => array('messages' => $messages)
+                );
+            }
+        );
+
+        $this->assertTrue($result['ok']);
+        $this->assertTrue($result['complete']);
+        $this->assertNull($result['next_until']);
+        $this->assertCount(10, $result['events']);
+        $this->assertSame(1, $calls);
     }
 
     public function testReconciliationFailsVisiblyWhenProviderCursorStalls()
