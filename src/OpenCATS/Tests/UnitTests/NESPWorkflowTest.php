@@ -98,6 +98,21 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('LOWER(TRIM(email))', $workflow);
     }
 
+    public function testApplicantQuestionnaireEmailRejectsAmbiguousFeatureFlagValues()
+    {
+        foreach (array(false, 0, '0', 'true', 'yes', 'false', -1) as $featureEnabled)
+        {
+            $this->assertFalse(
+                NESPWorkflow::isApplicantEmailDeliveryReady($featureEnabled, '1', 'hiring@nesportsphoto.com'),
+                'Applicant email must remain disabled for non-canonical feature flag values.'
+            );
+        }
+
+        $this->assertTrue(NESPWorkflow::isApplicantEmailFeatureExplicitlyEnabled(true));
+        $this->assertTrue(NESPWorkflow::isApplicantEmailFeatureExplicitlyEnabled(1));
+        $this->assertTrue(NESPWorkflow::isApplicantEmailFeatureExplicitlyEnabled('1'));
+    }
+
     public function testZoomParticipantLinkValidationRejectsHostLinks()
     {
         $valid = NESPWorkflow::validateZoomApplicantJoinURL('https://nesp.zoom.us/j/123456789?pwd=abc');
