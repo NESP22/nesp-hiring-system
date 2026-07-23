@@ -18,6 +18,8 @@ class NESPWorkflow
     private $_db;
 
     const APPLICANT_EMAIL_FEATURE_DESCRIPTION = 'When deliberately enabled with a configured sender, automatically sends one secure role-specific questionnaire email after a new applicant has a valid email and linked job, allows an administrator to send one to an existing reviewed applicant, and can send one four-day reminder when the separate reminder scheduler is enabled.';
+    const KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG = 'NESP_KOALENDAR_BOOKING_EMAIL_ENABLED';
+    const KOALENDAR_BOOKING_EMAIL_FEATURE_DESCRIPTION = 'Allows an administrator to explicitly send the assigned interviewer\'s public Koalendar booking page after questionnaire review. Disabled by default; no calendar event or automatic scheduling is created.';
     const QUESTIONNAIRE_REMINDER_AFTER_DAYS = 4;
     const QUESTIONNAIRE_CLOSE_REVIEW_AFTER_DAYS = 4;
 
@@ -40,6 +42,7 @@ class NESPWorkflow
             array('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0),
             array('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0),
             array('NESP_APPLICANT_EMAIL_ENABLED', 'Applicant Questionnaire Email', self::APPLICANT_EMAIL_FEATURE_DESCRIPTION, 0),
+            array(self::KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG, 'Koalendar Scheduling Link Email', self::KOALENDAR_BOOKING_EMAIL_FEATURE_DESCRIPTION, 0),
             array('NESP_BOARD_INTAKE_SCHEDULER_ENABLED', 'Board Inbox Scheduler', 'Twice-daily reconciliation and manual-review queue for approved-label job-board notifications.', 0),
             array('NESP_BOARD_INTAKE_AUTO_IMPORT_ENABLED', 'Board Inbox Auto-Import', 'Allows signed notifications carrying the configured approved-rule proof to create candidates in Needs Craig. Shared-label recovery remains manual review.', 0),
             NESPGoogleCalendarFreeBusy::getDefaultFeatureFlag()
@@ -60,6 +63,7 @@ class NESPWorkflow
             'NESP_STAFFING_FORECAST_ENABLED',
             'NESP_STAFFING_DRIVE_IMPORT_ENABLED',
             'NESP_APPLICANT_EMAIL_ENABLED',
+            self::KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG,
             'NESP_BOARD_INTAKE_SCHEDULER_ENABLED',
             'NESP_BOARD_INTAKE_AUTO_IMPORT_ENABLED',
             NESPGoogleCalendarFreeBusy::FEATURE_FLAG
@@ -212,7 +216,8 @@ class NESPWorkflow
             'revokeQuestionnaireLink',
             'regenerateQuestionnaireLink',
             'assignQuestionnaireReviewer',
-            'saveQuestionnaireReview'
+            'saveQuestionnaireReview',
+            'sendKoalendarSchedulingLink'
         )))
         {
             return 'NESP_WORKFLOW_ENABLED';
@@ -2283,6 +2288,7 @@ class NESPWorkflow
             array('nesp_screening_questionnaire', 'question_set_version_id'),
             array('nesp_screening_questionnaire', 'question_snapshot_json'),
             array('nesp_screening_questionnaire', 'reviewer_profile_id'),
+            array('nesp_screening_questionnaire', 'koalendar_booking_email_status_key'),
             array('nesp_screening_questionnaire_answer', 'answer_text'),
             array('nesp_screening_questionnaire_activity', 'activity_key'),
             array('nesp_recruiting_campaign_control', 'manual_spend'),
@@ -2322,7 +2328,7 @@ class NESPWorkflow
             FROM
                 nesp_feature_flag
             WHERE
-                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_INTERVIEWER_AVAILABILITY_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_INTERVIEWER_ZOOM_LINKS_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED", "NESP_APPLICANT_EMAIL_ENABLED", "NESP_BOARD_INTAKE_SCHEDULER_ENABLED", "NESP_BOARD_INTAKE_AUTO_IMPORT_ENABLED", "NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED")
+                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_INTERVIEWER_AVAILABILITY_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_INTERVIEWER_ZOOM_LINKS_ENABLED", "NESP_AI_REVIEW_ENABLED", "NESP_STAFFING_FORECAST_ENABLED", "NESP_STAFFING_DRIVE_IMPORT_ENABLED", "NESP_APPLICANT_EMAIL_ENABLED", "NESP_KOALENDAR_BOOKING_EMAIL_ENABLED", "NESP_BOARD_INTAKE_SCHEDULER_ENABLED", "NESP_BOARD_INTAKE_AUTO_IMPORT_ENABLED", "NESP_GOOGLE_CALENDAR_FREEBUSY_ENABLED")
             ORDER BY
                 display_name'
         );
@@ -3994,6 +4000,276 @@ class NESPWorkflow
             'message' => 'Questionnaire email sent. The applicant is now waiting to complete it.',
             'one_time_invitation_copy' => $invitationCopy
         );
+    }
+
+    public function getKoalendarBookingEmailDeliveryStatus()
+    {
+        if (!$this->isFeatureFlagEnabled(self::KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG))
+        {
+            return array(
+                'status_key' => 'disabled',
+                'message' => 'Scheduling-link email is disabled. No booking link can be sent from NESP yet.'
+            );
+        }
+
+        $applicantEmail = $this->getApplicantEmailDeliveryStatus();
+        if ($applicantEmail['status_key'] !== 'enabled')
+        {
+            return array(
+                'status_key' => 'not_ready',
+                'message' => 'Applicant email delivery is not ready. No scheduling link can be sent.'
+            );
+        }
+
+        if (!$this->isColumnInstalled('nesp_screening_questionnaire', 'koalendar_booking_email_status_key'))
+        {
+            return array(
+                'status_key' => 'not_ready',
+                'message' => 'Scheduling-link email tracking is not installed. No scheduling link can be sent.'
+            );
+        }
+
+        return array('status_key' => 'enabled', 'message' => 'Scheduling-link email is ready for an explicit confirmed send.');
+    }
+
+    public static function koalendarBookingLinkFingerprint($questionnaire)
+    {
+        return hash('sha256', implode("\n", array(
+            (string) (isset($questionnaire['screening_questionnaire_id']) ? (int) $questionnaire['screening_questionnaire_id'] : 0),
+            (string) (isset($questionnaire['booking_owner_grant_id']) ? (int) $questionnaire['booking_owner_grant_id'] : 0),
+            (string) (isset($questionnaire['booking_interviewer_profile_id']) ? (int) $questionnaire['booking_interviewer_profile_id'] : 0),
+            trim((string) (isset($questionnaire['reviewer_koalendar_booking_url']) ? $questionnaire['reviewer_koalendar_booking_url'] : '')),
+            trim((string) (isset($questionnaire['review_completed_at']) ? $questionnaire['review_completed_at'] : ''))
+        )));
+    }
+
+    public static function buildKoalendarSchedulingInvitationCopy($firstName, $roleTitle, $interviewerName, $bookingURL)
+    {
+        $firstName = trim((string) $firstName);
+        $roleTitle = trim((string) $roleTitle);
+        $interviewerName = trim((string) $interviewerName);
+        if ($firstName === '')
+        {
+            $firstName = 'there';
+        }
+        if ($roleTitle === '')
+        {
+            $roleTitle = 'NESP position';
+        }
+        if ($interviewerName === '')
+        {
+            $interviewerName = 'your NESP interviewer';
+        }
+
+        return 'Hi ' . $firstName . ",\n\n"
+            . 'Thank you for completing the NESP questionnaire for the ' . $roleTitle . " position.\n\n"
+            . 'Choose an interview time with ' . $interviewerName . " using the secure scheduling page below.\n\n"
+            . trim((string) $bookingURL) . "\n\n"
+            . 'If you need help, reply to this email. A person will review your application; no automated hiring decision will be made.';
+    }
+
+    public function getKoalendarSchedulingLinkEligibility($questionnaireID)
+    {
+        $detail = $this->getQuestionnaireDetail((int) $questionnaireID);
+        if (empty($detail))
+        {
+            return array('ok' => false, 'error' => 'Choose a valid reviewed questionnaire.');
+        }
+        if (!$this->isColumnInstalled('nesp_screening_questionnaire', 'koalendar_booking_email_status_key'))
+        {
+            return array('ok' => false, 'error' => 'Scheduling-link email tracking is not installed. No email was sent.');
+        }
+        if ($detail['status_key'] !== 'completed'
+            || $detail['review_status_key'] !== 'complete'
+            || empty($detail['review_completed_at'])
+            || empty($detail['booking_owner_grant_id'])
+            || empty($detail['booking_interviewer_profile_id']))
+        {
+            return array('ok' => false, 'error' => 'Complete the questionnaire review and assign one active interviewer before sending a scheduling link.');
+        }
+
+        $accountStateCondition = $this->isColumnInstalled('nesp_interviewer_profile', 'account_state_key')
+            ? ' AND ip.account_state_key = "active"' : '';
+        $owner = $this->_db->getAssoc(sprintf(
+            'SELECT ip.interviewer_profile_id, ip.display_name, ip.koalendar_booking_url
+             FROM nesp_interviewer_candidate_grant cg
+             INNER JOIN nesp_interviewer_profile ip
+                ON ip.interviewer_profile_id = cg.interviewer_profile_id
+                AND ip.is_active = 1%s
+             INNER JOIN nesp_interviewer_job_role ijr
+                ON ijr.interviewer_profile_id = ip.interviewer_profile_id
+                AND ijr.joborder_id = cg.joborder_id
+                AND ijr.is_active = 1
+             WHERE cg.grant_id = %s
+               AND cg.candidate_id = %s
+               AND cg.joborder_id = %s
+               AND cg.interviewer_profile_id = %s
+               AND cg.date_revoked IS NULL
+             LIMIT 1',
+            $accountStateCondition,
+            $this->_db->makeQueryInteger((int) $detail['booking_owner_grant_id']),
+            $this->_db->makeQueryInteger((int) $detail['candidate_id']),
+            $this->_db->makeQueryInteger((int) $detail['joborder_id']),
+            $this->_db->makeQueryInteger((int) $detail['booking_interviewer_profile_id'])
+        ));
+        if (empty($owner))
+        {
+            return array('ok' => false, 'error' => 'The assigned interviewer is no longer active and approved for this role. No scheduling link was sent.');
+        }
+
+        $bookingURL = self::validateKoalendarBookingURL(isset($owner['koalendar_booking_url']) ? $owner['koalendar_booking_url'] : '');
+        if (empty($bookingURL['ok']) || $bookingURL['url'] === '')
+        {
+            return array('ok' => false, 'error' => 'The assigned interviewer has no valid public Koalendar booking page saved. No scheduling link was sent.');
+        }
+
+        $email = self::validateApplicantContactEmail(isset($detail['email1']) ? $detail['email1'] : '');
+        if (empty($email['ok']))
+        {
+            return array('ok' => false, 'error' => 'Add and verify the applicant email before sending a scheduling link.');
+        }
+
+        $detail['booking_interviewer_name'] = $owner['display_name'];
+        $detail['reviewer_koalendar_booking_url'] = $bookingURL['url'];
+        $detail['recipient_email'] = $email['email'];
+        $detail['booking_link_fingerprint'] = self::koalendarBookingLinkFingerprint($detail);
+        return array('ok' => true, 'questionnaire' => $detail);
+    }
+
+    public function sendKoalendarSchedulingLinkEmail($questionnaireID, $actorUserID, $reviewedEmailFingerprint, $reviewedBookingFingerprint, $allowResend = false)
+    {
+        $deliveryStatus = $this->getKoalendarBookingEmailDeliveryStatus();
+        if ($deliveryStatus['status_key'] !== 'enabled')
+        {
+            return array('ok' => false, 'sent' => false, 'error' => $deliveryStatus['message']);
+        }
+
+        $eligibility = $this->getKoalendarSchedulingLinkEligibility($questionnaireID);
+        if (empty($eligibility['ok']))
+        {
+            return array('ok' => false, 'sent' => false, 'error' => $eligibility['error']);
+        }
+        $detail = $eligibility['questionnaire'];
+        if ($reviewedEmailFingerprint === ''
+            || !hash_equals(self::applicantEmailFingerprint($detail['recipient_email']), (string) $reviewedEmailFingerprint))
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'The applicant email changed after review. Refresh and confirm the recipient again. No email was sent.');
+        }
+        if ($reviewedBookingFingerprint === ''
+            || !hash_equals((string) $detail['booking_link_fingerprint'], (string) $reviewedBookingFingerprint))
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'The interviewer assignment or booking page changed after review. Refresh and confirm the scheduling link again. No email was sent.');
+        }
+
+        $currentStatus = isset($detail['koalendar_booking_email_status_key'])
+            ? (string) $detail['koalendar_booking_email_status_key'] : 'not_attempted';
+        if ($currentStatus === 'not_attempted')
+        {
+            $expectedStatus = 'not_attempted';
+            $deliveryType = 'initial';
+        }
+        elseif (in_array($currentStatus, array('sent', 'failed'), true) && $allowResend)
+        {
+            $expectedStatus = $currentStatus;
+            $deliveryType = 'resend';
+        }
+        else
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'A scheduling-link email was already attempted. Use the explicit resend confirmation if another copy is necessary.');
+        }
+
+        $questionnaireID = (int) $detail['screening_questionnaire_id'];
+        $this->_db->query(sprintf(
+            'UPDATE nesp_screening_questionnaire
+             SET koalendar_booking_email_status_key = "sending",
+                 koalendar_booking_email_attempted_at = UTC_TIMESTAMP(),
+                 koalendar_booking_email_send_count = koalendar_booking_email_send_count + 1,
+                 date_modified = NOW()
+             WHERE screening_questionnaire_id = %s
+               AND koalendar_booking_email_status_key = %s',
+            $this->_db->makeQueryInteger($questionnaireID),
+            $this->_db->makeQueryString($expectedStatus)
+        ));
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            return array('ok' => false, 'sent' => false, 'error' => 'Another scheduling-link send is already in progress or was completed. Refresh before trying again.');
+        }
+
+        $metadata = array(
+            'delivery_type' => $deliveryType,
+            'interviewer_profile_id' => (int) $detail['booking_interviewer_profile_id'],
+            'booking_link_fingerprint' => hash('sha256', $detail['reviewer_koalendar_booking_url']),
+            'recipient_fingerprint' => self::applicantEmailFingerprint($detail['recipient_email'])
+        );
+        $activitySaved = $this->logQuestionnaireActivity($questionnaireID, $detail['token_hash'], 'koalendar_scheduling_link_email_attempt_started', $metadata);
+        $auditSaved = $this->logAuditEvent($actorUserID, 'koalendar_scheduling_link_email_attempt_started', 'screening_questionnaire', $questionnaireID, $metadata);
+        if (!$activitySaved || !$auditSaved)
+        {
+            $this->_db->query(sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET koalendar_booking_email_status_key = "failed", date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND koalendar_booking_email_status_key = "sending"',
+                $this->_db->makeQueryInteger($questionnaireID)
+            ));
+            return array('ok' => false, 'sent' => false, 'error' => 'The scheduling-link delivery attempt could not be audited safely. No email was sent.');
+        }
+
+        $sent = $this->deliverKoalendarSchedulingEmailMessage(
+            $actorUserID,
+            $detail['recipient_email'],
+            $detail['first_name'],
+            'Choose an NESP interview time for ' . trim((string) $detail['role_title']),
+            self::buildKoalendarSchedulingInvitationCopy(
+                $detail['first_name'],
+                $detail['role_title'],
+                $detail['booking_interviewer_name'],
+                $detail['reviewer_koalendar_booking_url']
+            )
+        );
+        if (!$sent)
+        {
+            $this->_db->query(sprintf(
+                'UPDATE nesp_screening_questionnaire
+                 SET koalendar_booking_email_status_key = "failed", date_modified = NOW()
+                 WHERE screening_questionnaire_id = %s
+                   AND koalendar_booking_email_status_key = "sending"',
+                $this->_db->makeQueryInteger($questionnaireID)
+            ));
+            $this->logQuestionnaireActivity($questionnaireID, $detail['token_hash'], 'koalendar_scheduling_link_email_failed', $metadata);
+            $this->logAuditEvent($actorUserID, 'koalendar_scheduling_link_email_failed', 'screening_questionnaire', $questionnaireID, $metadata);
+            return array('ok' => false, 'sent' => false, 'error' => 'The mail provider did not confirm the scheduling-link email. No automatic retry occurred.');
+        }
+
+        $this->_db->query(sprintf(
+            'UPDATE nesp_screening_questionnaire
+             SET koalendar_booking_email_status_key = "sent",
+                 koalendar_booking_email_sent_at = UTC_TIMESTAMP(),
+                 date_modified = NOW()
+             WHERE screening_questionnaire_id = %s
+               AND koalendar_booking_email_status_key = "sending"',
+            $this->_db->makeQueryInteger($questionnaireID)
+        ));
+        if ($this->_db->getAffectedRows() !== 1)
+        {
+            $this->logAuditEvent($actorUserID, 'koalendar_scheduling_link_email_tracking_failed', 'screening_questionnaire', $questionnaireID, $metadata);
+            return array('ok' => false, 'sent' => true, 'error' => 'The scheduling-link email was accepted, but tracking did not finish. Do not resend; review the audit log.');
+        }
+
+        $this->logQuestionnaireActivity($questionnaireID, $detail['token_hash'], 'koalendar_scheduling_link_email_sent', $metadata);
+        $this->logAuditEvent($actorUserID, 'koalendar_scheduling_link_email_sent', 'screening_questionnaire', $questionnaireID, $metadata);
+        return array(
+            'ok' => true,
+            'sent' => true,
+            'message' => $deliveryType === 'resend'
+                ? 'Scheduling link resent to the applicant and recorded in the audit trail.'
+                : 'Scheduling link emailed to the applicant and recorded in the audit trail.'
+        );
+    }
+
+    protected function deliverKoalendarSchedulingEmailMessage($actorUserID, $email, $firstName, $subject, $body)
+    {
+        return $this->deliverQuestionnaireEmailMessage($actorUserID, $email, $firstName, $subject, $body);
     }
 
     public static function applicantEmailFingerprint($email)

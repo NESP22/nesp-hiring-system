@@ -6,6 +6,10 @@ $applicantEmailReady = isset($this->applicantEmailDelivery['status_key']) && $th
 $questionnaireComplete = $this->questionnaire['status_key'] === 'completed';
 $questionnaireWaiting = in_array($this->questionnaire['status_key'], array('waiting', 'in_progress'), true);
 $emailStatus = isset($this->questionnaire['auto_email_status_key']) ? $this->questionnaire['auto_email_status_key'] : 'not_attempted';
+$koalendarBookingEmailReady = isset($this->koalendarBookingEmailDelivery['status_key'])
+    && $this->koalendarBookingEmailDelivery['status_key'] === 'enabled';
+$koalendarBookingEmailStatus = isset($this->questionnaire['koalendar_booking_email_status_key'])
+    ? $this->questionnaire['koalendar_booking_email_status_key'] : 'not_attempted';
 ?>
     <div id="main" class="nesp-workflow">
         <?php TemplateUtility::printQuickSearch(); ?>
@@ -28,6 +32,11 @@ $emailStatus = isset($this->questionnaire['auto_email_status_key']) ? $this->que
             <?php if ($this->questionnaireDeliveryMessage !== ''): ?>
                 <div class="<?php echo($this->questionnaireDeliverySeverity === 'success' ? 'nesp-success' : 'nesp-safety-banner'); ?>" role="status">
                     <?php $this->_($this->questionnaireDeliveryMessage); ?>
+                </div>
+            <?php endif; ?>
+            <?php if ($this->koalendarDeliveryMessage !== ''): ?>
+                <div class="<?php echo($this->koalendarDeliveryOK ? 'nesp-success' : 'nesp-safety-banner'); ?>" role="status">
+                    <?php $this->_($this->koalendarDeliveryMessage); ?>
                 </div>
             <?php endif; ?>
 
@@ -187,9 +196,45 @@ $emailStatus = isset($this->questionnaire['auto_email_status_key']) ? $this->que
             <div class="nesp-panel">
                 <h3>Reviewed Next Action</h3>
                 <?php if (!empty($this->questionnaire['reviewer_koalendar_booking_url'])): ?>
-                    <p>The questionnaire is reviewed and <?php $this->_($this->questionnaire['booking_interviewer_name']); ?> is assigned. Use that interviewer's approved Koalendar page for applicant scheduling.</p>
+                    <p>The questionnaire is reviewed and <?php $this->_($this->questionnaire['booking_interviewer_name']); ?> is assigned. The public Koalendar page below is tied to that interviewer only.</p>
                     <a class="nesp-primary-action" href="<?php echo(htmlspecialchars($this->questionnaire['reviewer_koalendar_booking_url'], ENT_QUOTES, 'UTF-8')); ?>" target="_blank" rel="noopener noreferrer">Open <?php $this->_($this->questionnaire['booking_interviewer_name']); ?>'s Booking Page</a>
                     <p class="nesp-muted">Opening this page does not email the applicant or create a booking.</p>
+                    <?php if ($this->isAdmin && $koalendarBookingEmailReady && $koalendarBookingEmailStatus === 'not_attempted'): ?>
+                        <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=sendKoalendarSchedulingLink">
+                            <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />
+                            <input type="hidden" name="reviewedEmailFingerprint" value="<?php echo(htmlspecialchars($this->reviewedEmailFingerprint, ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="reviewedBookingFingerprint" value="<?php echo(htmlspecialchars($this->reviewedBookingFingerprint, ENT_QUOTES, 'UTF-8')); ?>" />
+                            <label class="nesp-confirmation-check">
+                                <input type="checkbox" name="confirmBookingSend" value="confirm" required />
+                                I reviewed the applicant, assigned interviewer, and public Koalendar page. Send one scheduling-link email now.
+                            </label>
+                            <button class="nesp-primary-action" type="submit">Send Scheduling Link</button>
+                        </form>
+                    <?php elseif ($this->isAdmin && in_array($koalendarBookingEmailStatus, array('sent', 'failed'), true)): ?>
+                        <div class="nesp-empty">
+                            <?php echo($koalendarBookingEmailStatus === 'sent' ? 'A scheduling-link email was already sent.' : 'A previous scheduling-link email attempt failed.'); ?>
+                            A resend requires a new explicit confirmation and is recorded in the audit trail.
+                        </div>
+                        <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=sendKoalendarSchedulingLink">
+                            <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />
+                            <input type="hidden" name="reviewedEmailFingerprint" value="<?php echo(htmlspecialchars($this->reviewedEmailFingerprint, ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="reviewedBookingFingerprint" value="<?php echo(htmlspecialchars($this->reviewedBookingFingerprint, ENT_QUOTES, 'UTF-8')); ?>" />
+                            <input type="hidden" name="sendMode" value="resend" />
+                            <label class="nesp-confirmation-check">
+                                <input type="checkbox" name="confirmBookingSend" value="confirm" required />
+                                I reviewed the applicant, assigned interviewer, and public Koalendar page again.
+                            </label>
+                            <label class="nesp-confirmation-check">
+                                <input type="checkbox" name="confirmResend" value="resend" required />
+                                I intend to send another scheduling-link email and understand this is recorded.
+                            </label>
+                            <button class="nesp-secondary-action" type="submit">Resend Scheduling Link</button>
+                        </form>
+                    <?php elseif ($this->isAdmin): ?>
+                        <div class="nesp-empty"><?php $this->_($this->koalendarBookingEmailDelivery['message']); ?></div>
+                    <?php endif; ?>
                 <?php else: ?>
                     <div class="nesp-empty"><?php $this->_($this->questionnaire['booking_interviewer_name']); ?> is assigned, but no approved Koalendar booking page is saved yet. Add it in Interviewer Settings or My Availability.</div>
                 <?php endif; ?>

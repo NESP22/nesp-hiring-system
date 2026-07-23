@@ -15,7 +15,7 @@ class NESPWorkflowTest extends TestCase
         $flags = NESPWorkflow::getDefaultFeatureFlags();
         $keys = array();
 
-        $this->assertCount(14, $flags);
+        $this->assertCount(15, $flags);
         foreach ($flags as $flag)
         {
             $keys[] = $flag[0];
@@ -257,6 +257,54 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('Duplicate sends are blocked', $review);
     }
 
+    public function testKoalendarSchedulingEmailIsExplicitlyConfirmedFeatureFlaggedAndAudited()
+    {
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $review = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireReview.tpl');
+        $schema = file_get_contents(LEGACY_ROOT . '/modules/install/Schema.php');
+        $actionStart = strpos($ui, "case 'sendKoalendarSchedulingLink':");
+        $actionEnd = strpos($ui, "case 'confirmBulkQuestionnaireEmails':", $actionStart);
+        $action = substr($ui, $actionStart, $actionEnd - $actionStart);
+
+        $this->assertStringContainsString('NESP_KOALENDAR_BOOKING_EMAIL_ENABLED', $workflow);
+        $this->assertStringContainsString('sendKoalendarSchedulingLinkEmail', $workflow);
+        $this->assertStringContainsString('koalendar_scheduling_link_email_attempt_started', $workflow);
+        $this->assertStringContainsString('koalendar_scheduling_link_email_sent', $workflow);
+        $this->assertStringContainsString('koalendar_scheduling_link_email_failed', $workflow);
+        $this->assertStringContainsString('koalendar_booking_email_status_key', $workflow);
+        $this->assertStringContainsString('ip.account_state_key = "active"', $workflow);
+        $this->assertStringContainsString("array(self::KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG, 'Koalendar Scheduling Link Email'", $workflow);
+        $this->assertStringContainsString('$this->adminOnly();', $action);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $action);
+        $this->assertStringContainsString("\$_POST['confirmBookingSend'] !== 'confirm'", $ui);
+        $this->assertStringContainsString("\$_POST['confirmResend'] !== 'resend'", $ui);
+        $this->assertStringContainsString('Send Scheduling Link', $review);
+        $this->assertStringContainsString('Resend Scheduling Link', $review);
+        $this->assertStringContainsString('name="csrfToken"', $review);
+        $this->assertStringContainsString('name="reviewedBookingFingerprint"', $review);
+        $this->assertStringContainsString("'401' =>", $schema);
+        $this->assertStringContainsString('koalendar_booking_email_send_count', $schema);
+    }
+
+    public function testKoalendarSchedulingInvitationUsesOnlyThePublicBookingPage()
+    {
+        $invalid = NESPWorkflow::validateKoalendarBookingURL('https://koalendar.com/login');
+        $valid = NESPWorkflow::validateKoalendarBookingURL('https://koalendar.com/e/nesp-photographers');
+        $copy = NESPWorkflow::buildKoalendarSchedulingInvitationCopy(
+            'Taylor',
+            'Staff Photographer',
+            'Suthir',
+            'https://koalendar.com/e/nesp-photographers'
+        );
+
+        $this->assertFalse($invalid['ok']);
+        $this->assertTrue($valid['ok']);
+        $this->assertStringContainsString('https://koalendar.com/e/nesp-photographers', $copy);
+        $this->assertStringContainsString('Suthir', $copy);
+        $this->assertStringNotContainsString('Zoom', $copy);
+    }
+
     public function testBulkQuestionnaireEmailRequiresAdminReviewCsrfAndSingleUseSnapshot()
     {
         $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
@@ -421,7 +469,7 @@ class NESPWorkflowTest extends TestCase
         $this->assertFalse($otherHost['ok']);
     }
 
-    public function testKoalendarHandoffIsInterviewerOwnedReviewedAndManualOnly()
+    public function testKoalendarHandoffIsInterviewerOwnedAndOnlyAllowsAnExplicitConfirmedEmail()
     {
         $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
         $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
@@ -450,7 +498,11 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString("candidate['koalendar_booking_url']", $assignments);
         $this->assertStringContainsString('Open My Booking Page', $candidate);
         $this->assertStringContainsString("questionnaire_review_status_key'] === 'complete'", $candidate);
-        $this->assertStringNotContainsString('sendKoalendar', $ui);
+        $this->assertStringContainsString("case 'sendKoalendarSchedulingLink':", $ui);
+        $this->assertStringContainsString('$this->adminOnly();', $ui);
+        $this->assertStringContainsString('$this->requirePostCSRF();', $ui);
+        $this->assertStringNotContainsString('createKoalendar', $workflow);
+        $this->assertStringNotContainsString('Koalendar API', $workflow);
         $this->assertStringNotContainsString('globalKoalendar', $workflow);
     }
 

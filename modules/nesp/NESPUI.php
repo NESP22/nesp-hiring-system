@@ -271,6 +271,12 @@ class NESPUI extends UserInterface
                 $this->sendQuestionnaireEmail();
                 break;
 
+            case 'sendKoalendarSchedulingLink':
+                $this->adminOnly();
+                $this->requirePostCSRF();
+                $this->sendKoalendarSchedulingLink();
+                break;
+
             case 'confirmBulkQuestionnaireEmails':
                 $this->adminOnly();
                 $this->confirmBulkQuestionnaireEmails();
@@ -1310,6 +1316,36 @@ class NESPUI extends UserInterface
         CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
     }
 
+    private function sendKoalendarSchedulingLink()
+    {
+        $questionnaireID = isset($_POST['questionnaireID']) ? (int) $_POST['questionnaireID'] : 0;
+        $reviewedEmailFingerprint = isset($_POST['reviewedEmailFingerprint'])
+            ? trim((string) $_POST['reviewedEmailFingerprint']) : '';
+        $reviewedBookingFingerprint = isset($_POST['reviewedBookingFingerprint'])
+            ? trim((string) $_POST['reviewedBookingFingerprint']) : '';
+        $allowResend = isset($_POST['sendMode']) && $_POST['sendMode'] === 'resend';
+        if (!isset($_POST['confirmBookingSend']) || $_POST['confirmBookingSend'] !== 'confirm')
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Confirm the applicant, interviewer, and public booking page before sending the scheduling link.');
+        }
+        if ($allowResend && (!isset($_POST['confirmResend']) || $_POST['confirmResend'] !== 'resend'))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Confirm that this is an intentional resend before sending another scheduling link.');
+        }
+
+        $delivery = $this->_workflow->sendKoalendarSchedulingLinkEmail(
+            $questionnaireID,
+            $this->_userID,
+            $reviewedEmailFingerprint,
+            $reviewedBookingFingerprint,
+            $allowResend
+        );
+        $_SESSION['NESP_KOALENDAR_DELIVERY_MESSAGE'] = !empty($delivery['sent'])
+            ? $delivery['message'] : $delivery['error'];
+        $_SESSION['NESP_KOALENDAR_DELIVERY_OK'] = !empty($delivery['ok']) ? 1 : 0;
+        CATSUtility::transferRelativeURI('m=nesp&a=reviewQuestionnaire&questionnaireID=' . $questionnaireID);
+    }
+
     private function confirmBulkQuestionnaireEmails()
     {
         $preview = $this->_workflow->getBulkQuestionnaireEmailPreview(200);
@@ -1484,6 +1520,8 @@ class NESPUI extends UserInterface
         $this->_template->assign('oneTimeInvitationCopy', $oneTimeInvitationCopy);
         $this->_template->assign('reviewedEmailFingerprint', NESPWorkflow::applicantEmailFingerprint($detail['email1']));
         $this->_template->assign('applicantEmailDelivery', $this->_workflow->getApplicantEmailDeliveryStatus());
+        $this->_template->assign('koalendarBookingEmailDelivery', $this->_workflow->getKoalendarBookingEmailDeliveryStatus());
+        $this->_template->assign('reviewedBookingFingerprint', NESPWorkflow::koalendarBookingLinkFingerprint($detail));
         $questionnaireDeliveryMessage = isset($_SESSION['NESP_QUESTIONNAIRE_DELIVERY_MESSAGE'])
             ? $_SESSION['NESP_QUESTIONNAIRE_DELIVERY_MESSAGE'] : '';
         $questionnaireDeliveryOK = isset($_SESSION['NESP_QUESTIONNAIRE_DELIVERY_OK'])
@@ -1498,6 +1536,13 @@ class NESPUI extends UserInterface
         $this->_template->assign('questionnaireDeliveryMessage', $questionnaireDeliveryMessage);
         $this->_template->assign('questionnaireDeliveryOK', $questionnaireDeliveryOK);
         $this->_template->assign('questionnaireDeliverySeverity', $questionnaireDeliverySeverity);
+        $koalendarDeliveryMessage = isset($_SESSION['NESP_KOALENDAR_DELIVERY_MESSAGE'])
+            ? $_SESSION['NESP_KOALENDAR_DELIVERY_MESSAGE'] : '';
+        $koalendarDeliveryOK = isset($_SESSION['NESP_KOALENDAR_DELIVERY_OK'])
+            ? (int) $_SESSION['NESP_KOALENDAR_DELIVERY_OK'] : 0;
+        unset($_SESSION['NESP_KOALENDAR_DELIVERY_MESSAGE'], $_SESSION['NESP_KOALENDAR_DELIVERY_OK']);
+        $this->_template->assign('koalendarDeliveryMessage', $koalendarDeliveryMessage);
+        $this->_template->assign('koalendarDeliveryOK', $koalendarDeliveryOK);
         // The reviewer picker must use the same eligibility rules enforced on save.
         $this->_template->assign('eligibleReviewerProfiles', $isAdmin
             ? $this->_workflow->getEligibleInterviewersForAssignment((int) $detail['joborder_id'])
