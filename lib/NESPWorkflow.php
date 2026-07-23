@@ -11,6 +11,7 @@ include_once(LEGACY_ROOT . '/lib/NESPVapiIntegration.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
 include_once(LEGACY_ROOT . '/lib/NESPGoogleCalendarFreeBusy.php');
 include_once(LEGACY_ROOT . '/lib/Mailer.php');
+include_once(LEGACY_ROOT . '/lib/CATSUtility.php');
 
 class NESPWorkflow
 {
