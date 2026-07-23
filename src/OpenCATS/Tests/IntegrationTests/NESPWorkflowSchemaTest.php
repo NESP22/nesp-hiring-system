@@ -508,11 +508,12 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
 
         $this->assertTrue($workflow->assignQuestionnaireReviewer($questionnaireID, $sharedProfileID, 1));
         $dashboardRow = $findDashboardRow();
-        $this->assertNull($dashboardRow['koalendar_booking_url']);
-        $this->assertNull($dashboardRow['questionnaire_review_status_key']);
+        $this->assertSame('Shared Reviewer', $dashboardRow['booking_interviewer_name']);
+        $this->assertSame('https://koalendar.com/e/shared-reviewer', $dashboardRow['koalendar_booking_url']);
+        $this->assertSame('complete', $dashboardRow['questionnaire_review_status_key']);
         $questionnaireDetail = $workflow->getQuestionnaireDetail($questionnaireID);
-        $this->assertSame('assigned', $questionnaireDetail['review_status_key']);
-        $this->assertNull($questionnaireDetail['reviewer_koalendar_booking_url']);
+        $this->assertSame('complete', $questionnaireDetail['review_status_key']);
+        $this->assertSame('https://koalendar.com/e/shared-reviewer', $questionnaireDetail['reviewer_koalendar_booking_url']);
 
         $this->assertTrue($workflow->saveQuestionnaireReview($questionnaireID, 1, '', true));
         $dashboardRow = $findDashboardRow();
