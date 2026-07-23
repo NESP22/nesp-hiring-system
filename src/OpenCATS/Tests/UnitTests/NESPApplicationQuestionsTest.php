@@ -33,6 +33,22 @@ class NESPApplicationQuestionsTest extends TestCase
         $this->assertFalse(NESPApplicationQuestions::requiresLegacyCaptcha($template, 41002));
     }
 
+    public function testApprovedNESPJobsRemoveStandaloneCaptchaLabel()
+    {
+        $template = '<label id="keySkillsLabel">Relevant skills</label>'
+            . '<input-keySkills>'
+            . '<label id="captchaLabel" for="captcha">Captcha *</label>'
+            . '<input-captcha req>'
+            . '<submit value="Apply">';
+
+        $result = NESPApplicationQuestions::removeLegacyCaptchaForJob($template, 41002);
+
+        $this->assertStringNotContainsString('captcha', strtolower($result));
+        $this->assertStringContainsString('<label id="keySkillsLabel">Relevant skills</label>', $result);
+        $this->assertStringContainsString('<input-keySkills>', $result);
+        $this->assertStringContainsString('<submit value="Apply">', $result);
+    }
+
     public function testNonNESPJobsKeepLegacyCaptcha()
     {
         $template = '<tr><td><input-captcha req></td></tr>';

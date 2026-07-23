@@ -28,6 +28,12 @@ class NESPApplicationQuestions
             (string) $content
         );
 
+        $content = preg_replace(
+            '/\s*<label\b[^>]*id=(["\'])captchaLabel\1[^>]*>.*?<\/label>\s*/is',
+            '',
+            $content
+        );
+
         return str_replace(array('<input-captcha>', '<input-captcha req>'), '', $content);
     }
 
