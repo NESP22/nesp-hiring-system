@@ -2,6 +2,81 @@
 
 class NESPCareerApplicationSupport
 {
+    public static function resolveCandidateEmailMatch($candidates, $email)
+    {
+        $candidateID = $candidates->getIDByEmail($email);
+        if ($candidateID === false || (int) $candidateID < 1)
+        {
+            return array(
+                'status' => 'not_found',
+                'candidateID' => 0,
+                'candidate' => array()
+            );
+        }
+
+        $candidate = $candidates->get((int) $candidateID);
+        if (empty($candidate))
+        {
+            return array(
+                'status' => 'invalid',
+                'candidateID' => (int) $candidateID,
+                'candidate' => array()
+            );
+        }
+
+        return array(
+            'status' => !empty($candidate['isActive']) ? 'active' : 'inactive',
+            'candidateID' => (int) $candidateID,
+            'candidate' => $candidate
+        );
+    }
+
+    public static function ensureCandidateJobOrderLink($pipelines, $candidateID, $jobOrderID, $actorUserID)
+    {
+        $candidateID = (int) $candidateID;
+        $jobOrderID = (int) $jobOrderID;
+        if ($candidateID <= 0 || $jobOrderID <= 0)
+        {
+            return array(
+                'success' => false,
+                'newApplication' => false,
+                'candidateJobOrderID' => 0
+            );
+        }
+
+        $pipeline = $pipelines->get($candidateID, $jobOrderID);
+        $newApplication = false;
+        if (empty($pipeline) || empty($pipeline['candidateJobOrderID']))
+        {
+            if (!$pipelines->add($candidateID, $jobOrderID, $actorUserID))
+            {
+                return array(
+                    'success' => false,
+                    'newApplication' => false,
+                    'candidateJobOrderID' => 0
+                );
+            }
+
+            $pipeline = $pipelines->get($candidateID, $jobOrderID);
+            $newApplication = true;
+        }
+
+        if (empty($pipeline) || empty($pipeline['candidateJobOrderID']))
+        {
+            return array(
+                'success' => false,
+                'newApplication' => $newApplication,
+                'candidateJobOrderID' => 0
+            );
+        }
+
+        return array(
+            'success' => true,
+            'newApplication' => $newApplication,
+            'candidateJobOrderID' => (int) $pipeline['candidateJobOrderID']
+        );
+    }
+
     public static function inspectResumeUpload($files, $field = 'file')
     {
         if (!isset($files[$field]) || !is_array($files[$field]))
