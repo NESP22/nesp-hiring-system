@@ -345,7 +345,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->assertTrue($duplicateRejected, 'The unique active questionnaire lock must reject a competing route.');
     }
 
-    public function testCustomerServiceAndProfileOnlyInterviewerCannotReceiveDirectGrant()
+    public function testProfileOnlyInterviewerCannotReceiveDirectGrant()
     {
         include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
         include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
@@ -370,7 +370,6 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
         $this->assertFalse($workflow->interviewerCanReceiveAssignment($profileID, $jobOrderID));
         $this->assertFalse($workflow->createCandidateGrant($profileID, $candidateID, $jobOrderID, 1));
-        $this->assertFalse($workflow->createCandidateGrant($profileID, $candidateID, 41001, 1));
         $this->assertSame(0, $this->countRowsWhere(
             'nesp_interviewer_candidate_grant',
             sprintf('interviewer_profile_id = %d AND candidate_id = %d', $profileID, $candidateID)

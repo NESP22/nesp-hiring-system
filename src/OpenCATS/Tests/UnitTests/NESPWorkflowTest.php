@@ -383,6 +383,7 @@ class NESPWorkflowTest extends TestCase
         $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
         $this->assertStringContainsString('interviewerProfileEmailIsInUse($email)', $workflow);
         $this->assertStringContainsString('interviewerProfileEmailIsInUse($requestedEmail, $interviewerProfileID)', $workflow);
+        $this->assertStringContainsString('normalizeInterviewerProfileEmail($requestedEmail) !== self::normalizeInterviewerProfileEmail($currentEmail)', $workflow);
         $this->assertStringContainsString('LOWER(TRIM(email))', $workflow);
     }
 
@@ -555,13 +556,25 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('ijr.joborder_id = %s', $workflow);
     }
 
+    public function testCustomerServiceUsesTheSameRoleScopedReviewerGrantPath()
+    {
+        $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+        $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
+        $template = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireReview.tpl');
+
+        $this->assertStringNotContainsString('customer_service_craig_manual_only', $workflow);
+        $this->assertStringNotContainsString('$jobOrderID === 41001 || !$this->isTableInstalled', $workflow);
+        $this->assertStringNotContainsString('Customer Service questionnaires stay with Craig and do not need an interviewer assignment.', $ui);
+        $this->assertStringNotContainsString('Customer Service questionnaires stay with Craig. No interviewer assignment is needed.', $template);
+        $this->assertStringContainsString('interviewerCanReceiveAssignment($interviewerProfileID, $jobOrderID)', $workflow);
+    }
+
     public function testQuestionnaireReviewerPickerUsesTheSameEligibilityRulesAsAssignment()
     {
         $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
         $template = file_get_contents(LEGACY_ROOT . '/modules/nesp/QuestionnaireReview.tpl');
 
         $this->assertStringContainsString('getEligibleInterviewersForAssignment((int) $detail[\'joborder_id\'])', $ui);
-        $this->assertStringContainsString('Customer Service questionnaires stay with Craig', $ui);
         $this->assertStringContainsString('Choose an active, open interviewer approved for this role.', $ui);
         $this->assertStringContainsString('eligibleReviewerProfiles', $template);
         $this->assertStringContainsString('No active, open interviewer is approved for this role yet.', $template);

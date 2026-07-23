@@ -1541,10 +1541,6 @@ class NESPUI extends UserInterface
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose a valid questionnaire.');
         }
-        if ((int) $detail['joborder_id'] === 41001)
-        {
-            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Customer Service questionnaires stay with Craig and do not need an interviewer assignment.');
-        }
         if ($this->_workflow->assignQuestionnaireReviewer($questionnaireID, $interviewerProfileID, $this->_userID) === false)
         {
             CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Choose an active, open interviewer approved for this role.');
