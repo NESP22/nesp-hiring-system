@@ -12,6 +12,31 @@ class NESPApplicationQuestions
         return isset($config[(int) $jobOrderID]);
     }
 
+    public static function removeLegacyCaptchaForJob($content, $jobOrderID)
+    {
+        if (!self::hasQuestionsForJob($jobOrderID))
+        {
+            return (string) $content;
+        }
+
+        $content = preg_replace_callback(
+            '/<tr\b[^>]*>.*?<\/tr>/is',
+            function ($matches)
+            {
+                return strpos($matches[0], '<input-captcha') !== false ? '' : $matches[0];
+            },
+            (string) $content
+        );
+
+        return str_replace(array('<input-captcha>', '<input-captcha req>'), '', $content);
+    }
+
+    public static function requiresLegacyCaptcha($content, $jobOrderID)
+    {
+        return !self::hasQuestionsForJob($jobOrderID)
+            && strpos((string) $content, '<input-captcha req>') !== false;
+    }
+
     public static function getRoleTitle($jobOrderID)
     {
         $config = self::getConfig();

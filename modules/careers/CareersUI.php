@@ -631,6 +631,11 @@ class CareersUI extends UserInterface
                 die();
             }
 
+            $template['Content'] = NESPApplicationQuestions::removeLegacyCaptchaForJob(
+                $template['Content'],
+                $jobID
+            );
+
             /* Make JavaScript validation rules. */
             $validator = $this->_makeApplyValidator($template);
 
@@ -827,7 +832,10 @@ class CareersUI extends UserInterface
                 die();
             }
 
-            if ($this->careerPortalTemplateRequiresCaptcha($template['Content - Apply for Position']))
+            if (NESPApplicationQuestions::requiresLegacyCaptcha(
+                $template['Content - Apply for Position'],
+                (int) $_POST['ID']
+            ))
             {
                 $captchaValue = isset($_POST['captcha']) ? $_POST['captcha'] : '';
                 if (!$this->validateCareerPortalCaptcha($captchaValue))
@@ -1204,11 +1212,6 @@ class CareersUI extends UserInterface
         $builder->output();
 
         die();
-    }
-
-    private function careerPortalTemplateRequiresCaptcha($templateContent)
-    {
-        return (strpos($templateContent, '<input-captcha req>') !== false);
     }
 
     private function validateCareerPortalCaptcha($captchaValue)
