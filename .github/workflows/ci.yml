@@ -77,7 +77,9 @@ jobs:
           timeout 180s bash -c "until [ \"\$(docker inspect --format '{{.State.Health.Status}}' \"${integrationtestdb_container}\" 2>/dev/null)\" = \"healthy\" ]; do sleep 3; done"
 
           # 2. Pre-clean the integration database
-          docker compose -f docker-compose-test.yml exec -T integrationtestdb mysql -uroot -pdev -e "DROP DATABASE IF EXISTS cats_integrationtest; CREATE DATABASE cats_integrationtest;"
+          # Explicit TCP avoids the MariaDB CLI's transient local-socket race.
+          timeout 60s bash -c 'until docker compose -f docker-compose-test.yml exec -T integrationtestdb mysqladmin --protocol=tcp -h127.0.0.1 -uroot -pdev ping --silent >/dev/null 2>&1; do sleep 2; done'
+          docker compose -f docker-compose-test.yml exec -T integrationtestdb mysql --protocol=tcp -h127.0.0.1 -uroot -pdev -e "DROP DATABASE IF EXISTS cats_integrationtest; CREATE DATABASE cats_integrationtest;"
 
           # 3. DIAGNOSTIC: Check if PHP can resolve the database hostname
           echo "Diagnostic: Resolving integrationtestdb from PHP container..."
