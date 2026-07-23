@@ -124,8 +124,16 @@ class NESPCareerPortalProtectionTest extends TestCase
         $this->assertStringContainsString('NESPCareerPortalProtection::protectsJob($jobID)', $source);
         $this->assertStringContainsString('NESPCareerPortalProtection::validateSubmission(', $source);
         $this->assertStringContainsString('else if (NESPApplicationQuestions::requiresLegacyCaptcha', $source);
-        $this->assertStringContainsString('$candidates->getIDByEmail($email)', $source);
-        $this->assertStringContainsString('$pipelines->get($candidateID, $jobOrderID)', $source);
+        $this->assertStringContainsString('resolveCandidateEmailMatch($candidates, $email)', $source);
+        $this->assertStringContainsString("\$candidateMatch['status'] === 'inactive'", $source);
+        $this->assertStringContainsString('ensureCandidateJobOrderLink(', $source);
+        $this->assertStringContainsString('routeCareerPortalApplicationToNeedsCraigResult(', $source);
+        $this->assertStringNotContainsString('&& !$workflow->ensureCandidateWorkflowRow(', $source);
         $this->assertStringContainsString('NESPApplicationQuestions::validatePost($jobOrderID, $_POST)', $source);
+        $this->assertGreaterThan(
+            strpos($source, 'routeCareerPortalApplicationToNeedsCraigResult('),
+            strrpos($source, "\$result['success'] = true;"),
+            'The public success result must only be set after verified workflow routing.'
+        );
     }
 }
