@@ -39,6 +39,51 @@ class NESPCareerPortalProtectionTest extends TestCase
         $this->assertSame('', NESPCareerPortalProtection::renderFields(99999, $session, 1000));
     }
 
+    public function testOpeningAnotherFormForTheSameJobDoesNotInvalidateTheFirstForm()
+    {
+        $session = array();
+        $firstHTML = NESPCareerPortalProtection::renderFields(41002, $session, 1000);
+        $secondHTML = NESPCareerPortalProtection::renderFields(41002, $session, 1001);
+        preg_match('/name="nesp_application_token" value="([a-f0-9]{64})"/', $firstHTML, $firstMatches);
+        preg_match('/name="nesp_application_token" value="([a-f0-9]{64})"/', $secondHTML, $secondMatches);
+
+        $firstResult = NESPCareerPortalProtection::validateSubmission(41002, array(
+            NESPCareerPortalProtection::TOKEN_FIELD => $firstMatches[1],
+            NESPCareerPortalProtection::HONEYPOT_FIELD => ''
+        ), $session, '192.0.2.10', 1003);
+        $secondResult = NESPCareerPortalProtection::validateSubmission(41002, array(
+            NESPCareerPortalProtection::TOKEN_FIELD => $secondMatches[1],
+            NESPCareerPortalProtection::HONEYPOT_FIELD => ''
+        ), $session, '192.0.2.10', 1004);
+
+        $this->assertTrue($firstResult['valid']);
+        $this->assertTrue($secondResult['valid']);
+        $this->assertCount(2, $session[NESPCareerPortalProtection::FORM_SESSION_KEY][41002]['tokens']);
+    }
+
+    public function testActiveFormsAreBoundedAndExpiredFormsArePruned()
+    {
+        $session = array();
+
+        for ($index = 0; $index < NESPCareerPortalProtection::MAXIMUM_ACTIVE_FORMS_PER_JOB + 3; $index++)
+        {
+            NESPCareerPortalProtection::renderFields(41002, $session, 1000 + $index);
+        }
+
+        $this->assertCount(
+            NESPCareerPortalProtection::MAXIMUM_ACTIVE_FORMS_PER_JOB,
+            $session[NESPCareerPortalProtection::FORM_SESSION_KEY][41002]['tokens']
+        );
+
+        NESPCareerPortalProtection::renderFields(
+            41002,
+            $session,
+            1000 + NESPCareerPortalProtection::MAXIMUM_FORM_AGE_SECONDS + 20
+        );
+
+        $this->assertCount(1, $session[NESPCareerPortalProtection::FORM_SESSION_KEY][41002]['tokens']);
+    }
+
     public function testValidSubmissionPassesServerSideChecksForEveryNESPJob()
     {
         foreach (array(41001, 41002, 41003, 41005) as $jobOrderID)

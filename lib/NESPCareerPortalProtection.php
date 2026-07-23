@@ -10,6 +10,7 @@ class NESPCareerPortalProtection
     const RATE_SESSION_KEY = 'nespCareerPortalRate';
     const MINIMUM_FILL_SECONDS = 2;
     const MAXIMUM_FORM_AGE_SECONDS = 7200;
+    const MAXIMUM_ACTIVE_FORMS_PER_JOB = 8;
     const RATE_LIMIT_WINDOW_SECONDS = 600;
     const RATE_LIMIT_ATTEMPTS = 8;
 
@@ -34,9 +35,29 @@ class NESPCareerPortalProtection
             $session[self::FORM_SESSION_KEY] = array();
         }
 
+        $existingState = isset($session[self::FORM_SESSION_KEY][$jobOrderID])
+            && is_array($session[self::FORM_SESSION_KEY][$jobOrderID])
+            ? $session[self::FORM_SESSION_KEY][$jobOrderID]
+            : array();
+        $activeTokens = self::activeTokenStates($existingState, $now);
+        $tokenHash = hash('sha256', $token);
+        $activeTokens[$tokenHash] = $now;
+
+        if (count($activeTokens) > self::MAXIMUM_ACTIVE_FORMS_PER_JOB)
+        {
+            asort($activeTokens, SORT_NUMERIC);
+            $activeTokens = array_slice(
+                $activeTokens,
+                -self::MAXIMUM_ACTIVE_FORMS_PER_JOB,
+                null,
+                true
+            );
+        }
+
         $session[self::FORM_SESSION_KEY][$jobOrderID] = array(
-            'token_hash' => hash('sha256', $token),
-            'issued_at' => $now
+            'token_hash' => $tokenHash,
+            'issued_at' => $now,
+            'tokens' => $activeTokens
         );
 
         return '<input type="hidden" name="' . self::TOKEN_FIELD . '" value="'
@@ -64,11 +85,14 @@ class NESPCareerPortalProtection
         $submittedToken = isset($postData[self::TOKEN_FIELD])
             ? trim((string) $postData[self::TOKEN_FIELD])
             : '';
-        $storedTokenHash = isset($formState['token_hash']) ? (string) $formState['token_hash'] : '';
+        $submittedTokenHash = $submittedToken === '' ? '' : hash('sha256', $submittedToken);
+        $activeTokens = self::activeTokenStates($formState, $now, false);
+        $issuedAt = isset($activeTokens[$submittedTokenHash])
+            ? (int) $activeTokens[$submittedTokenHash]
+            : 0;
 
         if ($submittedToken === ''
-            || $storedTokenHash === ''
-            || !hash_equals($storedTokenHash, hash('sha256', $submittedToken)))
+            || $issuedAt <= 0)
         {
             return array('valid' => false, 'reason' => 'csrf');
         }
@@ -81,7 +105,6 @@ class NESPCareerPortalProtection
             return array('valid' => false, 'reason' => 'honeypot');
         }
 
-        $issuedAt = isset($formState['issued_at']) ? (int) $formState['issued_at'] : 0;
         $elapsed = $now - $issuedAt;
         if ($issuedAt <= 0 || $elapsed < self::MINIMUM_FILL_SECONDS)
         {
@@ -117,5 +140,35 @@ class NESPCareerPortalProtection
         $session[self::RATE_SESSION_KEY][$rateKey] = $attempts;
 
         return array('valid' => true, 'reason' => 'valid');
+    }
+
+    private static function activeTokenStates($formState, $now, $pruneExpired = true)
+    {
+        $tokens = array();
+
+        if (isset($formState['tokens']) && is_array($formState['tokens']))
+        {
+            foreach ($formState['tokens'] as $tokenHash => $issuedAt)
+            {
+                $issuedAt = (int) $issuedAt;
+                if ($issuedAt > 0
+                    && (!$pruneExpired || ($now - $issuedAt) <= self::MAXIMUM_FORM_AGE_SECONDS))
+                {
+                    $tokens[(string) $tokenHash] = $issuedAt;
+                }
+            }
+        }
+
+        if (isset($formState['token_hash']) && isset($formState['issued_at']))
+        {
+            $issuedAt = (int) $formState['issued_at'];
+            if ($issuedAt > 0
+                && (!$pruneExpired || ($now - $issuedAt) <= self::MAXIMUM_FORM_AGE_SECONDS))
+            {
+                $tokens[(string) $formState['token_hash']] = $issuedAt;
+            }
+        }
+
+        return $tokens;
     }
 }
