@@ -19,7 +19,7 @@ class NESPWorkflow
 
     const APPLICANT_EMAIL_FEATURE_DESCRIPTION = 'When deliberately enabled with a configured sender, automatically sends one secure role-specific questionnaire email after a new applicant has a valid email and linked job, allows an administrator to send one to an existing reviewed applicant, and can send one four-day reminder when the separate reminder scheduler is enabled.';
     const KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG = 'NESP_KOALENDAR_BOOKING_EMAIL_ENABLED';
-    const KOALENDAR_BOOKING_EMAIL_FEATURE_DESCRIPTION = 'Automatically emails the assigned interviewer\'s public Koalendar booking page after questionnaire review is completed. Disabled by default; no calendar event or automatic scheduling is created.';
+    const KOALENDAR_BOOKING_EMAIL_FEATURE_DESCRIPTION = 'Automatically emails the public Koalendar booking page for the assigned interviewer after questionnaire review is completed. Disabled by default; no calendar event or automatic scheduling is created.';
     const QUESTIONNAIRE_REMINDER_AFTER_DAYS = 4;
     const QUESTIONNAIRE_CLOSE_REVIEW_AFTER_DAYS = 4;
 
