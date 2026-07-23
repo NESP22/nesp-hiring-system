@@ -6,6 +6,21 @@ Branch: `codex/phase2-vapi-phone-screen`
 
 Starting commit: `06a9133a71df108ae355c7819e6bd63b5f513a12`
 
+## Overnight Production Status
+
+- PR #7 was merged and deployed with scheduled Vapi calling disabled.
+- Additive scheduler and recruiting-control migrations were applied after the verified encrypted production backup.
+- PR #8 hotfix was merged and deployed to fix the public phone-screen scheduler bootstrap path.
+- Current deployed commit after the hotfix: `a806ceea0c2bf34f09942a4a76ee33e32a2c192a`.
+- `NESP_VAPI_ENABLED` remained `0`.
+- OpenCATS mail remained disabled.
+- No Render scheduled-call cron was created.
+- No phone call, applicant contact, email, SMS, ad publication, ad spend, candidate stage change, or Customer Service Vapi modification occurred.
+- Public scheduler invalid-token checks returned the safe branded "Scheduling link unavailable" page without stack traces, SQL errors, filesystem paths, raw IDs, or secrets.
+- A valid production scheduling-token page was not exercised because no production fake candidate/token may be created without Craig's later approval.
+
+See `docs/nesp/MORNING_HANDOFF_2026-07-15.md` for the owner handoff and approval gates.
+
 ## Completed In Code
 
 - Added Vapi safety helper for consent script, role scripts, webhook validation, redaction, status mapping, and outbound payload construction.
