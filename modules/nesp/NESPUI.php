@@ -497,6 +497,11 @@ class NESPUI extends UserInterface
                 $this->staffingForecast();
                 break;
 
+            case 'exportCandidatesCsv':
+                $this->adminOnly();
+                $this->exportCandidatesCsv();
+                break;
+
             case 'waiting':
             case 'interviews':
             case 'completed':
@@ -542,6 +547,72 @@ class NESPUI extends UserInterface
         unset($_SESSION['NESP_ASSIGNMENT_MESSAGE']);
         $this->_template->assign('assignmentMessage', $assignmentMessage);
         $this->_template->display('./modules/nesp/Dashboard.tpl');
+    }
+
+    /**
+     * Creates a read-only contingency export for administrator review.
+     */
+    private function exportCandidatesCsv()
+    {
+        $rows = $this->_workflow->getCandidateExportRows();
+        $actorUserID = isset($_SESSION['CATS']) ? (int) $_SESSION['CATS']->getUserID() : 0;
+        $this->_workflow->logAuditEvent($actorUserID, 'candidate_backup_exported', 'candidate_export', 0, array(
+            'row_count' => count($rows)
+        ));
+
+        $filename = 'nesp-candidate-backup-' . gmdate('Y-m-d-His') . '.csv';
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-store, private');
+
+        $handle = fopen('php://output', 'w');
+        fputcsv($handle, array(
+            'candidate_id', 'first_name', 'last_name', 'email', 'alternate_email',
+            'home_phone', 'cell_phone', 'work_phone', 'city', 'state', 'source',
+            'roles', 'workflow_stage', 'waiting_on', 'questionnaire_status',
+            'assigned_interviewers', 'resume_attached', 'created_at', 'last_modified'
+        ));
+
+        foreach ($rows as $row)
+        {
+            fputcsv($handle, array(
+                $this->csvExportValue($row['candidate_id']),
+                $this->csvExportValue($row['first_name']),
+                $this->csvExportValue($row['last_name']),
+                $this->csvExportValue($row['email']),
+                $this->csvExportValue($row['alternate_email']),
+                $this->csvExportValue($row['home_phone']),
+                $this->csvExportValue($row['cell_phone']),
+                $this->csvExportValue($row['work_phone']),
+                $this->csvExportValue($row['city']),
+                $this->csvExportValue($row['state']),
+                $this->csvExportValue($row['source']),
+                $this->csvExportValue($row['roles']),
+                $this->csvExportValue($row['workflow_stage']),
+                $this->csvExportValue($row['waiting_on']),
+                $this->csvExportValue($row['questionnaire_status']),
+                $this->csvExportValue($row['assigned_interviewers']),
+                $this->csvExportValue($row['resume_attached']),
+                $this->csvExportValue($row['created_at']),
+                $this->csvExportValue($row['last_modified'])
+            ));
+        }
+
+        fclose($handle);
+        exit;
+    }
+
+    private function csvExportValue($value)
+    {
+        $value = trim((string) $value);
+
+        // Avoid spreadsheet formula execution when the backup is opened locally.
+        if ($value !== '' && preg_match('/^[=+@-]/', $value))
+        {
+            return "'" . $value;
+        }
+
+        return $value;
     }
 
     private function settings($oneTimeLoginDetails = array())

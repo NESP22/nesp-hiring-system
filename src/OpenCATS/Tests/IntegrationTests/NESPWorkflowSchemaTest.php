@@ -1906,6 +1906,46 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $this->mySQLQueryMultipleLocal(file_get_contents('db/nesp_hiring_workflow_qa_hardening_additive.sql'), ";\n");
     }
 
+    public function testCandidateBackupExportIncludesActiveCandidateWorkflowSummary()
+    {
+        $workflow = new \NESPWorkflow();
+        $candidateID = $this->insertFakeCandidate('Export', 'Fixture');
+        $jobOrderID = $this->insertFakeJobOrder('CSV Backup Role');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->mySQLQueryLocal(
+            sprintf(
+                "UPDATE candidate
+                 SET email1 = 'export.fixture@example.test',
+                     phone_cell = '555-0101',
+                     city = 'Methuen',
+                     state = 'MA',
+                     source = 'NESP Ad: Test'
+                 WHERE candidate_id = %d",
+                $candidateID
+            )
+        );
+        $this->assertNotFalse($workflow->ensureCandidateWorkflowRow($candidateID, $jobOrderID, 1));
+
+        $exported = array();
+        foreach ($workflow->getCandidateExportRows() as $row)
+        {
+            if ((int) $row['candidate_id'] === $candidateID)
+            {
+                $exported = $row;
+                break;
+            }
+        }
+
+        $this->assertNotEmpty($exported);
+        $this->assertSame('Export', $exported['first_name']);
+        $this->assertSame('Fixture', $exported['last_name']);
+        $this->assertSame('export.fixture@example.test', $exported['email']);
+        $this->assertSame('555-0101', $exported['cell_phone']);
+        $this->assertSame('NESP Ad: Test', $exported['source']);
+        $this->assertSame('CSV Backup Role', $exported['roles']);
+        $this->assertSame('No', $exported['resume_attached']);
+    }
+
     private function countMatchingTables($table)
     {
         global $mySQLConnection;
