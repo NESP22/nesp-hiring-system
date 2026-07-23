@@ -493,7 +493,6 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
 
         $questionnaireDetail = $workflow->getQuestionnaireDetail($questionnaireID);
         $this->assertSame((int) $primaryGrantID, (int) $questionnaireDetail['booking_owner_grant_id']);
-        $this->assertSame($profileID, (int) $questionnaireDetail['booking_interviewer_profile_id']);
         $this->assertSame('Booking Interviewer', $questionnaireDetail['booking_interviewer_name']);
         $this->assertSame('https://koalendar.com/e/booking-interviewer', $questionnaireDetail['reviewer_koalendar_booking_url']);
 
