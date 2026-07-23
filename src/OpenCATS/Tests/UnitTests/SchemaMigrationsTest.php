@@ -75,4 +75,31 @@ class SchemaMigrationsTest extends TestCase
             $previous = $key;
         }
     }
+
+    public function testKoalendarMigrationRendersPortableSql(): void
+    {
+        if (!defined('OFFSET_GMT')) {
+            define('OFFSET_GMT', 0);
+        }
+        if (!defined('EXTRA_FIELD_TEXT')) {
+            define('EXTRA_FIELD_TEXT', 1);
+        }
+        if (!defined('EXTRA_FIELD_CHECKBOX')) {
+            define('EXTRA_FIELD_CHECKBOX', 2);
+        }
+
+        require_once LEGACY_ROOT . '/modules/install/Schema.php';
+
+        $migrations = CATSSchema::get();
+        $this->assertArrayHasKey('401', $migrations);
+        $this->assertStringContainsString(
+            'Automatically emails the public Koalendar booking page for the assigned interviewer',
+            $migrations['401']
+        );
+        $this->assertStringNotContainsString(
+            "interviewer\\'s",
+            $migrations['401'],
+            'Migration SQL must not depend on backslash apostrophe escaping.'
+        );
+    }
 }

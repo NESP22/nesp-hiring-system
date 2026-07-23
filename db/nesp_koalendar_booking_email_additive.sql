@@ -4,7 +4,7 @@
 INSERT INTO nesp_feature_flag
     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
 VALUES
-    ('NESP_KOALENDAR_BOOKING_EMAIL_ENABLED', 'Koalendar Interview Invite Email', 'Automatically emails the assigned interviewer\'s public Koalendar booking page after questionnaire review is completed. Disabled by default; no calendar event or automatic scheduling is created.', 0, 1, NOW(), NOW())
+    ('NESP_KOALENDAR_BOOKING_EMAIL_ENABLED', 'Koalendar Interview Invite Email', 'Automatically emails the public Koalendar booking page for the assigned interviewer after questionnaire review is completed. Disabled by default; no calendar event or automatic scheduling is created.', 0, 1, NOW(), NOW())
 ON DUPLICATE KEY UPDATE
     display_name = VALUES(display_name),
     description = VALUES(description),
