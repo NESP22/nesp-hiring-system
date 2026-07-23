@@ -2954,9 +2954,7 @@ class NESPWorkflow
                 $card['assignable_interviewers'] = $this->getEligibleInterviewersForAssignment((int) $row['joborder_id']);
                 if (empty($card['assignable_interviewers']))
                 {
-                    $card['assignment_block_reason'] = ((int) $row['joborder_id'] === 41001)
-                        ? 'Customer Service stays with Craig in Needs Craig.'
-                        : 'No active interviewer is approved and open for this role yet.';
+                    $card['assignment_block_reason'] = 'No active interviewer is approved and open for this role yet.';
                 }
             }
             $cardKey = $row['candidate_workflow_id'];
@@ -3392,18 +3390,6 @@ class NESPWorkflow
             return false;
         }
 
-        if ($jobOrderID === 41001)
-        {
-            $this->logAuditEvent(
-                $actorUserID,
-                'interviewer_candidate_grant_rejected',
-                'interviewer_profile',
-                $interviewerProfileID,
-                array('candidate_id' => $candidateID, 'joborder_id' => $jobOrderID, 'reason' => 'customer_service_craig_manual_only')
-            );
-            return false;
-        }
-
         $candidateJobOrder = $this->_db->getAssoc(
             sprintf(
                 'SELECT cjo.candidate_joborder_id
@@ -3490,7 +3476,7 @@ class NESPWorkflow
     public function getEligibleInterviewersForAssignment($jobOrderID)
     {
         $jobOrderID = (int) $jobOrderID;
-        if ($jobOrderID <= 0 || $jobOrderID === 41001 || !$this->isTableInstalled('nesp_interviewer_job_role'))
+        if ($jobOrderID <= 0 || !$this->isTableInstalled('nesp_interviewer_job_role'))
         {
             return array();
         }
@@ -6131,7 +6117,9 @@ class NESPWorkflow
         if (isset($settings['email']))
         {
             $requestedEmail = trim($settings['email']);
-            if ($this->interviewerProfileEmailIsInUse($requestedEmail, $interviewerProfileID))
+            $currentEmail = isset($before['email']) ? $before['email'] : '';
+            if (self::normalizeInterviewerProfileEmail($requestedEmail) !== self::normalizeInterviewerProfileEmail($currentEmail)
+                && $this->interviewerProfileEmailIsInUse($requestedEmail, $interviewerProfileID))
             {
                 return array('ok' => false, 'error' => 'An interviewer profile already uses this email address.');
             }
@@ -11493,11 +11481,6 @@ class NESPWorkflow
         {
             return false;
         }
-        if ($jobOrderID === 41001)
-        {
-            return false;
-        }
-
         $availabilityColumn = $this->isColumnInstalled('nesp_interviewer_profile', 'availability_status_key')
             ? "AND ip.availability_status_key = 'open'"
             : '';

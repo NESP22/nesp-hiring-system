@@ -130,9 +130,7 @@ $emailStatus = isset($this->questionnaire['auto_email_status_key']) ? $this->que
 
                 <div class="nesp-panel">
                     <h3>Assign Reviewer</h3>
-                    <?php if ((int) $this->questionnaire['joborder_id'] === 41001): ?>
-                        <p class="nesp-muted">Customer Service questionnaires stay with Craig. No interviewer assignment is needed.</p>
-                    <?php elseif (empty($this->eligibleReviewerProfiles)): ?>
+                    <?php if (empty($this->eligibleReviewerProfiles)): ?>
                         <p class="nesp-muted">No active, open interviewer is approved for this role yet. Update Interviewer Settings before assigning this questionnaire.</p>
                     <?php else: ?>
                         <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignQuestionnaireReviewer">
