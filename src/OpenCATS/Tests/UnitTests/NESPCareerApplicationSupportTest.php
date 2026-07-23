@@ -6,6 +6,106 @@ include_once(LEGACY_ROOT . '/lib/NESPCareerApplicationSupport.php');
 
 class NESPCareerApplicationSupportTest extends TestCase
 {
+    public function testInactiveEmailMatchIsExplicitAndNotReused()
+    {
+        $candidates = new class {
+            public function getIDByEmail($email)
+            {
+                return 41;
+            }
+
+            public function get($candidateID)
+            {
+                return array('candidateID' => $candidateID, 'isActive' => 0);
+            }
+        };
+
+        $match = NESPCareerApplicationSupport::resolveCandidateEmailMatch(
+            $candidates,
+            'inactive@example.test'
+        );
+
+        $this->assertSame('inactive', $match['status']);
+        $this->assertSame(41, $match['candidateID']);
+    }
+
+    public function testActiveEmailMatchCanBeReusedWithoutDuplication()
+    {
+        $candidates = new class {
+            public function getIDByEmail($email)
+            {
+                return 42;
+            }
+
+            public function get($candidateID)
+            {
+                return array('candidateID' => $candidateID, 'isActive' => 1);
+            }
+        };
+
+        $match = NESPCareerApplicationSupport::resolveCandidateEmailMatch(
+            $candidates,
+            'active@example.test'
+        );
+
+        $this->assertSame('active', $match['status']);
+        $this->assertSame(42, $match['candidateID']);
+    }
+
+    public function testFailedPipelineWriteCannotBecomeApplicationSuccess()
+    {
+        $pipelines = new class {
+            public function get($candidateID, $jobOrderID)
+            {
+                return array();
+            }
+
+            public function add($candidateID, $jobOrderID, $actorUserID)
+            {
+                return false;
+            }
+        };
+
+        $result = NESPCareerApplicationSupport::ensureCandidateJobOrderLink(
+            $pipelines,
+            21,
+            41002,
+            1
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(0, $result['candidateJobOrderID']);
+    }
+
+    public function testPipelineWriteMustBeReadableBeforeApplicationContinues()
+    {
+        $pipelines = new class {
+            public $reads = 0;
+
+            public function get($candidateID, $jobOrderID)
+            {
+                $this->reads++;
+                return array();
+            }
+
+            public function add($candidateID, $jobOrderID, $actorUserID)
+            {
+                return true;
+            }
+        };
+
+        $result = NESPCareerApplicationSupport::ensureCandidateJobOrderLink(
+            $pipelines,
+            22,
+            41003,
+            1
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertTrue($result['newApplication']);
+        $this->assertSame(2, $pipelines->reads);
+    }
+
     public function testMissingResumeIsOptional()
     {
         $this->assertSame(

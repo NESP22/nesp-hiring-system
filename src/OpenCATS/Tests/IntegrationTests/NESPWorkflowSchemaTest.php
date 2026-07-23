@@ -811,7 +811,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         ));
     }
 
-    public function testCareerPortalReapplicationReusesQuestionnaireAndWaitsForApplicantAfterManualShare()
+    public function testCareerPortalReapplicationPreservesQuestionnaireAlreadyWaitingForApplicant()
     {
         include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
         include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
@@ -840,7 +840,13 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $questionnaireID = (int) $questionnaire['screening_questionnaire_id'];
         $this->assertTrue($workflow->markQuestionnaireInvitationCopied($questionnaireID, 1));
 
-        $this->assertTrue($workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, 1, false));
+        $result = $workflow->routeCareerPortalApplicationToNeedsCraigResult(
+            $candidateID,
+            $jobOrderID,
+            1,
+            false
+        );
+        $this->assertTrue($result['success']);
         $this->assertSame(1, $this->countRowsWhere(
             'nesp_screening_questionnaire',
             sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
@@ -852,6 +858,224 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
                 $candidateID,
                 $jobOrderID
             )
+        ));
+
+        $laterReapplication = $workflow->routeCareerPortalApplicationToNeedsCraigResult(
+            $candidateID,
+            $jobOrderID,
+            1,
+            false
+        );
+        $this->assertFalse($laterReapplication['success']);
+        $this->assertSame('already_in_progress', $laterReapplication['reason']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+    }
+
+    public function testCareerPortalLaterStageReapplicationIsPreservedWithoutFalseSuccess()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Later', 'Stage');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->mySQLQueryLocal(
+            "UPDATE nesp_feature_flag
+             SET is_enabled = 1
+             WHERE flag_key = 'NESP_WORKFLOW_ENABLED'"
+        );
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $this->assertTrue($workflow->routeCareerPortalApplicationToNeedsCraig(
+            $candidateID,
+            $jobOrderID,
+            1,
+            true
+        ));
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_candidate_workflow
+             SET workflow_stage_id = (
+                 SELECT workflow_stage_id
+                 FROM nesp_workflow_stage
+                 WHERE stage_key = 'follow_up_needed'
+                 LIMIT 1
+             )
+             WHERE candidate_id = %d
+               AND joborder_id = %d",
+            $candidateID,
+            $jobOrderID
+        ));
+
+        $result = $workflow->routeCareerPortalApplicationToNeedsCraigResult(
+            $candidateID,
+            $jobOrderID,
+            1,
+            false
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('already_in_progress', $result['reason']);
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf(
+                "candidate_id = %d
+                 AND joborder_id = %d
+                 AND workflow_stage_id = (
+                     SELECT workflow_stage_id
+                     FROM nesp_workflow_stage
+                     WHERE stage_key = 'follow_up_needed'
+                     LIMIT 1
+                 )",
+                $candidateID,
+                $jobOrderID
+            )
+        ));
+        $this->assertSame(1, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+    }
+
+    public function testCareerPortalInactiveCandidateCannotBeRoutedOrDuplicated()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Inactive', 'Applicant');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->mySQLQueryLocal(sprintf(
+            'UPDATE candidate SET is_active = 0 WHERE candidate_id = %d',
+            $candidateID
+        ));
+        $this->mySQLQueryLocal(
+            "UPDATE nesp_feature_flag
+             SET is_enabled = 1
+             WHERE flag_key = 'NESP_WORKFLOW_ENABLED'"
+        );
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $result = $workflow->routeCareerPortalApplicationToNeedsCraigResult(
+            $candidateID,
+            $jobOrderID,
+            1,
+            true
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('candidate_or_pipeline_unavailable', $result['reason']);
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+    }
+
+    public function testCareerPortalQuestionnaireWriteFailureRollsBackAndReturnsFailure()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Questionnaire', 'Failure');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->mySQLQueryLocal(
+            "UPDATE nesp_feature_flag
+             SET is_enabled = 1
+             WHERE flag_key = 'NESP_WORKFLOW_ENABLED'"
+        );
+        $this->mySQLQueryLocal(
+            "CREATE TRIGGER nesp_test_fail_questionnaire_insert
+             BEFORE INSERT ON nesp_screening_questionnaire
+             FOR EACH ROW
+             SIGNAL SQLSTATE '45000'
+             SET MESSAGE_TEXT = 'forced questionnaire failure'"
+        );
+
+        $cleanupRolledBackTransaction = false;
+        try
+        {
+            $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+            $result = $workflow->routeCareerPortalApplicationToNeedsCraigResult(
+                $candidateID,
+                $jobOrderID,
+                1,
+                true
+            );
+        }
+        finally
+        {
+            $cleanupRolledBackTransaction = \DatabaseConnection::getInstance()->rollbackTransaction();
+            $this->mySQLQueryLocal('DROP TRIGGER IF EXISTS nesp_test_fail_questionnaire_insert');
+        }
+
+        $this->assertFalse($cleanupRolledBackTransaction, 'The route must roll back its failed transaction.');
+        $this->assertFalse($result['success']);
+        $this->assertSame('persistence_exception', $result['reason']);
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+    }
+
+    public function testCareerPortalWorkflowWriteFailureRollsBackQuestionnaireAndReturnsFailure()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $candidateID = $this->insertFakeCandidate('Workflow', 'Failure');
+        $jobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($candidateID, $jobOrderID);
+        $this->mySQLQueryLocal(
+            "UPDATE nesp_feature_flag
+             SET is_enabled = 1
+             WHERE flag_key = 'NESP_WORKFLOW_ENABLED'"
+        );
+        $this->mySQLQueryLocal(
+            "CREATE TRIGGER nesp_test_fail_workflow_insert
+             BEFORE INSERT ON nesp_candidate_workflow
+             FOR EACH ROW
+             SIGNAL SQLSTATE '45000'
+             SET MESSAGE_TEXT = 'forced workflow failure'"
+        );
+
+        $cleanupRolledBackTransaction = false;
+        try
+        {
+            $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+            $result = $workflow->routeCareerPortalApplicationToNeedsCraigResult(
+                $candidateID,
+                $jobOrderID,
+                1,
+                true
+            );
+        }
+        finally
+        {
+            $cleanupRolledBackTransaction = \DatabaseConnection::getInstance()->rollbackTransaction();
+            $this->mySQLQueryLocal('DROP TRIGGER IF EXISTS nesp_test_fail_workflow_insert');
+        }
+
+        $this->assertFalse($cleanupRolledBackTransaction, 'The route must roll back its failed transaction.');
+        $this->assertFalse($result['success']);
+        $this->assertSame('persistence_exception', $result['reason']);
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_candidate_workflow',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
+        ));
+        $this->assertSame(0, $this->countRowsWhere(
+            'nesp_screening_questionnaire',
+            sprintf('candidate_id = %d AND joborder_id = %d', $candidateID, $jobOrderID)
         ));
     }
 
