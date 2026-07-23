@@ -1,0 +1,346 @@
+.nesp-simple-admin {
+    --hub-bg: #f5f7fa;
+    --hub-panel: #ffffff;
+    --hub-ink: #172033;
+    --hub-muted: #5c667a;
+    --hub-line: #d7dde7;
+    --hub-blue: #175ea8;
+    --hub-blue-dark: #0f467f;
+    --hub-red: #cf202f;
+    background: var(--hub-bg);
+    color: var(--hub-ink);
+    min-height: 620px;
+}
+
+.nesp-simple-admin #contents {
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 1440px;
+    padding: 22px;
+}
+
+.nesp-simple-admin .hub-title {
+    align-items: flex-start;
+    border-bottom: 4px solid var(--hub-red);
+    display: flex;
+    gap: 20px;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+}
+
+.nesp-simple-admin h2,
+.nesp-simple-admin h3,
+.nesp-simple-admin p {
+    margin-top: 0;
+}
+
+.nesp-simple-admin h2 {
+    font-size: 28px;
+    line-height: 1.2;
+    margin-bottom: 6px;
+}
+
+.nesp-simple-admin h3 {
+    font-size: 18px;
+}
+
+.nesp-simple-admin .hub-eyebrow {
+    color: var(--hub-red);
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.nesp-simple-admin .hub-filters {
+    align-items: end;
+    background: var(--hub-panel);
+    border: 1px solid var(--hub-line);
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(150px, 1fr)) auto auto;
+    margin-bottom: 14px;
+    padding: 14px;
+}
+
+.nesp-simple-admin label {
+    color: var(--hub-muted);
+    display: grid;
+    font-weight: 700;
+    gap: 6px;
+}
+
+.nesp-simple-admin input,
+.nesp-simple-admin select {
+    background: #fff;
+    border: 1px solid #aeb8c7;
+    box-sizing: border-box;
+    color: var(--hub-ink);
+    min-height: 40px;
+    padding: 8px 10px;
+    width: 100%;
+}
+
+.nesp-simple-admin .hub-button {
+    align-items: center;
+    border: 1px solid transparent;
+    box-sizing: border-box;
+    display: inline-flex;
+    font-weight: 700;
+    justify-content: center;
+    min-height: 40px;
+    padding: 8px 14px;
+    text-decoration: none;
+}
+
+.nesp-simple-admin .hub-button.primary {
+    background: var(--hub-blue);
+    color: #fff;
+}
+
+.nesp-simple-admin .hub-button.primary:hover,
+.nesp-simple-admin .hub-button.primary:focus {
+    background: var(--hub-blue-dark);
+}
+
+.nesp-simple-admin .hub-button.secondary {
+    background: #fff;
+    border-color: var(--hub-blue);
+    color: var(--hub-blue);
+}
+
+.nesp-simple-admin .hub-button.compact {
+    min-height: 34px;
+    padding: 6px 12px;
+}
+
+.nesp-simple-admin .hub-clear,
+.nesp-simple-admin .hub-back {
+    align-items: center;
+    color: var(--hub-blue);
+    display: inline-flex;
+    font-weight: 700;
+    min-height: 40px;
+}
+
+.nesp-simple-admin .hub-back {
+    margin-bottom: 12px;
+}
+
+.nesp-simple-admin .hub-count {
+    color: var(--hub-muted);
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.nesp-simple-admin .hub-table-wrap {
+    overflow-x: auto;
+}
+
+.nesp-simple-admin .hub-table {
+    background: var(--hub-panel);
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.nesp-simple-admin .hub-table th,
+.nesp-simple-admin .hub-table td {
+    border: 1px solid var(--hub-line);
+    padding: 11px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.nesp-simple-admin .hub-table th {
+    background: #e9eef5;
+    color: #273247;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.nesp-simple-admin .hub-table td span {
+    color: var(--hub-muted);
+    display: block;
+    margin-top: 3px;
+}
+
+.nesp-simple-admin .hub-table .hub-status {
+    color: var(--hub-ink);
+    font-weight: 700;
+    margin: 0;
+}
+
+.nesp-simple-admin .hub-action {
+    text-align: right;
+    width: 70px;
+}
+
+.nesp-simple-admin .hub-empty,
+.nesp-simple-admin .hub-panel,
+.nesp-simple-admin .hub-summary-grid > div,
+.nesp-simple-admin .hub-notice {
+    background: var(--hub-panel);
+    border: 1px solid var(--hub-line);
+    padding: 18px;
+}
+
+.nesp-simple-admin .hub-summary-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    margin-bottom: 16px;
+}
+
+.nesp-simple-admin .hub-summary-grid span {
+    color: var(--hub-muted);
+    display: block;
+    margin-bottom: 6px;
+}
+
+.nesp-simple-admin .hub-summary-grid strong {
+    overflow-wrap: anywhere;
+    font-size: 17px;
+}
+
+.nesp-simple-admin .hub-summary-grid small {
+    color: var(--hub-muted);
+    display: block;
+    margin-top: 5px;
+    overflow-wrap: anywhere;
+}
+
+.nesp-simple-admin .hub-two-column {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 16px;
+}
+
+.nesp-simple-admin .hub-panel {
+    margin-bottom: 16px;
+}
+
+.nesp-simple-admin .hub-panel form {
+    align-items: end;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr auto;
+}
+
+.nesp-simple-admin .hub-large-status {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.nesp-simple-admin .hub-answers {
+    margin: 0;
+}
+
+.nesp-simple-admin .hub-answers div {
+    border-top: 1px solid var(--hub-line);
+    display: grid;
+    gap: 20px;
+    grid-template-columns: minmax(220px, 1fr) 2fr;
+    padding: 13px 0;
+}
+
+.nesp-simple-admin .hub-answers div:first-child {
+    border-top: 0;
+}
+
+.nesp-simple-admin .hub-answers dt {
+    font-weight: 700;
+}
+
+.nesp-simple-admin .hub-answers dd {
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+.nesp-simple-admin .hub-notice.success {
+    border-left: 5px solid #16834f;
+}
+
+.nesp-simple-admin .hub-notice.error {
+    border-left: 5px solid var(--hub-red);
+}
+
+.nesp-simple-admin .sr-only {
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+}
+
+@media (max-width: 1024px) {
+    .nesp-simple-admin .hub-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .nesp-simple-admin .hub-summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 700px) {
+    .nesp-simple-admin #contents {
+        padding: 14px;
+    }
+
+    .nesp-simple-admin .hub-title,
+    .nesp-simple-admin .hub-two-column,
+    .nesp-simple-admin .hub-panel form,
+    .nesp-simple-admin .hub-answers div {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .nesp-simple-admin .hub-filters,
+    .nesp-simple-admin .hub-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .nesp-simple-admin .hub-table thead {
+        display: none;
+    }
+
+    .nesp-simple-admin .hub-table,
+    .nesp-simple-admin .hub-table tbody,
+    .nesp-simple-admin .hub-table tr,
+    .nesp-simple-admin .hub-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .nesp-simple-admin .hub-table tr {
+        border: 1px solid var(--hub-line);
+        margin-bottom: 12px;
+    }
+
+    .nesp-simple-admin .hub-table td {
+        border: 0;
+        border-bottom: 1px solid var(--hub-line);
+        box-sizing: border-box;
+        padding-left: 42%;
+        position: relative;
+    }
+
+    .nesp-simple-admin .hub-table td::before {
+        color: var(--hub-muted);
+        content: attr(data-label);
+        font-weight: 700;
+        left: 11px;
+        position: absolute;
+        top: 11px;
+        width: 36%;
+    }
+
+    .nesp-simple-admin .hub-table .hub-action {
+        padding-left: 11px;
+        text-align: left;
+    }
+}
