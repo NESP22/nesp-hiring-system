@@ -2005,6 +2005,13 @@ class CareersUI extends UserInterface
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Email address is required. Please return to the application and complete the email field.');
             return $result;
         }
+        $validatedEmail = NESPWorkflow::validateApplicantContactEmail($email);
+        if (empty($validatedEmail['ok']))
+        {
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Enter a valid email address so the hiring team can process your application.');
+            return $result;
+        }
+        $email = $validatedEmail['email'];
 
         if (empty($source))
         {
@@ -2039,6 +2046,15 @@ class CareersUI extends UserInterface
         if ($candidateID !== false)
         {
             $candidate = $candidates->get($candidateID);
+            if (empty($candidate) || empty($candidate['isActive']))
+            {
+                CommonErrors::fatal(
+                    COMMONERROR_BADFIELDS,
+                    $this,
+                    'An inactive application record already uses this account. The hiring team must review it before another application can be submitted.'
+                );
+                return $result;
+            }
 
             // Candidate exists and registered. Update their profile with new values (if provided)
             $candidates->update(
@@ -2054,8 +2070,24 @@ class CareersUI extends UserInterface
         }
         else
         {
-            // Lookup the candidate by e-mail, use that candidate instead if found (but don't update profile)
-            $candidateID = $candidates->getIDByEmail($email);
+            $candidateMatch = NESPCareerApplicationSupport::resolveCandidateEmailMatch($candidates, $email);
+            if ($candidateMatch['status'] === 'inactive')
+            {
+                CommonErrors::fatal(
+                    COMMONERROR_BADFIELDS,
+                    $this,
+                    'An inactive application record already uses this email address. The hiring team must review it before another application can be submitted.'
+                );
+                return $result;
+            }
+            if ($candidateMatch['status'] === 'invalid')
+            {
+                CommonErrors::fatal(COMMONERROR_RECORDERROR, $this, 'The existing candidate record could not be verified.');
+                return $result;
+            }
+            $candidateID = $candidateMatch['status'] === 'active'
+                ? $candidateMatch['candidateID']
+                : false;
         }
 
         if ($candidateID === false || $candidateID < 0)
@@ -2183,29 +2215,20 @@ class CareersUI extends UserInterface
         $pipelines = new Pipelines();
         $activityEntries = new ActivityEntries();
 
-        /* Is the candidate already in the pipeline for this job order? */
-        $rs = $pipelines->get($candidateID, $jobOrderID);
-        if (count($rs) == 0)
+        $pipelineResult = NESPCareerApplicationSupport::ensureCandidateJobOrderLink(
+            $pipelines,
+            $candidateID,
+            $jobOrderID,
+            $automatedUser['userID']
+        );
+        if (empty($pipelineResult['success']))
         {
-            /* Attempt to add the candidate to the pipeline. */
-            if (!$pipelines->add($candidateID, $jobOrderID))
-            {
-                CommonErrors::fatal(COMMONERROR_RECORDERROR, $this, 'Failed to add candidate to job order.');
-                return $result;
-            }
-
-            // FIXME: For some reason, pipeline entries like to disappear between
-            //        the above add() and this get(). WTF?
-            $rs = $pipelines->get($candidateID, $jobOrderID);
-            if (isset($rs['candidateJobOrderID']))
-                $pipelines->updateRatingValue($rs['candidateJobOrderID'], -1);
-
-            $newApplication = true;
+            CommonErrors::fatal(COMMONERROR_RECORDERROR, $this, 'Failed to create and verify the candidate job-order link.');
+            return $result;
         }
-        else
-        {
-            $newApplication = false;
-        }
+        $newApplication = !empty($pipelineResult['newApplication']);
+        if ($newApplication)
+            $pipelines->updateRatingValue($pipelineResult['candidateJobOrderID'], -1);
 
         NESPApplicationQuestions::logCandidateAnswers($jobOrderID, $candidateID, $_POST);
 
@@ -2213,9 +2236,23 @@ class CareersUI extends UserInterface
         // This creates a role-specific questionnaire link and routes the applicant
         // to Needs Craig. It emails the link only when the explicit applicant-email
         // feature flag and approved mail sender are configured.
-        if (!$workflow->routeCareerPortalApplicationToNeedsCraig($candidateID, $jobOrderID, $automatedUser['userID'], $newApplication)
-            && !$workflow->ensureCandidateWorkflowRow($candidateID, $jobOrderID, $automatedUser['userID'], $source))
+        $routingResult = $workflow->routeCareerPortalApplicationToNeedsCraigResult(
+            $candidateID,
+            $jobOrderID,
+            $automatedUser['userID'],
+            $newApplication
+        );
+        if (empty($routingResult['success']))
         {
+            if (isset($routingResult['reason']) && $routingResult['reason'] === 'already_in_progress')
+            {
+                CommonErrors::fatal(
+                    COMMONERROR_BADFIELDS,
+                    $this,
+                    'An application for this role is already being processed. Your existing application was not changed or duplicated.'
+                );
+                return $result;
+            }
             CommonErrors::fatal(COMMONERROR_RECORDERROR, $this, 'Failed to route application for human review.');
             return $result;
         }
