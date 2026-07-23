@@ -8213,7 +8213,7 @@ class NESPWorkflow
         $row['question_set_version'] = (int) $version['version_number'];
         $row['question_set_version_id'] = (int) $version['question_set_version_id'];
         $row['questions'] = $version['questions'];
-        $row['question_snapshot_json'] = json_encode($row['questions']);
+        $row['question_snapshot_json'] = self::buildQuestionnaireIssuedSnapshot($row);
         $row['estimated_minutes'] = '5-10 minutes';
         return $row;
     }
@@ -8940,27 +8940,68 @@ class NESPWorkflow
         $this->ensureDefaultQuestionSetsSeeded();
         if ($this->isTableInstalled('nesp_question_set_version'))
         {
-            $matchSQL = sprintf(
+            $publishedRows = $this->_db->getAllAssoc(
                 'SELECT qsv.*,
+                        qs.question_set_id,
                         qs.set_key,
                         COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
                         COALESCE(qsv.description, qs.description) AS description
-                 FROM nesp_question_set_role_match rm
-                 INNER JOIN nesp_question_set qs
-                    ON qs.question_set_id = rm.question_set_id
-                   AND qs.status_key = "active"
+                 FROM nesp_question_set qs
                  INNER JOIN nesp_question_set_version qsv
                     ON qsv.question_set_version_id = qs.current_version_id
                    AND qsv.status_key = "published"
-                 WHERE rm.is_active = 1
-                   AND (rm.joborder_id = %s OR (rm.joborder_id IS NULL AND %s LIKE CONCAT("%%", rm.match_text, "%%")))
-                 ORDER BY CASE WHEN rm.joborder_id = %s THEN 0 ELSE 1 END, rm.priority ASC
-                 LIMIT 1',
-                $this->_db->makeQueryInteger((int) $jobOrderID),
-                $this->_db->makeQueryString(strtolower((string) $roleTitle)),
-                $this->_db->makeQueryInteger((int) $jobOrderID)
+                 WHERE qs.status_key = "active"
+                 ORDER BY qs.question_set_id ASC'
             );
-            $row = $this->_db->getAssoc($matchSQL);
+            $roleTitleLower = strtolower((string) $roleTitle);
+            $row = array();
+            $bestRank = 999;
+            $bestPriority = 999999;
+            foreach ($publishedRows as $candidateRow)
+            {
+                $matches = !empty($candidateRow['role_match_snapshot_json']) ? json_decode((string) $candidateRow['role_match_snapshot_json'], true) : null;
+                if (!is_array($matches))
+                {
+                    $matches = array();
+                    $defaults = self::getQuestionnaireQuestionSets();
+                    if (isset($defaults[$candidateRow['set_key']]))
+                    {
+                        $priority = 10;
+                        foreach ((array) $defaults[$candidateRow['set_key']]['match'] as $matchText)
+                        {
+                            $matches[] = array('match_text' => $matchText, 'joborder_id' => null, 'priority' => $priority, 'is_active' => 1);
+                            $priority += 10;
+                        }
+                    }
+                }
+                foreach ($this->normalizeQuestionSetRoleMatches($matches) as $match)
+                {
+                    if (isset($match['is_active']) && (int) $match['is_active'] !== 1)
+                    {
+                        continue;
+                    }
+                    $rank = 999;
+                    if (!empty($match['joborder_id']) && (int) $match['joborder_id'] === (int) $jobOrderID)
+                    {
+                        $rank = 0;
+                    }
+                    else
+                    {
+                        $matchText = strtolower(trim((string) $match['match_text']));
+                        if ($matchText !== '' && strpos($roleTitleLower, $matchText) !== false)
+                        {
+                            $rank = 1;
+                        }
+                    }
+                    $priority = isset($match['priority']) ? (int) $match['priority'] : 999999;
+                    if ($rank < 999 && ($rank < $bestRank || ($rank === $bestRank && $priority < $bestPriority)))
+                    {
+                        $row = $candidateRow;
+                        $bestRank = $rank;
+                        $bestPriority = $priority;
+                    }
+                }
+            }
             if (empty($row))
             {
                 $row = $this->_db->getAssoc(
@@ -9037,10 +9078,10 @@ class NESPWorkflow
     {
         if (!empty($row['question_snapshot_json']))
         {
-            $decoded = json_decode($row['question_snapshot_json'], true);
-            if (is_array($decoded))
+            $snapshot = self::decodeQuestionnaireIssuedSnapshot($row['question_snapshot_json']);
+            if (!empty($snapshot['questions']))
             {
-                return self::normalizeQuestionnaireSnapshotQuestions($decoded);
+                return $snapshot['questions'];
             }
         }
         if (!empty($row['question_set_version_id']))
@@ -9052,6 +9093,44 @@ class NESPWorkflow
             }
         }
         return self::getQuestionnaireQuestionsForSet($row['question_set_key']);
+    }
+
+    private static function buildQuestionnaireIssuedSnapshot($preview)
+    {
+        $snapshot = array(
+            'snapshot_schema' => 2,
+            'question_set_key' => isset($preview['question_set_key']) ? (string) $preview['question_set_key'] : '',
+            'question_set_label' => isset($preview['question_set_label']) ? (string) $preview['question_set_label'] : '',
+            'question_set_intro' => isset($preview['question_set_intro']) ? (string) $preview['question_set_intro'] : '',
+            'question_set_version' => isset($preview['question_set_version']) ? (int) $preview['question_set_version'] : 0,
+            'question_set_version_id' => isset($preview['question_set_version_id']) ? (int) $preview['question_set_version_id'] : 0,
+            'questions' => self::normalizeQuestionnaireSnapshotQuestions(isset($preview['questions']) ? $preview['questions'] : array())
+        );
+
+        return json_encode($snapshot);
+    }
+
+    private static function decodeQuestionnaireIssuedSnapshot($snapshotJSON)
+    {
+        $decoded = json_decode((string) $snapshotJSON, true);
+        if (!is_array($decoded))
+        {
+            return array('questions' => array());
+        }
+
+        if (isset($decoded['questions']) && is_array($decoded['questions']))
+        {
+            return array(
+                'question_set_key' => isset($decoded['question_set_key']) ? (string) $decoded['question_set_key'] : '',
+                'question_set_label' => isset($decoded['question_set_label']) ? (string) $decoded['question_set_label'] : '',
+                'question_set_intro' => isset($decoded['question_set_intro']) ? (string) $decoded['question_set_intro'] : '',
+                'question_set_version' => isset($decoded['question_set_version']) ? (int) $decoded['question_set_version'] : 0,
+                'question_set_version_id' => isset($decoded['question_set_version_id']) ? (int) $decoded['question_set_version_id'] : 0,
+                'questions' => self::normalizeQuestionnaireSnapshotQuestions($decoded['questions'])
+            );
+        }
+
+        return array('questions' => self::normalizeQuestionnaireSnapshotQuestions($decoded));
     }
 
     private function replaceQuestionSetVersionQuestions($versionID, $questions)
@@ -11176,7 +11255,30 @@ class NESPWorkflow
         }
         $sets = self::getQuestionnaireQuestionSets();
         $row['question_set_label'] = isset($sets[$row['question_set_key']]) ? $sets[$row['question_set_key']]['label'] : $set['label'];
-        if (!empty($row['question_set_version_id']) && $this->isTableInstalled('nesp_question_set_version'))
+        $hasIssuedSnapshotMetadata = false;
+        if (!empty($row['question_snapshot_json']))
+        {
+            $issuedSnapshot = self::decodeQuestionnaireIssuedSnapshot($row['question_snapshot_json']);
+            if (!empty($issuedSnapshot['question_set_key']))
+            {
+                $row['question_set_key'] = $issuedSnapshot['question_set_key'];
+            }
+            if (!empty($issuedSnapshot['question_set_label']))
+            {
+                $row['question_set_label'] = $issuedSnapshot['question_set_label'];
+                $hasIssuedSnapshotMetadata = true;
+            }
+            if (isset($issuedSnapshot['question_set_intro']) && $issuedSnapshot['question_set_intro'] !== '')
+            {
+                $row['question_set_intro'] = $issuedSnapshot['question_set_intro'];
+                $hasIssuedSnapshotMetadata = true;
+            }
+            if (!empty($issuedSnapshot['question_set_version']))
+            {
+                $row['question_set_version'] = (int) $issuedSnapshot['question_set_version'];
+            }
+        }
+        if (!$hasIssuedSnapshotMetadata && !empty($row['question_set_version_id']) && $this->isTableInstalled('nesp_question_set_version'))
         {
             $versionLabel = $this->_db->getAssoc(sprintf(
                 'SELECT COALESCE(NULLIF(qsv.display_name, ""), qs.display_name) AS display_name,
