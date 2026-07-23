@@ -41,6 +41,7 @@ include_once(LEGACY_ROOT . '/lib/DatabaseSearch.php');
 include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 include_once(LEGACY_ROOT . '/lib/Questionnaire.php');
 include_once(LEGACY_ROOT . '/lib/NESPApplicationQuestions.php');
+include_once(LEGACY_ROOT . '/lib/NESPCareerPortalProtection.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/DocumentToText.php');
@@ -631,6 +632,11 @@ class CareersUI extends UserInterface
                 die();
             }
 
+            $template['Content'] = NESPApplicationQuestions::removeLegacyCaptchaForJob(
+                $template['Content'],
+                $jobID
+            );
+
             /* Make JavaScript validation rules. */
             $validator = $this->_makeApplyValidator($template);
 
@@ -796,6 +802,7 @@ class CareersUI extends UserInterface
 
             if (strpos($template['Content'], '<catsform>') === false)
             {
+                $nespProtectionHTML = NESPCareerPortalProtection::renderFields($jobID, $_SESSION);
                 $template['Content'] = $startTD . "\n" . $validator . "\n"
                     . '<form name="applyToJobForm" id="applyToJobForm" action="'
                     . CATSUtility::getIndexName()
@@ -803,17 +810,20 @@ class CareersUI extends UserInterface
                     . 'enctype="multipart/form-data" method="post" onsubmit="return applyValidate();">'
                     . '<input type="hidden" name="ID" value="' . $jobID . '">'
                     . '<input type="hidden" name="candidateID" value="' . $candidateID . '">'
+                    . $nespProtectionHTML
                     . $template['Content'] . '</form>' . "\n" . $endTD;
             }
             else
             {
+                $nespProtectionHTML = NESPCareerPortalProtection::renderFields($jobID, $_SESSION);
                 $template['Content'] = $startTD . "\n" . $validator . "\n" .
                     str_replace('<catsform>', '<form name="applyToJobForm" id="applyToJobForm" action="'
                         . CATSUtility::getIndexName()
                         . '?m=careers&amp;p=onApplyToJobOrder" '
                         . 'enctype="multipart/form-data" method="post" onsubmit="return applyValidate();">'
                         . '<input type="hidden" name="ID" value="' . $jobID . '">'
-                        . '<input type="hidden" name="candidateID" value="' . $candidateID . '">',
+                        . '<input type="hidden" name="candidateID" value="' . $candidateID . '">'
+                        . $nespProtectionHTML,
                         $template['Content'])
                     . "\n" . $endTD;
             }
@@ -827,7 +837,30 @@ class CareersUI extends UserInterface
                 die();
             }
 
-            if ($this->careerPortalTemplateRequiresCaptcha($template['Content - Apply for Position']))
+            $jobID = (int) $_POST['ID'];
+            if (NESPCareerPortalProtection::protectsJob($jobID))
+            {
+                $clientKey = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : 'unknown';
+                $protectionResult = NESPCareerPortalProtection::validateSubmission(
+                    $jobID,
+                    $_POST,
+                    $_SESSION,
+                    $clientKey
+                );
+                if (!$protectionResult['valid'])
+                {
+                    CommonErrors::fatal(
+                        COMMONERROR_MISSINGFIELDS,
+                        $this,
+                        'The application security check expired or could not be verified. Please return to the job and try again.'
+                    );
+                    return;
+                }
+            }
+            else if (NESPApplicationQuestions::requiresLegacyCaptcha(
+                $template['Content - Apply for Position'],
+                $jobID
+            ))
             {
                 $captchaValue = isset($_POST['captcha']) ? $_POST['captcha'] : '';
                 if (!$this->validateCareerPortalCaptcha($captchaValue))
@@ -1204,11 +1237,6 @@ class CareersUI extends UserInterface
         $builder->output();
 
         die();
-    }
-
-    private function careerPortalTemplateRequiresCaptcha($templateContent)
-    {
-        return (strpos($templateContent, '<input-captcha req>') !== false);
     }
 
     private function validateCareerPortalCaptcha($captchaValue)

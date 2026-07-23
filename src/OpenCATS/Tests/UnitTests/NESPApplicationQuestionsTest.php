@@ -17,6 +17,33 @@ class NESPApplicationQuestionsTest extends TestCase
         $this->assertFalse(NESPApplicationQuestions::hasQuestionsForJob(41004));
     }
 
+    public function testApprovedNESPJobsRemoveLegacyCaptchaWithoutRemovingOtherFields()
+    {
+        $template = '<table>'
+            . '<tr><td><input-keySkills></td></tr>'
+            . '<tr><td><label id="captchaLabel">Captcha</label></td><td><input-captcha req></td></tr>'
+            . '<tr><td><submit value="Apply"></td></tr>'
+            . '</table>';
+
+        $result = NESPApplicationQuestions::removeLegacyCaptchaForJob($template, 41002);
+
+        $this->assertStringNotContainsString('captcha', strtolower($result));
+        $this->assertStringContainsString('<input-keySkills>', $result);
+        $this->assertStringContainsString('<submit value="Apply">', $result);
+        $this->assertFalse(NESPApplicationQuestions::requiresLegacyCaptcha($template, 41002));
+    }
+
+    public function testNonNESPJobsKeepLegacyCaptcha()
+    {
+        $template = '<tr><td><input-captcha req></td></tr>';
+
+        $this->assertSame(
+            $template,
+            NESPApplicationQuestions::removeLegacyCaptchaForJob($template, 99999)
+        );
+        $this->assertTrue(NESPApplicationQuestions::requiresLegacyCaptcha($template, 99999));
+    }
+
     public function testRequiredQuestionsAreValidated()
     {
         $errors = NESPApplicationQuestions::validatePost(41001, array(
