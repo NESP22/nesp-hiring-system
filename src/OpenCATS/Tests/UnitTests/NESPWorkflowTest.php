@@ -59,6 +59,28 @@ class NESPWorkflowTest extends TestCase
         putenv('NESP_INTERVIEWER_ZOOM_LINKS_ENABLED');
     }
 
+    public function testPhaseTwoFakeInterviewerFixturesDoNotShareAnApplicationUser()
+    {
+        $fixture = file_get_contents(LEGACY_ROOT . '/db/nesp_phase2_fake_fixtures.sql');
+
+        $this->assertStringContainsString(
+            "(920001, NULL, 'Fixture Photographer Lead'",
+            $fixture
+        );
+        $this->assertStringContainsString(
+            "(920002, NULL, 'Fixture Customer Service Reviewer'",
+            $fixture
+        );
+        $this->assertStringNotContainsString(
+            "(920001, 1, 'Fixture Photographer Lead'",
+            $fixture
+        );
+        $this->assertStringNotContainsString(
+            "(920002, 1, 'Fixture Customer Service Reviewer'",
+            $fixture
+        );
+    }
+
     public function testApplicantQuestionnaireEmailRequiresFlagAndConfiguredSender()
     {
         $this->assertFalse(NESPWorkflow::isApplicantEmailDeliveryReady(false, '1', 'hiring@nesportsphoto.com'));
