@@ -42,6 +42,7 @@ include_once(LEGACY_ROOT . '/lib/CommonErrors.php');
 include_once(LEGACY_ROOT . '/lib/Questionnaire.php');
 include_once(LEGACY_ROOT . '/lib/NESPApplicationQuestions.php');
 include_once(LEGACY_ROOT . '/lib/NESPCareerPortalProtection.php');
+include_once(LEGACY_ROOT . '/lib/NESPCareerApplicationSupport.php');
 include_once(LEGACY_ROOT . '/lib/NESPRecruitingAds.php');
 include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
 include_once(LEGACY_ROOT . '/lib/DocumentToText.php');
@@ -710,7 +711,11 @@ class CareersUI extends UserInterface
             $template['Content'] = str_replace('<input-source>', '<input name="source" id="source" class="inputBoxNormal" value="' . $sourceEscaped . '" />', $template['Content']);
             $template['Content'] = str_replace('<input-employer>', '<input name="employer" id="employer" class="inputBoxNormal" value="' . $employerEscaped . '" />', $template['Content']);
             $template['Content'] = str_replace(array('<input-captcha>', '<input-captcha req>'), '<img src="' . CATSUtility::getIndexName() . '?m=careers&amp;p=captcha&amp;t=' . time() . '" alt="Captcha" /><br />' . '<input type="text" name="captcha" id="captcha" class="inputBoxNormal" />', $template['Content']);
-            $template['Content'] = str_replace('<input-resumeUpload>', '<input type="file" id="resume" name="file" class="inputBoxFile" />', $template['Content']);
+            $template['Content'] = str_replace(
+                '<input-resumeUpload>',
+                NESPCareerApplicationSupport::resumeInputHTML(),
+                $template['Content']
+            );
             $template['Content'] = str_replace('<input-resumeUploadPreview>',
                 '<input type="hidden" id="applyToJobSubAction" name="applyToJobSubAction" value="" /> '
                 . '<input type="hidden" id="file" name="file" value="' . $resumeFileLocationEscaped . '" /> '
@@ -896,7 +901,11 @@ class CareersUI extends UserInterface
             if ((isset($_GET[$id='questionnairePostBack']) && $_GET[$id] == '1') || !$questionnaireID)
             {
                 // Continue on our merry way
-                $this->onApplyToJobOrder($candidateID);
+                $applicationResult = $this->onApplyToJobOrder($candidateID);
+                if (!$applicationResult['success'])
+                {
+                    return;
+                }
 
                 $jobOrderData = $jobOrders->get($jobID);
                 if (!isset($jobOrderData['public']) || $jobOrderData['public'] == 0)
@@ -906,8 +915,18 @@ class CareersUI extends UserInterface
                     die();
                 }
 
-                $template['Content'] = $template['Content - Thanks for your Submission'];
                 $jobTitleEscaped = htmlspecialchars((string) $jobOrderData['title'], ENT_QUOTES | ENT_SUBSTITUTE, HTML_ENCODING);
+                if (NESPCareerPortalProtection::protectsJob($jobID))
+                {
+                    $template['Content'] = NESPCareerApplicationSupport::renderSuccessPage(
+                        $jobOrderData['title'],
+                        $applicationResult['resumeWarning']
+                    );
+                }
+                else
+                {
+                    $template['Content'] = $template['Content - Thanks for your Submission'];
+                }
                 $jobDetailsUrl = CATSUtility::getIndexName() . '?m=careers'
                     . (isset($_GET['templateName']) ? '&templateName=' . urlencode($_GET['templateName']) : '')
                     . '&p=showJob&ID=' . (string) $_POST['ID'];
@@ -1904,13 +1923,14 @@ class CareersUI extends UserInterface
     /* Called by Careers Page function to handle the processing of candidate input. */
     private function onApplyToJobOrder($candidateID = false)
     {
+        $result = array('success' => false, 'resumeWarning' => '');
         $jobOrders = new JobOrders();
         $careerPortalSettings = new CareerPortalSettings();
 
         if (!$this->isRequiredIDValid('ID', $_POST))
         {
             CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid job order ID.');
-            return;
+            return $result;
         }
 
         $jobOrderID = $_POST['ID'];
@@ -1919,7 +1939,7 @@ class CareersUI extends UserInterface
         if (!isset($jobOrderData['public']) || $jobOrderData['public'] == 0)
         {
             CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'The specified job order could not be found.');
-            return;
+            return $result;
         }
 
         $prescreenErrors = NESPApplicationQuestions::validatePost($jobOrderID, $_POST);
@@ -1930,7 +1950,7 @@ class CareersUI extends UserInterface
                 $this,
                 'Please answer the required NESP job-related questions before submitting your application.'
             );
-            return;
+            return $result;
         }
 	    
         // NOTE: Careers Portal renders these values into HTML without consistent output escaping.
@@ -1971,16 +1991,19 @@ class CareersUI extends UserInterface
         if (empty($firstName))
         {
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'First Name is a required field - please have your administrator edit your templates to include the first name field.');
+            return $result;
         }
 
         if (empty($lastName))
         {
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Last Name is a required field - please have your administrator edit your templates to include the last name field.');
+            return $result;
         }
 
         if (empty($email))
         {
             CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Email address is required. Please return to the application and complete the email field.');
+            return $result;
         }
 
         if (empty($source))
@@ -2077,6 +2100,12 @@ class CareersUI extends UserInterface
             $candidates->extraFields->setValuesOnEdit($candidateID);
         }
 
+        if ($candidateID === false || $candidateID < 1)
+        {
+            CommonErrors::fatal(COMMONERROR_RECORDERROR, $this, 'Failed to create or locate the candidate record.');
+            return $result;
+        }
+
         // If the candidate was added and a questionnaire exists for the job order
         if ($candidateID > 0 && ($questionnaireID = $jobOrderData['questionnaireID']))
         {
@@ -2086,9 +2115,11 @@ class CareersUI extends UserInterface
         }
 
         $fileUploaded = false;
+        $resumeUpload = NESPCareerApplicationSupport::inspectResumeUpload($_FILES, 'file');
+        $result['resumeWarning'] = $resumeUpload['warning'];
 
         /* Upload resume (no questionnaire) */
-        if (isset($_FILES['file']) && !empty($_FILES['file']['name']))
+        if ($resumeUpload['hasUpload'])
         {
             $attachmentCreator = new AttachmentCreator();
             $attachmentCreator->createFromUpload(
@@ -2097,19 +2128,20 @@ class CareersUI extends UserInterface
 
             if ($attachmentCreator->isError())
             {
-                CommonErrors::fatal(COMMONERROR_FILEERROR, $this, $attachmentCreator->getError());
-                return;
+                $result['resumeWarning'] = $attachmentCreator->getError();
             }
+            else
+            {
+                $duplicatesOccurred = $attachmentCreator->duplicatesOccurred();
 
-            $duplicatesOccurred = $attachmentCreator->duplicatesOccurred();
+                $isTextExtractionError = $attachmentCreator->isTextExtractionError();
+                $textExtractionErrorMessage = $attachmentCreator->getTextExtractionError();
 
-            $isTextExtractionError = $attachmentCreator->isTextExtractionError();
-            $textExtractionErrorMessage = $attachmentCreator->getTextExtractionError();
+                // FIXME: Show parse errors!
 
-            // FIXME: Show parse errors!
-
-            $fileUploaded = true;
-            $resumePath = $attachmentCreator->getNewFilePath();
+                $fileUploaded = true;
+                $resumePath = $attachmentCreator->getNewFilePath();
+            }
         }
         /* Upload resume (with questionnaire) */
         else if (isset($_POST['file']) && !empty($_POST['file']))
@@ -2127,19 +2159,24 @@ class CareersUI extends UserInterface
 
                 if ($attachmentCreator->isError())
                 {
-                    CommonErrors::fatal(COMMONERROR_FILEERROR, $this, $attachmentCreator->getError());
-                    return;
+                    $result['resumeWarning'] = $attachmentCreator->getError();
                 }
+                else
+                {
+                    $duplicatesOccurred = $attachmentCreator->duplicatesOccurred();
 
-                $duplicatesOccurred = $attachmentCreator->duplicatesOccurred();
+                    $isTextExtractionError = $attachmentCreator->isTextExtractionError();
+                    $textExtractionErrorMessage = $attachmentCreator->getTextExtractionError();
 
-                $isTextExtractionError = $attachmentCreator->isTextExtractionError();
-                $textExtractionErrorMessage = $attachmentCreator->getTextExtractionError();
+                    // FIXME: Show parse errors!
 
-                // FIXME: Show parse errors!
-
-                $fileUploaded = true;
-                $resumePath = $attachmentCreator->getNewFilePath();
+                    $fileUploaded = true;
+                    $resumePath = $attachmentCreator->getNewFilePath();
+                }
+            }
+            else
+            {
+                $result['resumeWarning'] = 'The staged resume file was no longer available.';
             }
         }
 
@@ -2154,6 +2191,7 @@ class CareersUI extends UserInterface
             if (!$pipelines->add($candidateID, $jobOrderID))
             {
                 CommonErrors::fatal(COMMONERROR_RECORDERROR, $this, 'Failed to add candidate to job order.');
+                return $result;
             }
 
             // FIXME: For some reason, pipeline entries like to disappear between
@@ -2179,7 +2217,7 @@ class CareersUI extends UserInterface
             && !$workflow->ensureCandidateWorkflowRow($candidateID, $jobOrderID, $automatedUser['userID'], $source))
         {
             CommonErrors::fatal(COMMONERROR_RECORDERROR, $this, 'Failed to route application for human review.');
-            return;
+            return $result;
         }
 
         /* Build activity note. */
@@ -2205,6 +2243,10 @@ class CareersUI extends UserInterface
                 $activityNote .= ' and attached an existing resume (<a href="'
                     . $resumePath . '">Download</a>)';
             }
+        }
+        else if ($result['resumeWarning'] !== '')
+        {
+            $activityNote .= '; resume attachment was skipped after an upload validation error';
         }
 
 		if (!empty($extraNotes))
@@ -2353,6 +2395,9 @@ class CareersUI extends UserInterface
                 );
             }
         }
+
+        $result['success'] = true;
+        return $result;
     }
 
     public function capturePostData($ignore = array())
