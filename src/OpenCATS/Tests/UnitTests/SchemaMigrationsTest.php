@@ -101,5 +101,12 @@ class SchemaMigrationsTest extends TestCase
             $migrations['401'],
             'Migration SQL must not depend on backslash apostrophe escaping.'
         );
+
+        $statements = array_values(array_filter(array_map('trim', explode(';', $migrations['401']))));
+        $this->assertCount(
+            2,
+            $statements,
+            'Migration 401 must contain exactly two statements for the legacy semicolon-based migration runner.'
+        );
     }
 }
