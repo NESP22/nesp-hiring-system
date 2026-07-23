@@ -895,7 +895,7 @@ class AttachmentCreator
             'bmp', 'csv', 'doc', 'docx', 'heic',
             'jpeg', 'jpg', 'msg', 'odg', 'odt',
             'pages', 'pdf', 'png', 'ppt', 'pptx',
-            'rtf', 'tiff', 'wpd', 'wps', 'xls',
+            'rtf', 'tiff', 'txt', 'wpd', 'wps', 'xls',
             'xlsx', 'xps'
         );
 
