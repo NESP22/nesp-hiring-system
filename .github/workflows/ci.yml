@@ -61,6 +61,8 @@ jobs:
         run: |
           # 1. Prepare environment files
           cp test/config.php ./config.php
+          sed -i "s/define('DATABASE_HOST', 'opencatsdb');/define('DATABASE_HOST', 'integrationtestdb');/" ./config.php
+          sed -i "s/define('DATABASE_NAME', 'cats_test');/define('DATABASE_NAME', 'cats_integrationtest');/" ./config.php
           touch ./INSTALL_BLOCK
 
           cd docker/
@@ -83,6 +85,9 @@ jobs:
 
           echo "Running PHPUnit Integration Tests..."
           docker compose -f docker-compose-test.yml exec -T --workdir /var/www/public php ./vendor/bin/phpunit --log-junit /var/www/public/reports/integration-report.xml --testsuite IntegrationTests
+
+          # Restore the browser-test configuration after the isolated PHPUnit run.
+          cp ../test/config.php ../config.php
 
           echo "Running Behat Suites..."
           docker compose -f docker-compose-test.yml exec -T --workdir /var/www/public php ./vendor/bin/behat -v -c ./test/behat.yml --suite="default" --format=progress --out=std --format=junit --out=reports/behat-default
