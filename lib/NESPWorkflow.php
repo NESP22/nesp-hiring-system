@@ -2288,7 +2288,6 @@ class NESPWorkflow
             array('nesp_screening_questionnaire', 'question_set_version_id'),
             array('nesp_screening_questionnaire', 'question_snapshot_json'),
             array('nesp_screening_questionnaire', 'reviewer_profile_id'),
-            array('nesp_screening_questionnaire', 'koalendar_booking_email_status_key'),
             array('nesp_screening_questionnaire_answer', 'answer_text'),
             array('nesp_screening_questionnaire_activity', 'activity_key'),
             array('nesp_recruiting_campaign_control', 'manual_spend'),
