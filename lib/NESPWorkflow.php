@@ -9488,7 +9488,7 @@ class NESPWorkflow
                         WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
                         THEN booking_owner_profile.interviewer_profile_id
                         ELSE NULL
-                    END AS booking_owner_profile_id,
+                    END AS booking_interviewer_profile_id,
                     CASE
                         WHEN booking_questionnaire.screening_questionnaire_id = q.screening_questionnaire_id
                         THEN booking_owner_profile.display_name
