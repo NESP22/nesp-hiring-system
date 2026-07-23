@@ -57,6 +57,14 @@
             </div>
 
             <?php if ($this->viewKey === 'dashboard'): ?>
+                <div class="nesp-panel nesp-export-panel">
+                    <h3>Candidate Backup</h3>
+                    <p>Download every active candidate and their current hiring status before doing any manual follow-up. This does not email, update, or remove anyone.</p>
+                    <a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=exportCandidatesCsv">Export All Active Candidates (CSV)</a>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($this->viewKey === 'dashboard'): ?>
                 <div class="nesp-panel nesp-bulk-questionnaire-panel">
                     <h3>Questionnaire Email</h3>
                     <?php if ($this->bulkQuestionnairePreview['delivery']['status_key'] !== 'enabled'): ?>

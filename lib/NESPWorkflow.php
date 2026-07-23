@@ -3115,6 +3115,73 @@ class NESPWorkflow
         );
     }
 
+    /**
+     * Returns one read-only backup row for every active OpenCATS candidate.
+     */
+    public function getCandidateExportRows()
+    {
+        return $this->_db->getAllAssoc(
+            sprintf(
+                'SELECT
+                    c.candidate_id,
+                    c.first_name,
+                    c.last_name,
+                    c.email1 AS email,
+                    c.email2 AS alternate_email,
+                    c.phone_home AS home_phone,
+                    c.phone_cell AS cell_phone,
+                    c.phone_work AS work_phone,
+                    c.city,
+                    c.state,
+                    c.source,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT export_job.title ORDER BY export_job.title SEPARATOR " | ")
+                        FROM candidate_joborder export_cjo
+                        INNER JOIN joborder export_job ON export_job.joborder_id = export_cjo.joborder_id
+                        WHERE export_cjo.candidate_id = c.candidate_id
+                    ) AS roles,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT export_stage.display_name ORDER BY export_stage.display_name SEPARATOR " | ")
+                        FROM nesp_candidate_workflow export_workflow
+                        INNER JOIN nesp_workflow_stage export_stage
+                            ON export_stage.workflow_stage_id = export_workflow.workflow_stage_id
+                        WHERE export_workflow.candidate_id = c.candidate_id
+                    ) AS workflow_stage,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT export_workflow.waiting_on_key ORDER BY export_workflow.waiting_on_key SEPARATOR " | ")
+                        FROM nesp_candidate_workflow export_workflow
+                        WHERE export_workflow.candidate_id = c.candidate_id
+                    ) AS waiting_on,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT export_questionnaire.status_key ORDER BY export_questionnaire.status_key SEPARATOR " | ")
+                        FROM nesp_screening_questionnaire export_questionnaire
+                        WHERE export_questionnaire.candidate_id = c.candidate_id
+                    ) AS questionnaire_status,
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT assigned_ip.display_name ORDER BY assigned_ip.display_name SEPARATOR " | ")
+                        FROM nesp_interviewer_candidate_grant assigned_grant
+                        INNER JOIN nesp_interviewer_profile assigned_ip
+                            ON assigned_ip.interviewer_profile_id = assigned_grant.interviewer_profile_id
+                        WHERE assigned_grant.candidate_id = c.candidate_id
+                          AND assigned_grant.date_revoked IS NULL
+                    ) AS assigned_interviewers,
+                    CASE WHEN EXISTS (
+                        SELECT 1
+                        FROM attachment resume_attachment
+                        WHERE resume_attachment.data_item_type = %s
+                          AND resume_attachment.data_item_id = c.candidate_id
+                          AND resume_attachment.resume = 1
+                    ) THEN "Yes" ELSE "No" END AS resume_attached,
+                    c.date_created AS created_at,
+                    c.date_modified AS last_modified
+                 FROM candidate c
+                 WHERE c.is_active = 1
+                 ORDER BY c.last_name ASC, c.first_name ASC, c.candidate_id ASC',
+                DATA_ITEM_CANDIDATE
+            )
+        );
+    }
+
     public function getUpcomingInterviews($limit)
     {
         $limit = max(1, min(100, (int) $limit));
