@@ -19,7 +19,7 @@ class NESPWorkflow
 
     const APPLICANT_EMAIL_FEATURE_DESCRIPTION = 'When deliberately enabled with a configured sender, automatically sends one secure role-specific questionnaire email after a new applicant has a valid email and linked job, allows an administrator to send one to an existing reviewed applicant, and can send one four-day reminder when the separate reminder scheduler is enabled.';
     const KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG = 'NESP_KOALENDAR_BOOKING_EMAIL_ENABLED';
-    const KOALENDAR_BOOKING_EMAIL_FEATURE_DESCRIPTION = 'Allows an administrator to explicitly send the assigned interviewer\'s public Koalendar booking page after questionnaire review. Disabled by default; no calendar event or automatic scheduling is created.';
+    const KOALENDAR_BOOKING_EMAIL_FEATURE_DESCRIPTION = 'Automatically emails the assigned interviewer\'s public Koalendar booking page after questionnaire review is completed. Disabled by default; no calendar event or automatic scheduling is created.';
     const QUESTIONNAIRE_REMINDER_AFTER_DAYS = 4;
     const QUESTIONNAIRE_CLOSE_REVIEW_AFTER_DAYS = 4;
 
@@ -42,7 +42,7 @@ class NESPWorkflow
             array('NESP_STAFFING_FORECAST_ENABLED', 'Staffing Forecast', 'Seasonal staffing forecast screen and internal draft recommendations.', 0),
             array('NESP_STAFFING_DRIVE_IMPORT_ENABLED', 'Staffing Drive Import', 'Google Drive staffing schedule discovery and import controls.', 0),
             array('NESP_APPLICANT_EMAIL_ENABLED', 'Applicant Questionnaire Email', self::APPLICANT_EMAIL_FEATURE_DESCRIPTION, 0),
-            array(self::KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG, 'Koalendar Scheduling Link Email', self::KOALENDAR_BOOKING_EMAIL_FEATURE_DESCRIPTION, 0),
+            array(self::KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG, 'Koalendar Interview Invite Email', self::KOALENDAR_BOOKING_EMAIL_FEATURE_DESCRIPTION, 0),
             array('NESP_BOARD_INTAKE_SCHEDULER_ENABLED', 'Board Inbox Scheduler', 'Twice-daily reconciliation and manual-review queue for approved-label job-board notifications.', 0),
             array('NESP_BOARD_INTAKE_AUTO_IMPORT_ENABLED', 'Board Inbox Auto-Import', 'Allows signed notifications carrying the configured approved-rule proof to create candidates in Needs Craig. Shared-label recovery remains manual review.', 0),
             NESPGoogleCalendarFreeBusy::getDefaultFeatureFlag()
@@ -4029,7 +4029,7 @@ class NESPWorkflow
             );
         }
 
-        return array('status_key' => 'enabled', 'message' => 'Scheduling-link email is ready for an explicit confirmed send.');
+        return array('status_key' => 'enabled', 'message' => 'Interview invites are sent automatically after a completed questionnaire review and valid interviewer assignment.');
     }
 
     public static function koalendarBookingLinkFingerprint($questionnaire)
@@ -4136,8 +4136,9 @@ class NESPWorkflow
         return array('ok' => true, 'questionnaire' => $detail);
     }
 
-    public function sendKoalendarSchedulingLinkEmail($questionnaireID, $actorUserID, $reviewedEmailFingerprint, $reviewedBookingFingerprint, $allowResend = false)
+    public function sendKoalendarSchedulingLinkEmail($questionnaireID, $actorUserID, $reviewedEmailFingerprint, $reviewedBookingFingerprint, $allowResend = false, $deliveryOrigin = 'manual')
     {
+        $deliveryOrigin = $deliveryOrigin === 'automatic' ? 'automatic' : 'manual';
         $deliveryStatus = $this->getKoalendarBookingEmailDeliveryStatus();
         if ($deliveryStatus['status_key'] !== 'enabled')
         {
@@ -4197,6 +4198,7 @@ class NESPWorkflow
 
         $metadata = array(
             'delivery_type' => $deliveryType,
+            'delivery_origin' => $deliveryOrigin,
             'interviewer_profile_id' => (int) $detail['booking_interviewer_profile_id'],
             'booking_link_fingerprint' => hash('sha256', $detail['reviewer_koalendar_booking_url']),
             'recipient_fingerprint' => self::applicantEmailFingerprint($detail['recipient_email'])
@@ -4262,8 +4264,44 @@ class NESPWorkflow
             'ok' => true,
             'sent' => true,
             'message' => $deliveryType === 'resend'
-                ? 'Scheduling link resent to the applicant and recorded in the audit trail.'
-                : 'Scheduling link emailed to the applicant and recorded in the audit trail.'
+                ? 'Interview invite resent to the applicant and recorded in the audit trail.'
+                : ($deliveryOrigin === 'automatic'
+                    ? 'Interview invite emailed automatically and recorded in the audit trail.'
+                    : 'Interview invite emailed to the applicant and recorded in the audit trail.')
+        );
+    }
+
+    /**
+     * Attempts the one allowed automatic interview invite after review completion.
+     * Eligibility and status checks make this idempotent and fail closed.
+     */
+    public function sendAutomaticKoalendarSchedulingLinkEmail($questionnaireID, $actorUserID)
+    {
+        $deliveryStatus = $this->getKoalendarBookingEmailDeliveryStatus();
+        if ($deliveryStatus['status_key'] !== 'enabled')
+        {
+            return array('ok' => false, 'sent' => false, 'skipped' => true, 'error' => $deliveryStatus['message']);
+        }
+
+        $eligibility = $this->getKoalendarSchedulingLinkEligibility($questionnaireID);
+        if (empty($eligibility['ok']))
+        {
+            return array('ok' => false, 'sent' => false, 'skipped' => true, 'error' => $eligibility['error']);
+        }
+
+        $detail = $eligibility['questionnaire'];
+        if ((string) $detail['koalendar_booking_email_status_key'] !== 'not_attempted')
+        {
+            return array('ok' => true, 'sent' => false, 'skipped' => true, 'message' => 'An interview invite was already attempted for this reviewed questionnaire.');
+        }
+
+        return $this->sendKoalendarSchedulingLinkEmail(
+            (int) $detail['screening_questionnaire_id'],
+            $actorUserID,
+            self::applicantEmailFingerprint($detail['recipient_email']),
+            (string) $detail['booking_link_fingerprint'],
+            false,
+            'automatic'
         );
     }
 
@@ -9771,19 +9809,28 @@ class NESPWorkflow
         {
             return false;
         }
+        $preserveCompletedReview = $detail['status_key'] === 'completed'
+            && $detail['review_status_key'] === 'complete'
+            && !empty($detail['review_completed_at']);
         $this->_db->query(
             sprintf(
                 'UPDATE nesp_screening_questionnaire
                  SET reviewer_profile_id = %s,
-                     review_status_key = "assigned",
+                     review_status_key = %s,
                      date_modified = NOW()
                  WHERE screening_questionnaire_id = %s',
                 $this->_db->makeQueryInteger($interviewerProfileID),
+                $this->_db->makeQueryString($preserveCompletedReview ? 'complete' : 'assigned'),
                 $this->_db->makeQueryInteger($questionnaireID)
             )
         );
+        $assigned = $this->_db->getAffectedRows() === 1;
         $this->logAuditEvent($actorUserID, 'screening_questionnaire_reviewer_assigned', 'screening_questionnaire', $questionnaireID, array('interviewer_profile_id' => $interviewerProfileID));
-        return $this->_db->getAffectedRows() === 1;
+        if ($assigned && $preserveCompletedReview)
+        {
+            $this->sendAutomaticKoalendarSchedulingLinkEmail($questionnaireID, $actorUserID);
+        }
+        return $assigned;
     }
 
     public function saveQuestionnaireReview($questionnaireID, $actorUserID, $reviewNote, $markComplete)
@@ -9814,6 +9861,10 @@ class NESPWorkflow
             )
         );
         $this->logAuditEvent($actorUserID, $markComplete ? 'screening_questionnaire_review_completed' : 'screening_questionnaire_review_saved', 'screening_questionnaire', $questionnaireID, array('review_note_length' => strlen($reviewNote)));
+        if ($markComplete)
+        {
+            $this->sendAutomaticKoalendarSchedulingLinkEmail($questionnaireID, $actorUserID);
+        }
         return true;
     }
 

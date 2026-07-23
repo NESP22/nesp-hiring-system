@@ -257,7 +257,7 @@ class NESPWorkflowTest extends TestCase
         $this->assertStringContainsString('Duplicate sends are blocked', $review);
     }
 
-    public function testKoalendarSchedulingEmailIsExplicitlyConfirmedFeatureFlaggedAndAudited()
+    public function testKoalendarInterviewInviteIsAutomaticFeatureFlaggedAndAudited()
     {
         $workflow = file_get_contents(LEGACY_ROOT . '/lib/NESPWorkflow.php');
         $ui = file_get_contents(LEGACY_ROOT . '/modules/nesp/NESPUI.php');
@@ -269,20 +269,23 @@ class NESPWorkflowTest extends TestCase
 
         $this->assertStringContainsString('NESP_KOALENDAR_BOOKING_EMAIL_ENABLED', $workflow);
         $this->assertStringContainsString('sendKoalendarSchedulingLinkEmail', $workflow);
+        $this->assertStringContainsString('sendAutomaticKoalendarSchedulingLinkEmail', $workflow);
         $this->assertStringContainsString('koalendar_scheduling_link_email_attempt_started', $workflow);
         $this->assertStringContainsString('koalendar_scheduling_link_email_sent', $workflow);
         $this->assertStringContainsString('koalendar_scheduling_link_email_failed', $workflow);
         $this->assertStringContainsString('koalendar_booking_email_status_key', $workflow);
         $this->assertStringContainsString('ip.account_state_key = "active"', $workflow);
-        $this->assertStringContainsString("array(self::KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG, 'Koalendar Scheduling Link Email'", $workflow);
+        $this->assertStringContainsString("array(self::KOALENDAR_BOOKING_EMAIL_FEATURE_FLAG, 'Koalendar Interview Invite Email'", $workflow);
         $this->assertStringContainsString('$this->adminOnly();', $action);
         $this->assertStringContainsString('$this->requirePostCSRF();', $action);
-        $this->assertStringContainsString("\$_POST['confirmBookingSend'] !== 'confirm'", $ui);
         $this->assertStringContainsString("\$_POST['confirmResend'] !== 'resend'", $ui);
-        $this->assertStringContainsString('Send Scheduling Link', $review);
-        $this->assertStringContainsString('Resend Scheduling Link', $review);
+        $this->assertStringContainsString('Send Interview Invite', $review);
+        $this->assertStringContainsString('Resend Interview Invite', $review);
         $this->assertStringContainsString('name="csrfToken"', $review);
         $this->assertStringContainsString('name="reviewedBookingFingerprint"', $review);
+        $this->assertStringContainsString('sendAutomaticKoalendarSchedulingLinkEmail($questionnaireID, $actorUserID)', $workflow);
+        $this->assertStringContainsString('$preserveCompletedReview', $workflow);
+        $this->assertStringContainsString("'delivery_origin' => \$deliveryOrigin", $workflow);
         $this->assertStringContainsString("'401' =>", $schema);
         $this->assertStringContainsString('koalendar_booking_email_send_count', $schema);
     }

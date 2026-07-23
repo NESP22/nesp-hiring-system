@@ -205,15 +205,12 @@ $koalendarBookingEmailStatus = isset($this->questionnaire['koalendar_booking_ema
                             <input type="hidden" name="questionnaireID" value="<?php echo((int) $this->questionnaire['screening_questionnaire_id']); ?>" />
                             <input type="hidden" name="reviewedEmailFingerprint" value="<?php echo(htmlspecialchars($this->reviewedEmailFingerprint, ENT_QUOTES, 'UTF-8')); ?>" />
                             <input type="hidden" name="reviewedBookingFingerprint" value="<?php echo(htmlspecialchars($this->reviewedBookingFingerprint, ENT_QUOTES, 'UTF-8')); ?>" />
-                            <label class="nesp-confirmation-check">
-                                <input type="checkbox" name="confirmBookingSend" value="confirm" required />
-                                I reviewed the applicant, assigned interviewer, and public Koalendar page. Send one scheduling-link email now.
-                            </label>
-                            <button class="nesp-primary-action" type="submit">Send Scheduling Link</button>
+                            <p class="nesp-muted">New completed reviews send this invite automatically. Use this only for a reviewed applicant who was completed before automatic invites were enabled.</p>
+                            <button class="nesp-primary-action" type="submit">Send Interview Invite</button>
                         </form>
                     <?php elseif ($this->isAdmin && in_array($koalendarBookingEmailStatus, array('sent', 'failed'), true)): ?>
                         <div class="nesp-empty">
-                            <?php echo($koalendarBookingEmailStatus === 'sent' ? 'A scheduling-link email was already sent.' : 'A previous scheduling-link email attempt failed.'); ?>
+                            <?php echo($koalendarBookingEmailStatus === 'sent' ? 'Interview invite sent.' : 'A previous interview-invite email attempt failed.'); ?>
                             A resend requires a new explicit confirmation and is recorded in the audit trail.
                         </div>
                         <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=sendKoalendarSchedulingLink">
@@ -228,9 +225,9 @@ $koalendarBookingEmailStatus = isset($this->questionnaire['koalendar_booking_ema
                             </label>
                             <label class="nesp-confirmation-check">
                                 <input type="checkbox" name="confirmResend" value="resend" required />
-                                I intend to send another scheduling-link email and understand this is recorded.
+                                I intend to send another interview invite and understand this is recorded.
                             </label>
-                            <button class="nesp-secondary-action" type="submit">Resend Scheduling Link</button>
+                            <button class="nesp-secondary-action" type="submit">Resend Interview Invite</button>
                         </form>
                     <?php elseif ($this->isAdmin): ?>
                         <div class="nesp-empty"><?php $this->_($this->koalendarBookingEmailDelivery['message']); ?></div>

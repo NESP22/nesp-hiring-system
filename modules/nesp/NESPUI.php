@@ -1324,13 +1324,10 @@ class NESPUI extends UserInterface
         $reviewedBookingFingerprint = isset($_POST['reviewedBookingFingerprint'])
             ? trim((string) $_POST['reviewedBookingFingerprint']) : '';
         $allowResend = isset($_POST['sendMode']) && $_POST['sendMode'] === 'resend';
-        if (!isset($_POST['confirmBookingSend']) || $_POST['confirmBookingSend'] !== 'confirm')
+        if ($allowResend && (!isset($_POST['confirmBookingSend']) || $_POST['confirmBookingSend'] !== 'confirm'
+            || !isset($_POST['confirmResend']) || $_POST['confirmResend'] !== 'resend'))
         {
-            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Confirm the applicant, interviewer, and public booking page before sending the scheduling link.');
-        }
-        if ($allowResend && (!isset($_POST['confirmResend']) || $_POST['confirmResend'] !== 'resend'))
-        {
-            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Confirm that this is an intentional resend before sending another scheduling link.');
+            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Confirm that this is an intentional resend before sending another interview invite.');
         }
 
         $delivery = $this->_workflow->sendKoalendarSchedulingLinkEmail(
