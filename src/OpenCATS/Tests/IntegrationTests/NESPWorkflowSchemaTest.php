@@ -629,6 +629,7 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
         $originalSetLabel = $page['questionnaire']['question_set_label'];
         $originalIntro = $page['questionnaire']['question_set_intro'];
         $versionID = (int) $page['questionnaire']['question_set_version_id'];
+        $this->assertStringContainsString('Photographer', $originalSetLabel);
 
         $draftID = $workflow->createQuestionSetDraftFromVersion(0, $versionID, 1);
         $draft = $workflow->getQuestionSetVersionDetail($draftID);
@@ -656,6 +657,19 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
             $input['questionSortOrder'][] = (string) $question['sort_order'];
         }
         $this->assertTrue($workflow->saveQuestionSetDraft($draftID, $input, 1)['ok']);
+        $this->assertSame($originalSetLabel, $workflow->getQuestionSetVersionDetail($versionID)['display_name']);
+
+        $this->mySQLQueryLocal(sprintf(
+            "UPDATE nesp_question_set
+             SET display_name = 'Shared mutable fixture label',
+                 description = 'Shared mutable fixture intro'
+             WHERE question_set_id = %d",
+            (int) $draft['question_set_id']
+        ));
+        $mutatedIssuedLink = $workflow->getQuestionnairePageByToken($token);
+        $this->assertTrue($mutatedIssuedLink['ok']);
+        $this->assertSame($originalSetLabel, $mutatedIssuedLink['questionnaire']['question_set_label']);
+        $this->assertSame($originalIntro, $mutatedIssuedLink['questionnaire']['question_set_intro']);
 
         $newCandidateID = $this->insertFakeCandidate('Future', 'Applicant');
         $this->insertFakeCandidateJobOrder($newCandidateID, $jobOrderID);
@@ -668,9 +682,69 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
 
         $sameIssuedLink = $workflow->getQuestionnairePageByToken($token);
         $this->assertTrue($sameIssuedLink['ok']);
+        $this->assertSame($originalSetLabel, $sameIssuedLink['questionnaire']['question_set_label']);
         $this->assertSame($originalIntro, $sameIssuedLink['questionnaire']['question_set_intro']);
         $this->assertSame($originalLabel, $sameIssuedLink['questionnaire']['questions'][0]['label']);
         $this->assertNotSame('Changed future-only fixture question', $sameIssuedLink['questionnaire']['questions'][0]['label']);
+
+        $publishedPreview = $workflow->getCandidateQuestionnairePreview($newCandidateID, $jobOrderID);
+        $this->assertSame('Draft-only fixture label', $publishedPreview['question_set_label']);
+        $this->assertSame('Draft-only fixture intro', $publishedPreview['question_set_intro']);
+        $this->assertSame('Changed future-only fixture question', $publishedPreview['questions'][0]['label']);
+    }
+
+    public function testQuestionnaireDraftRoleMatchesAffectRoutingOnlyAfterPublish()
+    {
+        include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+        include_once(LEGACY_ROOT . '/lib/NESPWorkflow.php');
+
+        $workflow = new \NESPWorkflow(\DatabaseConnection::getInstance());
+        $workflow->ensureDefaultQuestionSetsSeeded(1);
+
+        $fieldCandidateID = $this->insertFakeCandidate('Field', 'Fixture');
+        $fieldJobOrderID = $this->insertFakeJobOrder('Weekend Table Greeter / Field Assistant');
+        $this->insertFakeCandidateJobOrder($fieldCandidateID, $fieldJobOrderID);
+        $fieldPreview = $workflow->getCandidateQuestionnairePreview($fieldCandidateID, $fieldJobOrderID);
+        $this->assertSame('Field Staff Pre-Interview', $fieldPreview['question_set_label']);
+
+        $photoCandidateID = $this->insertFakeCandidate('Photo', 'Fixture');
+        $photoJobOrderID = $this->insertFakeJobOrder('Weekend Staff Portrait & Team Photographer - Youth Sports');
+        $this->insertFakeCandidateJobOrder($photoCandidateID, $photoJobOrderID);
+        $photoPreview = $workflow->getCandidateQuestionnairePreview($photoCandidateID, $photoJobOrderID);
+        $this->assertSame('Photographer Pre-Interview', $photoPreview['question_set_label']);
+
+        $draftID = $workflow->createQuestionSetDraftFromVersion(0, (int) $photoPreview['question_set_version_id'], 1);
+        $draft = $workflow->getQuestionSetVersionDetail($draftID);
+        $input = array(
+            'displayName' => 'Photographer Draft Routed To Field',
+            'description' => $draft['description'],
+            'roleMatches' => array(array('match_text' => '', 'joborder_id' => $fieldJobOrderID)),
+            'questionKey' => array(),
+            'questionLabel' => array(),
+            'questionHelp' => array(),
+            'questionType' => array(),
+            'questionRequired' => array(),
+            'questionChoices' => array(),
+            'questionSortOrder' => array()
+        );
+        foreach ($draft['questions'] as $question)
+        {
+            $input['questionKey'][] = $question['key'];
+            $input['questionLabel'][] = $question['label'];
+            $input['questionHelp'][] = $question['help'];
+            $input['questionType'][] = $question['type'];
+            $input['questionRequired'][] = !empty($question['required']) ? '1' : '0';
+            $input['questionChoices'][] = implode("\n", $question['choices']);
+            $input['questionSortOrder'][] = (string) $question['sort_order'];
+        }
+
+        $this->assertTrue($workflow->saveQuestionSetDraft($draftID, $input, 1)['ok']);
+        $fieldPreviewBeforePublish = $workflow->getCandidateQuestionnairePreview($fieldCandidateID, $fieldJobOrderID);
+        $this->assertSame('Field Staff Pre-Interview', $fieldPreviewBeforePublish['question_set_label']);
+
+        $this->assertTrue($workflow->publishQuestionSetDraft($draftID, 1));
+        $fieldPreviewAfterPublish = $workflow->getCandidateQuestionnairePreview($fieldCandidateID, $fieldJobOrderID);
+        $this->assertSame('Photographer Draft Routed To Field', $fieldPreviewAfterPublish['question_set_label']);
     }
 
     public function testInterviewerDirectAccessRequiresActiveExactNonRevokedGrant()
