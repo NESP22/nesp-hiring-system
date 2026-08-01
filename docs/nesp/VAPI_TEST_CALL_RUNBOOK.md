@@ -12,7 +12,19 @@ Do not place the controlled test call until all are true:
 - Craig explicitly confirms the test destination phone
 - fake test candidate is clearly labeled
 
+Current status after overnight deployment:
+
+- Scheduled-call code is deployed.
+- Public scheduler hotfix is deployed.
+- `NESP_VAPI_ENABLED=0`.
+- Render scheduled-call cron has not been created.
+- No production fake candidate exists.
+- No valid production scheduling link has been exercised.
+- Missing/invalid public scheduling links have been verified safe.
+
 ## One Controlled Scheduled Test Call
+
+Craig must explicitly approve this phase before any fake candidate, cron command, Vapi enablement, or call attempt is created.
 
 1. Confirm no real applicant data is used.
 2. Create or select one fake test candidate.

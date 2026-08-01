@@ -4,6 +4,18 @@ This guide is for Craig's day-to-day use of the NESP hiring dashboard after the 
 
 Sanitized callout screenshot: `docs/nesp/screenshots/craig-phone-screen-workflow-callouts.svg`
 
+## Current Morning Status
+
+- The scheduled phone-screen workflow is deployed.
+- The public scheduler hotfix is deployed.
+- Scheduled calling is still off because `NESP_VAPI_ENABLED=0`.
+- No Render scheduled-call cron has been created.
+- No candidate has been called.
+- No applicant has been emailed or texted by the system.
+- No job ad has been published.
+
+Craig's next approval is for a controlled fake-candidate scheduled-call test. Do not use a real applicant for that first call.
+
 ## 1. Log In
 
 1. Go to the NESP hiring site.
