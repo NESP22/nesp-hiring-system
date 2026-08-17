@@ -298,6 +298,30 @@ class FeatureContext extends MinkContext implements Context, SnippetAcceptingCon
 
         $this->getSession()->executeScript($script);
     }
+
+    /**
+     * @Given I set hidden field :field to a recent format-neutral date
+     */
+    public function iSetHiddenFieldToARecentFormatNeutralDate($field)
+    {
+        $this->iSetHiddenFieldTo($field, $this->getRecentFormatNeutralDate());
+    }
+
+    /**
+     * @Then I should see the recent format-neutral date at :time
+     */
+    public function iShouldSeeTheRecentFormatNeutralDateAt($time)
+    {
+        $this->assertSession()->pageTextContains(
+            sprintf('%s (%s)', $this->getRecentFormatNeutralDate(), $time)
+        );
+    }
+
+    private function getRecentFormatNeutralDate()
+    {
+        return sprintf('%1$s-%1$s-%2$s', date('m'), date('y'));
+    }
+
     /** Click on the element with the provided xpath query
      *
      * @When I click on the element :locator

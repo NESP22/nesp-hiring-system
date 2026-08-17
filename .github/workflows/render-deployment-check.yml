@@ -248,6 +248,9 @@ jobs:
           authenticated_status="$(curl -sS -u nesp-admin:test-only-install-password -o /tmp/root-authenticated.html -w '%{http_code}' http://127.0.0.1:18080/)"
           test "$authenticated_status" = "200"
           grep -qi 'OpenCATS' /tmp/root-authenticated.html
+          grep -Fqi '<meta name="robots" content="noindex, nofollow" />' /tmp/root-authenticated.html
+          curl -fsS -u nesp-admin:test-only-install-password http://127.0.0.1:18080/robots.txt \
+            | grep -Fx 'Allow: /$'
 
       - name: Verify persistent paths, safe config, and logical backup
         run: |
