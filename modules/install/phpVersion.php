@@ -6,6 +6,7 @@
 <html>
     <head>
         <title>CATS - Installation Wizard Script</title>
+        <meta name="robots" content="noindex, nofollow" />
         <script type="text/javascript" src="<?php echo TemplateUtility::getVersionedAssetURL('js/lib.js'); ?>"></script>
         <script type="text/javascript" src="<?php echo TemplateUtility::getVersionedAssetURL('js/install.js'); ?>"></script>
         <style type="text/css" media="all">@import "<?php echo TemplateUtility::getVersionedAssetURL('modules/install/install.css'); ?>";</style>

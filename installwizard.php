@@ -36,6 +36,7 @@
 <html>
     <head>
         <title>OpenCATS - Installation Wizard Script</title>
+        <meta name="robots" content="noindex, nofollow" />
         <?php
             if (!isset($php4) && isset($_SESSION['CATS']) && $_SESSION['CATS']->isLoggedIn())
             {

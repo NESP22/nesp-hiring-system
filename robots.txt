@@ -3,6 +3,11 @@
 User-agent: *
 Disallow: /
 
+# Let crawlers revisit only the root login page so they can observe its
+# noindex meta tag and remove the page from search results. The rest of the
+# private OpenCATS backend remains blocked.
+Allow: /$
+
 # Public careers portal (job listings, job details, applications)
 
 # Canonical public entry point for job listings and job details
