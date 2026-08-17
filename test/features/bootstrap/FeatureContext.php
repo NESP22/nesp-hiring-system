@@ -300,19 +300,26 @@ class FeatureContext extends MinkContext implements Context, SnippetAcceptingCon
     }
 
     /**
-     * @Given I set hidden field :field to today's short date
+     * @Given I set hidden field :field to a recent format-neutral date
      */
-    public function iSetHiddenFieldToTodaysShortDate($field)
+    public function iSetHiddenFieldToARecentFormatNeutralDate($field)
     {
-        $this->iSetHiddenFieldTo($field, date('m-d-y'));
+        $this->iSetHiddenFieldTo($field, $this->getRecentFormatNeutralDate());
     }
 
     /**
-     * @Then I should see today's short date
+     * @Then I should see the recent format-neutral date at :time
      */
-    public function iShouldSeeTodaysShortDate()
+    public function iShouldSeeTheRecentFormatNeutralDateAt($time)
     {
-        $this->assertSession()->pageTextContains(date('m-d-y'));
+        $this->assertSession()->pageTextContains(
+            sprintf('%s (%s)', $this->getRecentFormatNeutralDate(), $time)
+        );
+    }
+
+    private function getRecentFormatNeutralDate()
+    {
+        return sprintf('%1$s-%1$s-%2$s', date('m'), date('y'));
     }
 
     /** Click on the element with the provided xpath query
