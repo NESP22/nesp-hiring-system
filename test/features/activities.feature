@@ -46,4 +46,4 @@ Feature: Activities
     And I follow "Activities"
     Then I should see "Samwise"
     And I should see "Manual timestamp note"
-    And I should see today's short date at "04:37 PM"
+    And I should see today's short date

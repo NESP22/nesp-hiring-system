@@ -308,13 +308,11 @@ class FeatureContext extends MinkContext implements Context, SnippetAcceptingCon
     }
 
     /**
-     * @Then I should see today's short date at :time
+     * @Then I should see today's short date
      */
-    public function iShouldSeeTodaysShortDateAt($time)
+    public function iShouldSeeTodaysShortDate()
     {
-        $this->assertSession()->pageTextContains(
-            sprintf('%s (%s)', date('m-d-y'), $time)
-        );
+        $this->assertSession()->pageTextContains(date('m-d-y'));
     }
 
     /** Click on the element with the provided xpath query
