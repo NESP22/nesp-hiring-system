@@ -298,6 +298,25 @@ class FeatureContext extends MinkContext implements Context, SnippetAcceptingCon
 
         $this->getSession()->executeScript($script);
     }
+
+    /**
+     * @Given I set hidden field :field to today's short date
+     */
+    public function iSetHiddenFieldToTodaysShortDate($field)
+    {
+        $this->iSetHiddenFieldTo($field, date('m-d-y'));
+    }
+
+    /**
+     * @Then I should see today's short date at :time
+     */
+    public function iShouldSeeTodaysShortDateAt($time)
+    {
+        $this->assertSession()->pageTextContains(
+            sprintf('%s (%s)', date('m-d-y'), $time)
+        );
+    }
+
     /** Click on the element with the provided xpath query
      *
      * @When I click on the element :locator

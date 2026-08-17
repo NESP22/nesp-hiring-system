@@ -36,7 +36,7 @@ Feature: Activities
     And I switch to the iframe "popupInner"
     And I select "Not reached" from "activityTypeID"
     And fill in "activityNote" with "Manual timestamp note"
-    And I set hidden field "activityDate" to "07-07-26"
+    And I set hidden field "activityDate" to today's short date
     And I select "4" from "activityHour"
     And I select "37" from "activityMinute"
     And I select "PM" from "activityMeridiem"
@@ -46,4 +46,4 @@ Feature: Activities
     And I follow "Activities"
     Then I should see "Samwise"
     And I should see "Manual timestamp note"
-    And I should see "07-07-26 (04:37 PM)"
+    And I should see today's short date at "04:37 PM"
