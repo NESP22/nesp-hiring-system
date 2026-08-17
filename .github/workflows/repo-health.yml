@@ -1,0 +1,277 @@
+name: Repo Health
+
+# Free-tier repo health backbone. Advisory by design: it reports, it does not
+# gate merges. The single hard failure is a committed .env file (real secrets in
+# git), which is always worth stopping for.
+#
+# Secrets are never read on pull_request runs, so a PR branch cannot exfiltrate
+# the Supabase reporting key.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    # Mondays 13:23 UTC (~09:23 America/New_York). Off-the-hour to dodge the
+    # GitHub-wide cron stampede.
+    - cron: '23 13 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-health-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  health:
+    name: Health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Detect stack
+        id: stack
+        shell: bash
+        run: |
+          set -uo pipefail
+          exists() { if [ -e "$1" ]; then echo true; else echo false; fi; }
+          {
+            echo "npm=$(exists package.json)"
+            echo "npm_lock=$(exists package-lock.json)"
+            echo "composer=$(exists composer.json)"
+            echo "docker=$(exists Dockerfile)"
+            if [ -e requirements.txt ] || [ -e pyproject.toml ] || [ -e Pipfile ]; then
+              echo "python=true"
+            else
+              echo "python=false"
+            fi
+          } >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------- hygiene
+
+      - name: Repository hygiene
+        id: hygiene
+        shell: bash
+        run: |
+          set -uo pipefail
+          warn=0
+
+          note() { echo "- $1" >> hygiene.md; }   # top-level bullet
+          raw()  { echo "$1"   >> hygiene.md; }   # already-formatted line
+          : > hygiene.md
+
+          for f in README.md README.rst README.txt readme.md; do
+            [ -e "$f" ] && found_readme=1
+          done
+          if [ -z "${found_readme:-}" ]; then note "No README found"; warn=$((warn+1)); fi
+          [ -e .gitignore ] || { note "No .gitignore"; warn=$((warn+1)); }
+
+          # Committed .env — the one hard failure. .env.example / .env.sample are fine.
+          env_hits=$(git ls-files | grep -E '(^|/)\.env$' || true)
+          if [ -n "$env_hits" ]; then
+            note "**Committed .env file(s) — rotate anything inside, then git rm:**"
+            while IFS= read -r p; do raw "  - \`$p\`"; done <<< "$env_hits"
+            echo "committed_env=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "committed_env=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Large blobs — informational only.
+          big=$(git ls-files -z | while IFS= read -r -d '' p; do
+                  if [ -f "$p" ]; then
+                    s=$(wc -c < "$p")
+                    if [ "$s" -gt 5242880 ]; then printf '%s %s\n' "$s" "$p"; fi
+                  fi
+                done | sort -rn | head -5)
+          if [ -n "$big" ]; then
+            note "Files over 5 MB (consider Git LFS):"
+            while IFS= read -r line; do
+              raw "  - \`${line#* }\` ($(( ${line%% *} / 1048576 )) MB)"
+            done <<< "$big"
+          fi
+
+          echo "warnings=$warn" >> "$GITHUB_OUTPUT"
+          cat hygiene.md
+
+      # ------------------------------------------------------------------- node
+
+      - name: Set up Node
+        if: steps.stack.outputs.npm == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '20'
+
+      - name: npm audit
+        if: steps.stack.outputs.npm == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          # --ignore-scripts: never run dependency lifecycle scripts in CI.
+          if [ -e package-lock.json ]; then
+            npm ci --ignore-scripts --no-audit --no-fund || npm install --ignore-scripts --no-audit --no-fund
+          else
+            npm install --ignore-scripts --no-audit --no-fund
+          fi
+          npm audit --audit-level=moderate || true
+          npm audit --json > npm-audit.json 2>/dev/null || true
+
+      - name: npm test / lint (only if defined)
+        if: steps.stack.outputs.npm == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          has_script() { node -e "process.exit(require('./package.json').scripts?.['$1']?0:1)" 2>/dev/null; }
+          if has_script lint; then npm run lint --if-present; else echo "no lint script"; fi
+          if has_script test; then npm test --if-present; else echo "no test script"; fi
+
+      # ----------------------------------------------------------------- python
+
+      - name: Set up Python
+        if: steps.stack.outputs.python == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: pip-audit
+        if: steps.stack.outputs.python == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          python -m pip install --quiet --upgrade pip pip-audit
+          if [ -e requirements.txt ]; then
+            pip-audit -r requirements.txt --progress-spinner off || true
+            pip-audit -r requirements.txt --progress-spinner off -f json > pip-audit.json 2>/dev/null || true
+          else
+            pip-audit --progress-spinner off || true
+          fi
+
+      # -------------------------------------------------------------------- php
+
+      - name: composer audit
+        if: steps.stack.outputs.composer == 'true'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          composer --version || exit 0
+          composer audit --no-interaction || true
+
+      # ---------------------------------------------------------------- summary
+
+      - name: Build summary
+        id: summary
+        shell: bash
+        run: |
+          set -uo pipefail
+          python3 - <<'PY' > health.json
+          import json, os, subprocess
+
+          def sh(cmd):
+              try:
+                  return subprocess.check_output(cmd, shell=True, text=True).strip()
+              except Exception:
+                  return ""
+
+          report = {
+              "repo": os.environ["GITHUB_REPOSITORY"],
+              "ref": os.environ["GITHUB_REF_NAME"],
+              "sha": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "event": os.environ["GITHUB_EVENT_NAME"],
+              "checked_at": sh("date -u +%Y-%m-%dT%H:%M:%SZ"),
+              "tracked_files": int(sh("git ls-files | wc -l") or 0),
+              "last_commit_at": sh("git log -1 --format=%cI"),
+              "warnings": int(os.environ.get("HYGIENE_WARNINGS", "0") or 0),
+              "committed_env": os.environ.get("COMMITTED_ENV") == "true",
+          }
+
+          def vuln_count(path, fn):
+              if not os.path.exists(path):
+                  return None
+              try:
+                  with open(path) as fh:
+                      return fn(json.load(fh))
+              except Exception:
+                  return None
+
+          report["npm_vulns"] = vuln_count(
+              "npm-audit.json",
+              lambda d: d.get("metadata", {}).get("vulnerabilities", {}).get("total"),
+          )
+          report["pip_vulns"] = vuln_count(
+              "pip-audit.json",
+              lambda d: sum(len(x.get("vulns", [])) for x in (d.get("dependencies") or [])),
+          )
+
+          print(json.dumps(report, indent=2))
+          PY
+          cat health.json
+
+          {
+            echo "## Repo health — \`$GITHUB_REPOSITORY\`"
+            echo
+            echo '```json'
+            cat health.json
+            echo '```'
+            echo
+            echo "### Hygiene"
+            if [ -s hygiene.md ]; then cat hygiene.md; else echo "- Nothing to flag"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          HYGIENE_WARNINGS: ${{ steps.hygiene.outputs.warnings }}
+          COMMITTED_ENV: ${{ steps.hygiene.outputs.committed_env }}
+
+      - name: Upload health report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repo-health-${{ github.run_id }}
+          path: health.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      # ---------------------------------------------------------- report to CRM
+
+      - name: Report to Supabase
+        # Never on pull_request: PR branches must not be able to read the key.
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          # Prefer a narrowly-scoped key if one is configured; fall back to the
+          # org-level key. See the PR description for why a scoped key is better.
+          SUPABASE_KEY: ${{ secrets.SUPABASE_REPO_HEALTH_KEY || secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          set -uo pipefail
+          if [ -z "${SUPABASE_KEY:-}" ] || [ -z "${SUPABASE_URL:-}" ]; then
+            echo "Supabase reporting not configured (need SUPABASE_URL var + key secret) — skipping."
+            exit 0
+          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -X POST "${SUPABASE_URL%/}/rest/v1/repo_health" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: resolution=merge-duplicates,return=minimal" \
+            --data @health.json)
+          echo "Supabase responded: $code"
+          case "$code" in
+            2*) echo "Reported." ;;
+            404) echo "::warning::repo_health table not found — create it (DDL is in the PR description)." ;;
+            *)   echo "::warning::Supabase reporting returned $code." ;;
+          esac
+
+      - name: Fail on committed .env
+        if: steps.hygiene.outputs.committed_env == 'true'
+        shell: bash
+        run: |
+          echo "::error::A .env file is committed to this repository. Rotate the credentials inside it, then remove it from git."
+          exit 1
