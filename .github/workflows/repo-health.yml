@@ -1,8 +1,19 @@
 name: Repo Health
 
-# Free-tier repo health backbone. Advisory by design: it reports, it does not
-# gate merges. The single hard failure is a committed .env file (real secrets in
-# git), which is always worth stopping for.
+# Gating health check. It FAILS only on findings that need a human to act:
+#   * a committed .env
+#   * secret-scan hits from high-precision provider rules
+#   * HIGH/CRITICAL dependency vulnerabilities
+# Everything else (hygiene, LOW/MODERATE vulns, gitleaks' generic-api-key
+# entropy heuristic) is reported as a warning and does not fail the run.
+#
+# Secret scanning covers the WORKING TREE, not git history. History is a
+# separate concern with its own accepted, already-revoked findings; scanning it
+# here would pin some repos permanently red. nesp-crm keeps secret-history-audit.yml
+# for that.
+#
+# The repo's own test suite is NOT re-run here when the repo already has another
+# workflow — that would just duplicate an existing signal.
 #
 # Secrets are never read on pull_request runs, so a PR branch cannot exfiltrate
 # the Supabase reporting key.
@@ -24,6 +35,10 @@ concurrency:
   group: repo-health-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GITLEAKS_VERSION: '8.28.0'
+  GITLEAKS_SHA256: 'a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb'
+
 jobs:
   health:
     name: Health check
@@ -33,6 +48,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Detect stack
         id: stack
@@ -40,65 +57,84 @@ jobs:
         run: |
           set -uo pipefail
           exists() { if [ -e "$1" ]; then echo true; else echo false; fi; }
+          # Any workflow here other than this one means the repo already has CI,
+          # so we must not re-run its tests and produce a duplicate signal.
+          others=$(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) \
+                   ! -name 'repo-health.yml' 2>/dev/null | wc -l | tr -d ' ')
           {
             echo "npm=$(exists package.json)"
-            echo "npm_lock=$(exists package-lock.json)"
             echo "composer=$(exists composer.json)"
-            echo "docker=$(exists Dockerfile)"
+            echo "other_workflows=$others"
             if [ -e requirements.txt ] || [ -e pyproject.toml ] || [ -e Pipfile ]; then
               echo "python=true"
             else
               echo "python=false"
             fi
           } >> "$GITHUB_OUTPUT"
-
-      # ---------------------------------------------------------------- hygiene
+          echo "other workflows in this repo: $others"
 
       - name: Repository hygiene
-        id: hygiene
         shell: bash
         run: |
           set -uo pipefail
-          warn=0
+          python3 - <<'HYG'
+          import json, os, subprocess
 
-          note() { echo "- $1" >> hygiene.md; }   # top-level bullet
-          raw()  { echo "$1"   >> hygiene.md; }   # already-formatted line
-          : > hygiene.md
+          def sh(c):
+              try:
+                  return subprocess.check_output(c, shell=True, text=True).strip()
+              except Exception:
+                  return ""
 
-          for f in README.md README.rst README.txt readme.md; do
-            [ -e "$f" ] && found_readme=1
-          done
-          if [ -z "${found_readme:-}" ]; then note "No README found"; warn=$((warn+1)); fi
-          [ -e .gitignore ] || { note "No .gitignore"; warn=$((warn+1)); }
+          warnings, env_files = [], []
+          tracked = [p for p in sh("git ls-files").splitlines() if p]
 
-          # Committed .env — the one hard failure. .env.example / .env.sample are fine.
-          env_hits=$(git ls-files | grep -E '(^|/)\.env$' || true)
-          if [ -n "$env_hits" ]; then
-            note "**Committed .env file(s) — rotate anything inside, then git rm:**"
-            while IFS= read -r p; do raw "  - \`$p\`"; done <<< "$env_hits"
-            echo "committed_env=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "committed_env=false" >> "$GITHUB_OUTPUT"
-          fi
+          if not any(os.path.basename(p).lower().startswith("readme") for p in tracked):
+              warnings.append("No README found")
+          if ".gitignore" not in tracked:
+              warnings.append("No .gitignore")
 
-          # Large blobs — informational only.
-          big=$(git ls-files -z | while IFS= read -r -d '' p; do
-                  if [ -f "$p" ]; then
-                    s=$(wc -c < "$p")
-                    if [ "$s" -gt 5242880 ]; then printf '%s %s\n' "$s" "$p"; fi
-                  fi
-                done | sort -rn | head -5)
-          if [ -n "$big" ]; then
-            note "Files over 5 MB (consider Git LFS):"
-            while IFS= read -r line; do
-              raw "  - \`${line#* }\` ($(( ${line%% *} / 1048576 )) MB)"
-            done <<< "$big"
-          fi
+          # A committed .env is the one hygiene item that blocks. .env.example is fine.
+          for p in tracked:
+              if os.path.basename(p) == ".env":
+                  env_files.append(p)
 
-          echo "warnings=$warn" >> "$GITHUB_OUTPUT"
-          cat hygiene.md
+          big = []
+          for p in tracked:
+              try:
+                  s = os.path.getsize(p)
+              except OSError:
+                  continue
+              if s > 5 * 1024 * 1024:
+                  big.append((s, p))
+          for s, p in sorted(big, reverse=True)[:5]:
+              warnings.append("Large file `%s` (%d MB) — consider Git LFS" % (p, s // (1024 * 1024)))
 
-      # ------------------------------------------------------------------- node
+          json.dump({"warnings": warnings, "env_files": env_files,
+                     "tracked_files": len(tracked)}, open("hygiene.json", "w"), indent=2)
+          print(json.dumps({"warnings": warnings, "env_files": env_files}, indent=2))
+          HYG
+
+      - name: Install gitleaks (pinned + checksum-verified)
+        shell: bash
+        run: |
+          set -euo pipefail
+          f="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSLf -o "$f" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${f}"
+          echo "${GITLEAKS_SHA256}  ${f}" | sha256sum -c -
+          tar xzf "$f" gitleaks
+          ./gitleaks version
+
+      - name: Secret scan (working tree)
+        shell: bash
+        run: |
+          set -uo pipefail
+          # --exit-code 0: never fail here. Classification happens in the gate step.
+          ./gitleaks dir . --no-banner --exit-code 0 \
+            --report-format json --report-path gitleaks.json || true
+          [ -f gitleaks.json ] || echo '[]' > gitleaks.json
+          python3 -c "import json;print('secret-scan findings:',len(json.load(open('gitleaks.json'))))"
 
       - name: Set up Node
         if: steps.stack.outputs.npm == 'true'
@@ -109,29 +145,16 @@ jobs:
       - name: npm audit
         if: steps.stack.outputs.npm == 'true'
         continue-on-error: true
+        timeout-minutes: 6
         shell: bash
         run: |
           set -uo pipefail
-          # --ignore-scripts: never run dependency lifecycle scripts in CI.
-          if [ -e package-lock.json ]; then
-            npm ci --ignore-scripts --no-audit --no-fund || npm install --ignore-scripts --no-audit --no-fund
-          else
-            npm install --ignore-scripts --no-audit --no-fund
+          # npm audit reads the lockfile; no node_modules install needed.
+          if [ ! -e package-lock.json ]; then
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund || true
           fi
-          npm audit --audit-level=moderate || true
           npm audit --json > npm-audit.json 2>/dev/null || true
-
-      - name: npm test / lint (only if defined)
-        if: steps.stack.outputs.npm == 'true'
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -uo pipefail
-          has_script() { node -e "process.exit(require('./package.json').scripts?.['$1']?0:1)" 2>/dev/null; }
-          if has_script lint; then npm run lint --if-present; else echo "no lint script"; fi
-          if has_script test; then npm test --if-present; else echo "no test script"; fi
-
-      # ----------------------------------------------------------------- python
+          npm audit --audit-level=high || true
 
       - name: Set up Python
         if: steps.stack.outputs.python == 'true'
@@ -142,117 +165,265 @@ jobs:
       - name: pip-audit
         if: steps.stack.outputs.python == 'true'
         continue-on-error: true
+        timeout-minutes: 6
         shell: bash
         run: |
           set -uo pipefail
           python -m pip install --quiet --upgrade pip pip-audit
           if [ -e requirements.txt ]; then
-            pip-audit -r requirements.txt --progress-spinner off || true
             pip-audit -r requirements.txt --progress-spinner off -f json > pip-audit.json 2>/dev/null || true
           else
-            pip-audit --progress-spinner off || true
+            pip-audit --progress-spinner off -f json > pip-audit.json 2>/dev/null || true
           fi
-
-      # -------------------------------------------------------------------- php
 
       - name: composer audit
         if: steps.stack.outputs.composer == 'true'
         continue-on-error: true
+        timeout-minutes: 6
         shell: bash
         run: |
           set -uo pipefail
-          composer --version || exit 0
-          composer audit --no-interaction || true
+          composer --version >/dev/null 2>&1 || exit 0
+          composer audit --format=json --no-interaction > composer-audit.json 2>/dev/null || true
 
-      # ---------------------------------------------------------------- summary
-
-      - name: Build summary
-        id: summary
+      - name: Lint / test (only when this repo has no other CI workflow)
+        if: steps.stack.outputs.npm == 'true' && steps.stack.outputs.other_workflows == '0'
+        continue-on-error: true
+        timeout-minutes: 6
         shell: bash
         run: |
           set -uo pipefail
-          python3 - <<'PY' > health.json
-          import json, os, subprocess
+          npm ci --ignore-scripts --no-audit --no-fund || npm install --ignore-scripts --no-audit --no-fund
+          has() { node -e "process.exit(require('./package.json').scripts?.['$1']?0:1)" 2>/dev/null; }
+          if has lint; then npm run lint --if-present; else echo "no lint script"; fi
+          if has test; then npm test --if-present; else echo "no test script"; fi
 
-          def sh(cmd):
-              try:
-                  return subprocess.check_output(cmd, shell=True, text=True).strip()
-              except Exception:
-                  return ""
-
-          report = {
-              "repo": os.environ["GITHUB_REPOSITORY"],
-              "ref": os.environ["GITHUB_REF_NAME"],
-              "sha": os.environ["GITHUB_SHA"],
-              "run_id": os.environ["GITHUB_RUN_ID"],
-              "event": os.environ["GITHUB_EVENT_NAME"],
-              "checked_at": sh("date -u +%Y-%m-%dT%H:%M:%SZ"),
-              "tracked_files": int(sh("git ls-files | wc -l") or 0),
-              "last_commit_at": sh("git log -1 --format=%cI"),
-              "warnings": int(os.environ.get("HYGIENE_WARNINGS", "0") or 0),
-              "committed_env": os.environ.get("COMMITTED_ENV") == "true",
-          }
-
-          def vuln_count(path, fn):
-              if not os.path.exists(path):
-                  return None
-              try:
-                  with open(path) as fh:
-                      return fn(json.load(fh))
-              except Exception:
-                  return None
-
-          report["npm_vulns"] = vuln_count(
-              "npm-audit.json",
-              lambda d: d.get("metadata", {}).get("vulnerabilities", {}).get("total"),
-          )
-          report["pip_vulns"] = vuln_count(
-              "pip-audit.json",
-              lambda d: sum(len(x.get("vulns", [])) for x in (d.get("dependencies") or [])),
-          )
-
-          print(json.dumps(report, indent=2))
-          PY
-          cat health.json
-
-          {
-            echo "## Repo health — \`$GITHUB_REPOSITORY\`"
-            echo
-            echo '```json'
-            cat health.json
-            echo '```'
-            echo
-            echo "### Hygiene"
-            if [ -s hygiene.md ]; then cat hygiene.md; else echo "- Nothing to flag"; fi
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Evaluate gate
+        id: gate
+        shell: bash
         env:
-          HYGIENE_WARNINGS: ${{ steps.hygiene.outputs.warnings }}
-          COMMITTED_ENV: ${{ steps.hygiene.outputs.committed_env }}
+          CHECKED_AT: ${{ github.event.repository.updated_at }}
+        run: |
+          set -uo pipefail
+          export TRACKED_FILES=$(python3 -c "import json;print(json.load(open('hygiene.json'))['tracked_files'])")
+          export CHECKED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          python3 - <<'GATE'
+          import json, math, os, re, urllib.request
+
+          def load(p, default=None):
+              try:
+                  with open(p) as f:
+                      return json.load(f)
+              except Exception:
+                  return default
+
+          blocking, warnings = [], []
+
+          # ---------------------------------------------------------------- hygiene
+          hyg = load("hygiene.json", {}) or {}
+          for w in hyg.get("warnings", []):
+              warnings.append(("hygiene", w))
+          for p in hyg.get("env_files", []):
+              blocking.append(("committed-env", "`%s` is committed — rotate what is inside, then git rm" % p))
+
+          # ------------------------------------------------------------ secret scan
+          # generic-api-key is gitleaks' entropy heuristic and the main false-positive
+          # source (Drive folder ids, access codes). It warns. Provider-specific rules
+          # (aws-*, sendinblue-*, stripe-*, private-key, ...) are high precision: they fail.
+          WARN_ONLY_RULES = {"generic-api-key"}
+          TESTISH = re.compile(
+              r"(^|/)(tests?|__tests__|fixtures?|testdata|mocks?)(/|$)"
+              r"|\.(test|spec)\.[^/]+$|_test\.[^/]+$"
+          )
+          for f in load("gitleaks.json", []) or []:
+              rule, path = f.get("RuleID", "?"), f.get("File", "?")
+              where = "`%s:%s` [%s]" % (path, f.get("StartLine", "?"), rule)
+              if rule in WARN_ONLY_RULES or TESTISH.search(path):
+                  warnings.append(("secret-scan", where))
+              else:
+                  blocking.append(("secret-scan", where))
+
+          # ------------------------------------------------------------------- npm
+          npm = load("npm-audit.json")
+          if npm:
+              v = (npm.get("metadata") or {}).get("vulnerabilities") or {}
+              hi, cr = int(v.get("high") or 0), int(v.get("critical") or 0)
+              lo, mo = int(v.get("low") or 0), int(v.get("moderate") or 0)
+              names = sorted({k for k, d in (npm.get("vulnerabilities") or {}).items()
+                              if str(d.get("severity", "")).lower() in ("high", "critical")})
+              if hi or cr:
+                  blocking.append(("npm-vuln", "%d critical, %d high — %s"
+                                   % (cr, hi, ", ".join("`%s`" % n for n in names[:8]) or "see npm audit")))
+              if lo or mo:
+                  warnings.append(("npm-vuln", "%d moderate, %d low" % (mo, lo)))
+
+          # -------------------------------------------------------------- composer
+          comp = load("composer-audit.json")
+          if comp:
+              counts = {}
+              for items in (comp.get("advisories") or {}).values():
+                  for a in items or []:
+                      s = (a.get("severity") or "unknown").lower()
+                      counts[s] = counts.get(s, 0) + 1
+              hc = counts.get("high", 0) + counts.get("critical", 0)
+              rest = sum(n for k, n in counts.items() if k not in ("high", "critical"))
+              hc_pkgs = sorted({p for p, items in (comp.get("advisories") or {}).items()
+                                for a in (items or [])
+                                if str(a.get("severity", "")).lower() in ("high", "critical")})
+              if hc:
+                  blocking.append(("composer-vuln", "%d high/critical — %s"
+                                   % (hc, ", ".join("`%s`" % p for p in hc_pkgs[:8]))))
+              if rest:
+                  warnings.append(("composer-vuln", "%d lower severity" % rest))
+
+          # ------------------------------------------------------------------- pip
+          # pip-audit does not report severity, so resolve it from OSV. Anything we
+          # cannot classify warns rather than fails, to keep the gate low-noise.
+          AV = {"N": 0.85, "A": 0.62, "L": 0.55, "P": 0.2}
+          AC = {"L": 0.77, "H": 0.44}
+          PRU = {"N": 0.85, "L": 0.62, "H": 0.27}
+          PRC = {"N": 0.85, "L": 0.68, "H": 0.50}
+          UI = {"N": 0.85, "R": 0.62}
+          CIA = {"H": 0.56, "L": 0.22, "N": 0.0}
+          ORDER = ["LOW", "MODERATE", "HIGH", "CRITICAL"]
+
+          def roundup(x):
+              i = int(round(x * 100000))
+              return i / 100000.0 if i % 10000 == 0 else (math.floor(i / 10000) + 1) / 10.0
+
+          def cvss3(vec):
+              try:
+                  p = dict(kv.split(":") for kv in vec.split("/") if ":" in kv)
+                  changed = p.get("S") == "C"
+                  iss = 1 - ((1 - CIA[p["C"]]) * (1 - CIA[p["I"]]) * (1 - CIA[p["A"]]))
+                  impact = (7.52 * (iss - 0.029) - 3.25 * (iss - 0.02) ** 15) if changed else 6.42 * iss
+                  if impact <= 0:
+                      return 0.0
+                  expl = 8.22 * AV[p["AV"]] * AC[p["AC"]] * (PRC if changed else PRU)[p["PR"]] * UI[p["UI"]]
+                  return roundup(min((1.08 if changed else 1.0) * (impact + expl), 10))
+              except Exception:
+                  return None
+
+          def band(score):
+              if score is None:
+                  return None
+              if score >= 9.0: return "CRITICAL"
+              if score >= 7.0: return "HIGH"
+              if score >= 4.0: return "MODERATE"
+              return "LOW" if score > 0 else None
+
+          def osv_severity(vid):
+              try:
+                  req = urllib.request.Request("https://api.osv.dev/v1/vulns/%s" % vid,
+                                               headers={"User-Agent": "nesp-repo-health"})
+                  with urllib.request.urlopen(req, timeout=8) as r:
+                      d = json.load(r)
+              except Exception:
+                  return None
+              ds = (d.get("database_specific") or {}).get("severity")
+              if isinstance(ds, str) and ds.strip():
+                  s = ds.strip().upper()
+                  return "MODERATE" if s == "MEDIUM" else s
+              best = None
+              for s in d.get("severity") or []:
+                  if str(s.get("type", "")).startswith("CVSS_V3"):
+                      b = band(cvss3(s.get("score", "")))
+                      if b and (best is None or ORDER.index(b) > ORDER.index(best)):
+                          best = b
+              return best
+
+          pip = load("pip-audit.json")
+          if pip:
+              counts, unknown, seen, hc_items = {}, 0, 0, []
+              for dep in pip.get("dependencies") or []:
+                  for v in dep.get("vulns") or []:
+                      seen += 1
+                      if seen > 40:
+                          unknown += 1
+                          continue
+                      sev = None
+                      for vid in [v.get("id")] + list(v.get("aliases") or []):
+                          if vid:
+                              sev = osv_severity(vid)
+                              if sev:
+                                  break
+                      if sev:
+                          counts[sev] = counts.get(sev, 0) + 1
+                          if sev in ("HIGH", "CRITICAL"):
+                              hc_items.append("`%s %s` %s (%s)" % (dep.get("name", "?"),
+                                                                   dep.get("version", "?"),
+                                                                   v.get("id", "?"), sev))
+                      else:
+                          unknown += 1
+              hc = counts.get("HIGH", 0) + counts.get("CRITICAL", 0)
+              rest = sum(n for k, n in counts.items() if k not in ("HIGH", "CRITICAL")) + unknown
+              if hc:
+                  blocking.append(("pip-vuln", "%d high/critical — %s"
+                                   % (hc, "; ".join(hc_items[:8]))))
+              if rest:
+                  warnings.append(("pip-vuln", "%d lower severity or unclassified" % rest))
+
+          # ---------------------------------------------------------------- report
+          report = {
+              "repo": os.environ.get("GITHUB_REPOSITORY", ""),
+              "ref": os.environ.get("GITHUB_REF_NAME", ""),
+              "sha": os.environ.get("GITHUB_SHA", ""),
+              "run_id": os.environ.get("GITHUB_RUN_ID", ""),
+              "event": os.environ.get("GITHUB_EVENT_NAME", ""),
+              "checked_at": os.environ.get("CHECKED_AT", ""),
+              "tracked_files": int(os.environ.get("TRACKED_FILES") or 0),
+              "blocking_count": len(blocking),
+              "warning_count": len(warnings),
+              "blocking": [{"kind": k, "detail": d} for k, d in blocking],
+              "warnings": [{"kind": k, "detail": d} for k, d in warnings],
+          }
+          with open("health.json", "w") as f:
+              json.dump(report, f, indent=2)
+
+          lines = ["## Repo health — `%s`" % report["repo"], ""]
+          if blocking:
+              lines.append("### ❌ Blocking (%d) — these fail the check" % len(blocking))
+              lines += ["- **%s** — %s" % (k, d) for k, d in blocking]
+          else:
+              lines.append("### ✅ Nothing blocking")
+          lines.append("")
+          lines.append("### ⚠️ Warnings (%d) — reported, do not fail" % len(warnings))
+          lines += ["- %s — %s" % (k, d) for k, d in warnings] or ["- none"]
+          summary = "\n".join(lines) + "\n"
+          print(summary)
+          p = os.environ.get("GITHUB_STEP_SUMMARY")
+          if p:
+              with open(p, "a") as f:
+                  f.write(summary)
+          o = os.environ.get("GITHUB_OUTPUT")
+          if o:
+              with open(o, "a") as f:
+                  f.write("blocking=%s\n" % ("true" if blocking else "false"))
+          GATE
 
       - name: Upload health report
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: repo-health-${{ github.run_id }}
-          path: health.json
+          path: |
+            health.json
+            gitleaks.json
           retention-days: 30
           if-no-files-found: warn
 
-      # ---------------------------------------------------------- report to CRM
-
       - name: Report to Supabase
         # Never on pull_request: PR branches must not be able to read the key.
-        if: github.event_name != 'pull_request'
+        if: always() && github.event_name != 'pull_request'
         continue-on-error: true
         shell: bash
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-          # Prefer a narrowly-scoped key if one is configured; fall back to the
-          # org-level key. See the PR description for why a scoped key is better.
           SUPABASE_KEY: ${{ secrets.SUPABASE_REPO_HEALTH_KEY || secrets.SUPABASE_SERVICE_KEY }}
         run: |
           set -uo pipefail
-          if [ -z "${SUPABASE_KEY:-}" ] || [ -z "${SUPABASE_URL:-}" ]; then
-            echo "Supabase reporting not configured (need SUPABASE_URL var + key secret) — skipping."
+          if [ -z "${SUPABASE_KEY:-}" ] || [ -z "${SUPABASE_URL:-}" ] || [ ! -f health.json ]; then
+            echo "Supabase reporting not configured — skipping."
             exit 0
           fi
           code=$(curl -sS -o /dev/null -w '%{http_code}' \
@@ -265,13 +436,13 @@ jobs:
           echo "Supabase responded: $code"
           case "$code" in
             2*) echo "Reported." ;;
-            404) echo "::warning::repo_health table not found — create it (DDL is in the PR description)." ;;
+            404) echo "::warning::repo_health table not found — DDL is in NESP22/nesp-crm#208." ;;
             *)   echo "::warning::Supabase reporting returned $code." ;;
           esac
 
-      - name: Fail on committed .env
-        if: steps.hygiene.outputs.committed_env == 'true'
+      - name: Enforce gate
+        if: steps.gate.outputs.blocking == 'true'
         shell: bash
         run: |
-          echo "::error::A .env file is committed to this repository. Rotate the credentials inside it, then remove it from git."
+          echo "::error::Repo health found blocking issues — see the job summary."
           exit 1
