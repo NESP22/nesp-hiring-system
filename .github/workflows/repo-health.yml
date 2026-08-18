@@ -209,23 +209,23 @@ jobs:
           export CHECKED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           python3 - <<'GATE'
           import json, math, os, re, urllib.request
-          
+
           def load(p, default=None):
               try:
                   with open(p) as f:
                       return json.load(f)
               except Exception:
                   return default
-          
+
           blocking, warnings = [], []
-          
+
           # ---------------------------------------------------------------- hygiene
           hyg = load("hygiene.json", {}) or {}
           for w in hyg.get("warnings", []):
               warnings.append(("hygiene", w))
           for p in hyg.get("env_files", []):
               blocking.append(("committed-env", "`%s` is committed — rotate what is inside, then git rm" % p))
-          
+
           # ------------------------------------------------------------ secret scan
           # generic-api-key is gitleaks' entropy heuristic and the main false-positive
           # source (Drive folder ids, access codes). It warns. Provider-specific rules
@@ -242,18 +242,21 @@ jobs:
                   warnings.append(("secret-scan", where))
               else:
                   blocking.append(("secret-scan", where))
-          
+
           # ------------------------------------------------------------------- npm
           npm = load("npm-audit.json")
           if npm:
               v = (npm.get("metadata") or {}).get("vulnerabilities") or {}
               hi, cr = int(v.get("high") or 0), int(v.get("critical") or 0)
               lo, mo = int(v.get("low") or 0), int(v.get("moderate") or 0)
+              names = sorted({k for k, d in (npm.get("vulnerabilities") or {}).items()
+                              if str(d.get("severity", "")).lower() in ("high", "critical")})
               if hi or cr:
-                  blocking.append(("npm-vuln", "%d critical, %d high" % (cr, hi)))
+                  blocking.append(("npm-vuln", "%d critical, %d high — %s"
+                                   % (cr, hi, ", ".join("`%s`" % n for n in names[:8]) or "see npm audit")))
               if lo or mo:
                   warnings.append(("npm-vuln", "%d moderate, %d low" % (mo, lo)))
-          
+
           # -------------------------------------------------------------- composer
           comp = load("composer-audit.json")
           if comp:
@@ -264,11 +267,15 @@ jobs:
                       counts[s] = counts.get(s, 0) + 1
               hc = counts.get("high", 0) + counts.get("critical", 0)
               rest = sum(n for k, n in counts.items() if k not in ("high", "critical"))
+              hc_pkgs = sorted({p for p, items in (comp.get("advisories") or {}).items()
+                                for a in (items or [])
+                                if str(a.get("severity", "")).lower() in ("high", "critical")})
               if hc:
-                  blocking.append(("composer-vuln", "%d high/critical" % hc))
+                  blocking.append(("composer-vuln", "%d high/critical — %s"
+                                   % (hc, ", ".join("`%s`" % p for p in hc_pkgs[:8]))))
               if rest:
                   warnings.append(("composer-vuln", "%d lower severity" % rest))
-          
+
           # ------------------------------------------------------------------- pip
           # pip-audit does not report severity, so resolve it from OSV. Anything we
           # cannot classify warns rather than fails, to keep the gate low-noise.
@@ -279,11 +286,11 @@ jobs:
           UI = {"N": 0.85, "R": 0.62}
           CIA = {"H": 0.56, "L": 0.22, "N": 0.0}
           ORDER = ["LOW", "MODERATE", "HIGH", "CRITICAL"]
-          
+
           def roundup(x):
               i = int(round(x * 100000))
               return i / 100000.0 if i % 10000 == 0 else (math.floor(i / 10000) + 1) / 10.0
-          
+
           def cvss3(vec):
               try:
                   p = dict(kv.split(":") for kv in vec.split("/") if ":" in kv)
@@ -296,7 +303,7 @@ jobs:
                   return roundup(min((1.08 if changed else 1.0) * (impact + expl), 10))
               except Exception:
                   return None
-          
+
           def band(score):
               if score is None:
                   return None
@@ -304,7 +311,7 @@ jobs:
               if score >= 7.0: return "HIGH"
               if score >= 4.0: return "MODERATE"
               return "LOW" if score > 0 else None
-          
+
           def osv_severity(vid):
               try:
                   req = urllib.request.Request("https://api.osv.dev/v1/vulns/%s" % vid,
@@ -324,10 +331,10 @@ jobs:
                       if b and (best is None or ORDER.index(b) > ORDER.index(best)):
                           best = b
               return best
-          
+
           pip = load("pip-audit.json")
           if pip:
-              counts, unknown, seen = {}, 0, 0
+              counts, unknown, seen, hc_items = {}, 0, 0, []
               for dep in pip.get("dependencies") or []:
                   for v in dep.get("vulns") or []:
                       seen += 1
@@ -342,15 +349,20 @@ jobs:
                                   break
                       if sev:
                           counts[sev] = counts.get(sev, 0) + 1
+                          if sev in ("HIGH", "CRITICAL"):
+                              hc_items.append("`%s %s` %s (%s)" % (dep.get("name", "?"),
+                                                                   dep.get("version", "?"),
+                                                                   v.get("id", "?"), sev))
                       else:
                           unknown += 1
               hc = counts.get("HIGH", 0) + counts.get("CRITICAL", 0)
               rest = sum(n for k, n in counts.items() if k not in ("HIGH", "CRITICAL")) + unknown
               if hc:
-                  blocking.append(("pip-vuln", "%d high/critical" % hc))
+                  blocking.append(("pip-vuln", "%d high/critical — %s"
+                                   % (hc, "; ".join(hc_items[:8]))))
               if rest:
                   warnings.append(("pip-vuln", "%d lower severity or unclassified" % rest))
-          
+
           # ---------------------------------------------------------------- report
           report = {
               "repo": os.environ.get("GITHUB_REPOSITORY", ""),
@@ -367,7 +379,7 @@ jobs:
           }
           with open("health.json", "w") as f:
               json.dump(report, f, indent=2)
-          
+
           lines = ["## Repo health — `%s`" % report["repo"], ""]
           if blocking:
               lines.append("### ❌ Blocking (%d) — these fail the check" % len(blocking))
