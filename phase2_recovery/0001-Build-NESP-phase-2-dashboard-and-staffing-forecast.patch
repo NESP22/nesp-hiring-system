@@ -1,0 +1,2839 @@
+From 3a77a7664aa2b931a33acf1831b127356d4b5813 Mon Sep 17 00:00:00 2001
+From: NESP22 <craig.edwards@yahoo.com>
+Date: Mon, 13 Jul 2026 14:54:21 -0700
+Subject: [PATCH] Build NESP phase 2 dashboard and staffing forecast
+
+---
+ db/cats_schema.sql                            |  88 ++-
+ db/nesp_phase2_additive.sql                   | 122 +++
+ db/nesp_phase2_fake_fixtures.sql              | 109 +++
+ db/nesp_phase2_rollback.sql                   |  43 ++
+ .../PHASE2_DASHBOARD_AND_STAFFING_FORECAST.md |  47 ++
+ docs/nesp/PHASE2_IMPLEMENTATION_PLAN.md       |  63 ++
+ docs/nesp/PHASE2_ROLLBACK_RUNBOOK.md          |  50 ++
+ .../WEB_ONLY_HIRING_WORKFLOW_REQUIREMENTS.md  |  12 +-
+ docs/nesp/WEB_ONLY_PHASE_1_IMPLEMENTATION.md  |  14 +-
+ lib/NESPWorkflow.php                          | 727 +++++++++++++++++-
+ modules/install/Schema.php                    | 115 ++-
+ modules/nesp/AssignedCandidate.tpl            |  92 +++
+ modules/nesp/AssignedCandidates.tpl           |  37 +
+ modules/nesp/Dashboard.tpl                    | 148 +++-
+ modules/nesp/NESPUI.php                       | 188 ++++-
+ modules/nesp/SchemaMissing.tpl                |   2 +-
+ modules/nesp/Settings.tpl                     | 110 +++
+ modules/nesp/StaffingForecast.tpl             |  82 ++
+ modules/nesp/nespWorkflow.css                 | 186 ++++-
+ .../NESPWorkflowSchemaTest.php                |  35 +-
+ .../Tests/UnitTests/NESPWorkflowTest.php      |  52 +-
+ 21 files changed, 2218 insertions(+), 104 deletions(-)
+ create mode 100644 db/nesp_phase2_additive.sql
+ create mode 100644 db/nesp_phase2_fake_fixtures.sql
+ create mode 100644 db/nesp_phase2_rollback.sql
+ create mode 100644 docs/nesp/PHASE2_DASHBOARD_AND_STAFFING_FORECAST.md
+ create mode 100644 docs/nesp/PHASE2_IMPLEMENTATION_PLAN.md
+ create mode 100644 docs/nesp/PHASE2_ROLLBACK_RUNBOOK.md
+ create mode 100644 modules/nesp/AssignedCandidate.tpl
+ create mode 100644 modules/nesp/AssignedCandidates.tpl
+ create mode 100644 modules/nesp/Settings.tpl
+ create mode 100644 modules/nesp/StaffingForecast.tpl
+
+diff --git a/db/cats_schema.sql b/db/cats_schema.sql
+index 8247c7b..a09a058 100755
+--- a/db/cats_schema.sql
++++ b/db/cats_schema.sql
+@@ -1088,12 +1088,12 @@ CREATE TABLE `nesp_feature_flag` (
+ 
+ /* Data for the table `nesp_feature_flag` */
+ 
+-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('interviewer_portal_enabled', 'Interviewer Portal', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW());
+-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('scorecards_enabled', 'Interview Scorecards', 'Browser-based interview scorecards for assigned interviewers.', 0, 1, NOW(), NOW());
+-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('vapi_phone_screening_enabled', 'Vapi Phone Screens', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW());
+-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('zoom_scheduling_enabled', 'Zoom Scheduling', 'Craig-approved Zoom interview scheduling workflow.', 0, 1, NOW(), NOW());
+-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('ai_candidate_review_enabled', 'AI Candidate Review', 'On-demand candidate summary controlled by Craig.', 0, 1, NOW(), NOW());
+-INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('external_email_enabled', 'Applicant Email', 'Outbound applicant email delivery.', 0, 1, NOW(), NOW());
++INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_WORKFLOW_ENABLED', 'NESP Workflow', 'Craig-reviewed hiring workflow dashboard and task queues.', 0, 1, NOW(), NOW());
++INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_INTERVIEWER_POOL_ENABLED', 'Interviewer Pool', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW());
++INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW());
++INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0, 1, NOW(), NOW());
++INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0, 1, NOW(), NOW());
++INSERT INTO `nesp_feature_flag` (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`) VALUES ('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0, 1, NOW(), NOW());
+ 
+ /* Table structure for table `nesp_workflow_stage` */
+ 
+@@ -1118,14 +1118,20 @@ CREATE TABLE `nesp_workflow_stage` (
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('new', 'New', 'New application awaiting human review.', 10, 0, 1, NOW(), NOW());
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('needs_review', 'Needs Review', 'Craig or an authorized reviewer needs to inspect the application.', 20, 0, 1, NOW(), NOW());
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('follow_up_needed', 'Follow Up Needed', 'Missing information or clarification is needed.', 30, 0, 1, NOW(), NOW());
++INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('applicant_clarification_requested', 'Applicant Clarification Requested', 'Waiting on the applicant to clarify an application detail.', 35, 0, 1, NOW(), NOW());
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('phone_screen_pending', 'Phone Screen Pending', 'A phone screen is approved but not completed.', 40, 0, 1, NOW(), NOW());
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('phone_screen_complete', 'Phone Screen Complete', 'Phone-screen results are ready for human review.', 50, 0, 1, NOW(), NOW());
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('interview_requested', 'Interview Requested', 'Craig wants an interview scheduled.', 60, 0, 1, NOW(), NOW());
++INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('interview_confirmation_pending', 'Interview Confirmation Pending', 'Waiting for applicant confirmation or reschedule response.', 65, 0, 1, NOW(), NOW());
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('interview_scheduled', 'Interview Scheduled', 'A human interview has been scheduled.', 70, 0, 1, NOW(), NOW());
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('scorecard_pending', 'Scorecard Pending', 'An interviewer scorecard is expected.', 80, 0, 1, NOW(), NOW());
++INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('scorecard_complete', 'Scorecard Complete', 'Completed scorecard is ready for Craig decision.', 85, 0, 1, NOW(), NOW());
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('offer_review', 'Offer Review', 'Craig is reviewing a possible offer.', 90, 0, 1, NOW(), NOW());
+ INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('hired', 'Hired', 'Final human hiring decision recorded.', 100, 1, 1, NOW(), NOW());
+-INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('declined', 'Declined', 'Final human decline decision recorded.', 110, 1, 1, NOW(), NOW());
++INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('hold', 'Hold', 'Candidate is intentionally paused for future seasonal review.', 105, 1, 1, NOW(), NOW());
++INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('not_selected', 'Not Selected', 'Final human decline decision recorded.', 110, 1, 1, NOW(), NOW());
++INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('withdrawn', 'Withdrawn', 'Candidate withdrew or stopped the process.', 120, 1, 1, NOW(), NOW());
++INSERT INTO `nesp_workflow_stage` (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`) VALUES ('declined', 'Declined', 'Legacy final human decline decision recorded.', 130, 1, 1, NOW(), NOW());
+ 
+ /* Table structure for table `nesp_candidate_workflow` */
+ 
+@@ -1135,6 +1141,10 @@ CREATE TABLE `nesp_candidate_workflow` (
+   `joborder_id` INT(11) NOT NULL,
+   `workflow_stage_id` INT(11) NOT NULL,
+   `assigned_owner_user_id` INT(11),
++  `waiting_on_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Craig',
++  `summary` TEXT COLLATE utf8mb4_unicode_ci,
++  `next_action_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `due_at` DATETIME,
+   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+   PRIMARY KEY (`candidate_workflow_id`),
+@@ -1160,6 +1170,8 @@ CREATE TABLE `nesp_interviewer_profile` (
+   `can_view_ai_review` TINYINT(1) NOT NULL DEFAULT '0',
+   `can_change_stage` TINYINT(1) NOT NULL DEFAULT '0',
+   `can_view_other_interviewer_notes` TINYINT(1) NOT NULL DEFAULT '0',
++  `can_add_notes` TINYINT(1) NOT NULL DEFAULT '1',
++  `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1',
+   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+   PRIMARY KEY (`interviewer_profile_id`),
+@@ -1233,6 +1245,8 @@ CREATE TABLE `nesp_scorecard_template` (
+ 
+ /* Data for the table `nesp_scorecard_template` */
+ 
++INSERT INTO `nesp_scorecard_template` (`template_key`, `display_name`, `questions_json`, `is_enabled`, `date_created`, `date_modified`) VALUES ('nesp_standard_interview', 'NESP Standard Interview Scorecard', '[{"key":"reliability","label":"Reliability and schedule fit","type":"rating"},{"key":"people_skills","label":"Comfort with athletes, families, coaches, and staff","type":"rating"},{"key":"role_fit","label":"Role-specific skills or trainability","type":"rating"},{"key":"notes","label":"Factual notes from the conversation","type":"textarea"}]', 0, NOW(), NOW());
++
+ /* Table structure for table `nesp_scorecard_response` */
+ 
+ CREATE TABLE `nesp_scorecard_response` (
+@@ -1360,6 +1374,66 @@ CREATE TABLE `nesp_audit_event` (
+ 
+ /* Data for the table `nesp_audit_event` */
+ 
++/* Table structure for table `nesp_session_security_event` */
++
++CREATE TABLE `nesp_session_security_event` (
++  `session_security_event_id` INT(11) NOT NULL AUTO_INCREMENT,
++  `user_id` INT(11),
++  `event_type` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
++  `ip_address` VARCHAR(45) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `user_agent` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `metadata_json` TEXT COLLATE utf8mb4_unicode_ci,
++  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  PRIMARY KEY (`session_security_event_id`),
++  KEY `IDX_user_id` (`user_id`),
++  KEY `IDX_event_type` (`event_type`),
++  KEY `IDX_date_created` (`date_created`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++/* Data for the table `nesp_session_security_event` */
++
++/* Table structure for table `nesp_staffing_schedule_history` */
++
++CREATE TABLE `nesp_staffing_schedule_history` (
++  `schedule_history_id` INT(11) NOT NULL AUTO_INCREMENT,
++  `season_year` INT(4) NOT NULL,
++  `season_name` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `week_start` DATE NOT NULL,
++  `event_count` INT(11) NOT NULL DEFAULT '0',
++  `photographer_slots` INT(11) NOT NULL DEFAULT '0',
++  `photographer_hours` DECIMAL(8,2) NOT NULL DEFAULT '0.00',
++  `source_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `notes` TEXT COLLATE utf8mb4_unicode_ci,
++  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  PRIMARY KEY (`schedule_history_id`),
++  KEY `IDX_week_start` (`week_start`),
++  KEY `IDX_season` (`season_year`, `season_name`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++/* Data for the table `nesp_staffing_schedule_history` */
++
++/* Table structure for table `nesp_staffing_forecast` */
++
++CREATE TABLE `nesp_staffing_forecast` (
++  `staffing_forecast_id` INT(11) NOT NULL AUTO_INCREMENT,
++  `forecast_year` INT(4) NOT NULL,
++  `forecast_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `target_week_start` DATE NOT NULL,
++  `expected_event_count` INT(11) NOT NULL DEFAULT '0',
++  `required_photographers` INT(11) NOT NULL DEFAULT '0',
++  `expected_hours` DECIMAL(8,2) NOT NULL DEFAULT '0.00',
++  `confidence_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'low',
++  `notes` TEXT COLLATE utf8mb4_unicode_ci,
++  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  PRIMARY KEY (`staffing_forecast_id`),
++  KEY `IDX_target_week_start` (`target_week_start`),
++  KEY `IDX_forecast_year` (`forecast_year`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++/* Data for the table `nesp_staffing_forecast` */
++
+ /* Table structure for table `zipcodes` */
+ 
+ CREATE TABLE `zipcodes` (
+diff --git a/db/nesp_phase2_additive.sql b/db/nesp_phase2_additive.sql
+new file mode 100644
+index 0000000..a69118d
+--- /dev/null
++++ b/db/nesp_phase2_additive.sql
+@@ -0,0 +1,122 @@
++/* NESP Phase 2 additive migration.
++ *
++ * Safe defaults:
++ * - All feature flags are inserted or reset disabled.
++ * - Scorecard template is present but disabled.
++ * - No production applicants, interviewer accounts, calls, meetings, AI jobs,
++ *   emails, or SMS messages are created.
++ */
++
++INSERT INTO `nesp_feature_flag`
++    (`flag_key`, `display_name`, `description`, `is_enabled`, `requires_admin_approval`, `date_created`, `date_modified`)
++VALUES
++    ('NESP_WORKFLOW_ENABLED', 'NESP Workflow', 'Craig-reviewed hiring workflow dashboard and task queues.', 0, 1, NOW(), NOW()),
++    ('NESP_INTERVIEWER_POOL_ENABLED', 'Interviewer Pool', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW()),
++    ('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW()),
++    ('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0, 1, NOW(), NOW()),
++    ('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0, 1, NOW(), NOW()),
++    ('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0, 1, NOW(), NOW())
++ON DUPLICATE KEY UPDATE
++    display_name = VALUES(display_name),
++    description = VALUES(description),
++    is_enabled = 0,
++    requires_admin_approval = 1,
++    date_modified = NOW();
++
++ALTER TABLE `nesp_candidate_workflow`
++    ADD COLUMN IF NOT EXISTS `waiting_on_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Craig',
++    ADD COLUMN IF NOT EXISTS `summary` TEXT COLLATE utf8mb4_unicode_ci,
++    ADD COLUMN IF NOT EXISTS `next_action_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++    ADD COLUMN IF NOT EXISTS `due_at` DATETIME;
++
++ALTER TABLE `nesp_interviewer_profile`
++    ADD COLUMN IF NOT EXISTS `can_add_notes` TINYINT(1) NOT NULL DEFAULT '1',
++    ADD COLUMN IF NOT EXISTS `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1';
++
++INSERT INTO `nesp_workflow_stage`
++    (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`)
++SELECT 'applicant_clarification_requested', 'Applicant Clarification Requested', 'Waiting on the applicant to clarify an application detail.', 35, 0, 1, NOW(), NOW()
++FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `nesp_workflow_stage` WHERE `stage_key` = 'applicant_clarification_requested');
++
++INSERT INTO `nesp_workflow_stage`
++    (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`)
++SELECT 'interview_confirmation_pending', 'Interview Confirmation Pending', 'Waiting for applicant confirmation or reschedule response.', 65, 0, 1, NOW(), NOW()
++FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `nesp_workflow_stage` WHERE `stage_key` = 'interview_confirmation_pending');
++
++INSERT INTO `nesp_workflow_stage`
++    (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`)
++SELECT 'scorecard_complete', 'Scorecard Complete', 'Completed scorecard is ready for Craig decision.', 85, 0, 1, NOW(), NOW()
++FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `nesp_workflow_stage` WHERE `stage_key` = 'scorecard_complete');
++
++INSERT INTO `nesp_workflow_stage`
++    (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`)
++SELECT 'hold', 'Hold', 'Candidate is intentionally paused for future seasonal review.', 105, 1, 1, NOW(), NOW()
++FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `nesp_workflow_stage` WHERE `stage_key` = 'hold');
++
++INSERT INTO `nesp_workflow_stage`
++    (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`)
++SELECT 'not_selected', 'Not Selected', 'Final human decline decision recorded.', 110, 1, 1, NOW(), NOW()
++FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `nesp_workflow_stage` WHERE `stage_key` = 'not_selected');
++
++INSERT INTO `nesp_workflow_stage`
++    (`stage_key`, `display_name`, `description`, `sort_order`, `is_terminal`, `is_enabled`, `date_created`, `date_modified`)
++SELECT 'withdrawn', 'Withdrawn', 'Candidate withdrew or stopped the process.', 120, 1, 1, NOW(), NOW()
++FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `nesp_workflow_stage` WHERE `stage_key` = 'withdrawn');
++
++INSERT INTO `nesp_scorecard_template`
++    (`template_key`, `display_name`, `questions_json`, `is_enabled`, `date_created`, `date_modified`)
++VALUES
++    ('nesp_standard_interview', 'NESP Standard Interview Scorecard', '[{"key":"reliability","label":"Reliability and schedule fit","type":"rating"},{"key":"people_skills","label":"Comfort with athletes, families, coaches, and staff","type":"rating"},{"key":"role_fit","label":"Role-specific skills or trainability","type":"rating"},{"key":"notes","label":"Factual notes from the conversation","type":"textarea"}]', 0, NOW(), NOW())
++ON DUPLICATE KEY UPDATE
++    display_name = VALUES(display_name),
++    questions_json = VALUES(questions_json),
++    is_enabled = 0,
++    date_modified = NOW();
++
++CREATE TABLE IF NOT EXISTS `nesp_session_security_event` (
++  `session_security_event_id` INT(11) NOT NULL AUTO_INCREMENT,
++  `user_id` INT(11),
++  `event_type` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
++  `ip_address` VARCHAR(45) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `user_agent` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `metadata_json` TEXT COLLATE utf8mb4_unicode_ci,
++  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  PRIMARY KEY (`session_security_event_id`),
++  KEY `IDX_user_id` (`user_id`),
++  KEY `IDX_event_type` (`event_type`),
++  KEY `IDX_date_created` (`date_created`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++CREATE TABLE IF NOT EXISTS `nesp_staffing_schedule_history` (
++  `schedule_history_id` INT(11) NOT NULL AUTO_INCREMENT,
++  `season_year` INT(4) NOT NULL,
++  `season_name` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `week_start` DATE NOT NULL,
++  `event_count` INT(11) NOT NULL DEFAULT '0',
++  `photographer_slots` INT(11) NOT NULL DEFAULT '0',
++  `photographer_hours` DECIMAL(8,2) NOT NULL DEFAULT '0.00',
++  `source_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `notes` TEXT COLLATE utf8mb4_unicode_ci,
++  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  PRIMARY KEY (`schedule_history_id`),
++  KEY `IDX_week_start` (`week_start`),
++  KEY `IDX_season` (`season_year`, `season_name`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++CREATE TABLE IF NOT EXISTS `nesp_staffing_forecast` (
++  `staffing_forecast_id` INT(11) NOT NULL AUTO_INCREMENT,
++  `forecast_year` INT(4) NOT NULL,
++  `forecast_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++  `target_week_start` DATE NOT NULL,
++  `expected_event_count` INT(11) NOT NULL DEFAULT '0',
++  `required_photographers` INT(11) NOT NULL DEFAULT '0',
++  `expected_hours` DECIMAL(8,2) NOT NULL DEFAULT '0.00',
++  `confidence_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'low',
++  `notes` TEXT COLLATE utf8mb4_unicode_ci,
++  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++  PRIMARY KEY (`staffing_forecast_id`),
++  KEY `IDX_target_week_start` (`target_week_start`),
++  KEY `IDX_forecast_year` (`forecast_year`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+diff --git a/db/nesp_phase2_fake_fixtures.sql b/db/nesp_phase2_fake_fixtures.sql
+new file mode 100644
+index 0000000..6872d6e
+--- /dev/null
++++ b/db/nesp_phase2_fake_fixtures.sql
+@@ -0,0 +1,109 @@
++/* NESP Phase 2 fake fixture data.
++ *
++ * Use only in local/test databases. Do not run against production. Names,
++ * emails, schedules, and staffing history are synthetic.
++ */
++
++DELETE FROM `nesp_staffing_schedule_history`
++WHERE `source_label` = 'synthetic Craig schedule fixture';
++
++DELETE FROM `nesp_scorecard_response`
++WHERE `candidate_id` IN (920001, 920002, 920003, 920004);
++
++DELETE FROM `nesp_interview`
++WHERE `candidate_id` IN (920001, 920002, 920003, 920004);
++
++DELETE FROM `nesp_interviewer_candidate_grant`
++WHERE `candidate_id` IN (920001, 920002, 920003, 920004);
++
++DELETE FROM `nesp_candidate_workflow`
++WHERE `candidate_id` IN (920001, 920002, 920003, 920004);
++
++DELETE FROM `candidate_joborder`
++WHERE `candidate_id` IN (920001, 920002, 920003, 920004);
++
++INSERT INTO `joborder`
++    (`joborder_id`, `entered_by`, `owner`, `title`, `description`, `type`, `status`, `openings`, `city`, `state`, `country`, `date_created`, `date_modified`, `public`, `openings_available`)
++VALUES
++    (920001, 1, 1, 'Fixture Staff Photographer', 'Synthetic NESP Phase 2 fixture role.', 'C', 'Active', 8, 'Methuen', 'MA', 'US', NOW(), NOW(), 0, 8),
++    (920002, 1, 1, 'Fixture Photo Day Assistant', 'Synthetic NESP Phase 2 fixture role.', 'C', 'Active', 6, 'Methuen', 'MA', 'US', NOW(), NOW(), 0, 6)
++ON DUPLICATE KEY UPDATE
++    title = VALUES(title),
++    date_modified = NOW();
++
++INSERT INTO `candidate`
++    (`candidate_id`, `last_name`, `first_name`, `phone_cell`, `source`, `notes`, `key_skills`, `entered_by`, `owner`, `date_created`, `date_modified`, `email1`, `is_active`)
++VALUES
++    (920001, 'Applicant', 'Avery', '555-0101', 'NESP fixture', 'Synthetic candidate for dashboard queue review.', 'Weekend availability; youth sports experience.', 1, 1, NOW(), NOW(), 'avery.fixture@example.test', 1),
++    (920002, 'Candidate', 'Jordan', '555-0102', 'NESP fixture', 'Synthetic candidate waiting on applicant clarification.', 'Customer service; reliable transportation.', 1, 1, NOW(), NOW(), 'jordan.fixture@example.test', 1),
++    (920003, 'Interviewer', 'Morgan', '555-0103', 'NESP fixture', 'Synthetic candidate assigned to interviewer.', 'School portraits; early morning availability.', 1, 1, NOW(), NOW(), 'morgan.fixture@example.test', 1),
++    (920004, 'Complete', 'Taylor', '555-0104', 'NESP fixture', 'Synthetic completed scorecard candidate.', 'Photo day lead experience.', 1, 1, NOW(), NOW(), 'taylor.fixture@example.test', 1)
++ON DUPLICATE KEY UPDATE
++    notes = VALUES(notes),
++    key_skills = VALUES(key_skills),
++    date_modified = NOW();
++
++INSERT INTO `candidate_joborder`
++    (`candidate_id`, `joborder_id`, `status`, `date_submitted`, `date_created`, `date_modified`, `added_by`)
++VALUES
++    (920001, 920001, 400, NOW(), NOW(), NOW(), 1),
++    (920002, 920002, 300, NOW(), NOW(), NOW(), 1),
++    (920003, 920001, 500, NOW(), NOW(), NOW(), 1),
++    (920004, 920001, 500, NOW(), NOW(), NOW(), 1);
++
++INSERT INTO `nesp_candidate_workflow`
++    (`candidate_id`, `joborder_id`, `workflow_stage_id`, `assigned_owner_user_id`, `waiting_on_key`, `summary`, `next_action_label`, `due_at`, `date_created`, `date_modified`)
++SELECT 920001, 920001, `workflow_stage_id`, 1, 'Craig', 'New fixture application needs review for weekend photographer availability.', 'Review application', DATE_ADD(NOW(), INTERVAL 1 DAY), NOW(), NOW()
++FROM `nesp_workflow_stage` WHERE `stage_key` = 'needs_review'
++ON DUPLICATE KEY UPDATE `workflow_stage_id` = VALUES(`workflow_stage_id`), `summary` = VALUES(`summary`), `date_modified` = NOW();
++
++INSERT INTO `nesp_candidate_workflow`
++    (`candidate_id`, `joborder_id`, `workflow_stage_id`, `assigned_owner_user_id`, `waiting_on_key`, `summary`, `next_action_label`, `due_at`, `date_created`, `date_modified`)
++SELECT 920002, 920002, `workflow_stage_id`, 1, 'Applicant', 'Waiting for fixture applicant to clarify Saturday and Sunday availability.', 'Check applicant reply', DATE_ADD(NOW(), INTERVAL 3 DAY), NOW(), NOW()
++FROM `nesp_workflow_stage` WHERE `stage_key` = 'applicant_clarification_requested'
++ON DUPLICATE KEY UPDATE `workflow_stage_id` = VALUES(`workflow_stage_id`), `summary` = VALUES(`summary`), `date_modified` = NOW();
++
++INSERT INTO `nesp_candidate_workflow`
++    (`candidate_id`, `joborder_id`, `workflow_stage_id`, `assigned_owner_user_id`, `waiting_on_key`, `summary`, `next_action_label`, `due_at`, `date_created`, `date_modified`)
++SELECT 920003, 920001, `workflow_stage_id`, 1, 'Interviewer', 'Fixture interview is scheduled and needs scorecard completion.', 'Check scorecard', DATE_ADD(NOW(), INTERVAL 2 DAY), NOW(), NOW()
++FROM `nesp_workflow_stage` WHERE `stage_key` = 'scorecard_pending'
++ON DUPLICATE KEY UPDATE `workflow_stage_id` = VALUES(`workflow_stage_id`), `summary` = VALUES(`summary`), `date_modified` = NOW();
++
++INSERT INTO `nesp_candidate_workflow`
++    (`candidate_id`, `joborder_id`, `workflow_stage_id`, `assigned_owner_user_id`, `waiting_on_key`, `summary`, `next_action_label`, `due_at`, `date_created`, `date_modified`)
++SELECT 920004, 920001, `workflow_stage_id`, 1, 'Craig', 'Completed fixture scorecard is ready for Craig decision.', 'Make decision', NOW(), NOW(), NOW()
++FROM `nesp_workflow_stage` WHERE `stage_key` = 'scorecard_complete'
++ON DUPLICATE KEY UPDATE `workflow_stage_id` = VALUES(`workflow_stage_id`), `summary` = VALUES(`summary`), `date_modified` = NOW();
++
++INSERT INTO `nesp_interviewer_profile`
++    (`interviewer_profile_id`, `user_id`, `display_name`, `email`, `role_key`, `is_active`, `can_view_resume`, `can_add_notes`, `can_submit_scorecard`, `date_created`, `date_modified`)
++VALUES
++    (920001, 1, 'Fixture Interviewer', 'fixture.interviewer@example.test', 'interviewer', 1, 1, 1, 1, NOW(), NOW())
++ON DUPLICATE KEY UPDATE
++    display_name = VALUES(display_name),
++    is_active = 1,
++    date_modified = NOW();
++
++INSERT INTO `nesp_interviewer_candidate_grant`
++    (`interviewer_profile_id`, `candidate_id`, `joborder_id`, `granted_by_user_id`, `access_level_key`, `can_view_resume`, `can_add_notes`, `can_submit_scorecard`, `date_granted`, `date_revoked`)
++VALUES
++    (920001, 920003, 920001, 1, 'interview', 1, 1, 1, NOW(), NULL),
++    (920001, 920004, 920001, 1, 'interview', 1, 1, 1, NOW(), NULL);
++
++INSERT INTO `nesp_interview`
++    (`candidate_id`, `joborder_id`, `interviewer_profile_id`, `scheduled_start`, `scheduled_end`, `status_key`, `date_created`, `date_modified`)
++VALUES
++    (920003, 920001, 920001, DATE_ADD(NOW(), INTERVAL 2 DAY), DATE_ADD(DATE_ADD(NOW(), INTERVAL 2 DAY), INTERVAL 30 MINUTE), 'scheduled', NOW(), NOW()),
++    (920004, 920001, 920001, DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_ADD(DATE_SUB(NOW(), INTERVAL 1 DAY), INTERVAL 30 MINUTE), 'complete', NOW(), NOW());
++
++INSERT INTO `nesp_staffing_schedule_history`
++    (`season_year`, `season_name`, `week_start`, `event_count`, `photographer_slots`, `photographer_hours`, `source_label`, `notes`, `date_created`, `date_modified`)
++VALUES
++    (2024, 'spring fixture', '2024-04-15', 5, 11, 58.0, 'synthetic Craig schedule fixture', 'Opening spring fixture week.', NOW(), NOW()),
++    (2024, 'spring fixture', '2024-04-22', 8, 18, 94.5, 'synthetic Craig schedule fixture', 'Busy youth sports picture days.', NOW(), NOW()),
++    (2024, 'spring fixture', '2024-04-29', 10, 24, 128.0, 'synthetic Craig schedule fixture', 'Peak spring fixture week.', NOW(), NOW()),
++    (2024, 'spring fixture', '2024-05-06', 12, 30, 162.0, 'synthetic Craig schedule fixture', 'Peak spring fixture week.', NOW(), NOW()),
++    (2024, 'spring fixture', '2024-05-13', 9, 22, 118.0, 'synthetic Craig schedule fixture', 'Weather movement week.', NOW(), NOW()),
++    (2024, 'fall fixture', '2024-09-09', 7, 16, 82.0, 'synthetic Craig schedule fixture', 'Fall ramp fixture week.', NOW(), NOW()),
++    (2024, 'fall fixture', '2024-09-16', 9, 21, 112.0, 'synthetic Craig schedule fixture', 'Fall peak fixture week.', NOW(), NOW()),
++    (2024, 'fall fixture', '2024-09-23', 11, 27, 143.5, 'synthetic Craig schedule fixture', 'Fall peak fixture week.', NOW(), NOW());
+diff --git a/db/nesp_phase2_rollback.sql b/db/nesp_phase2_rollback.sql
+new file mode 100644
+index 0000000..364ef31
+--- /dev/null
++++ b/db/nesp_phase2_rollback.sql
+@@ -0,0 +1,43 @@
++/* NESP Phase 2 rollback migration.
++ *
++ * Run only after restoring or independently verifying a production database
++ * backup. This removes Phase 2 additive data structures and disabled flags
++ * without touching legacy OpenCATS candidate/job data.
++ */
++
++DELETE FROM `nesp_scorecard_template`
++WHERE `template_key` = 'nesp_standard_interview';
++
++DELETE FROM `nesp_feature_flag`
++WHERE `flag_key` IN (
++    'NESP_WORKFLOW_ENABLED',
++    'NESP_INTERVIEWER_POOL_ENABLED',
++    'NESP_PRESCREEN_ENABLED',
++    'NESP_VAPI_ENABLED',
++    'NESP_ZOOM_ENABLED',
++    'NESP_AI_REVIEW_ENABLED'
++);
++
++DELETE FROM `nesp_workflow_stage`
++WHERE `stage_key` IN (
++    'applicant_clarification_requested',
++    'interview_confirmation_pending',
++    'scorecard_complete',
++    'hold',
++    'not_selected',
++    'withdrawn'
++);
++
++DROP TABLE IF EXISTS `nesp_staffing_forecast`;
++DROP TABLE IF EXISTS `nesp_staffing_schedule_history`;
++DROP TABLE IF EXISTS `nesp_session_security_event`;
++
++ALTER TABLE `nesp_interviewer_profile`
++    DROP COLUMN IF EXISTS `can_add_notes`,
++    DROP COLUMN IF EXISTS `can_submit_scorecard`;
++
++ALTER TABLE `nesp_candidate_workflow`
++    DROP COLUMN IF EXISTS `waiting_on_key`,
++    DROP COLUMN IF EXISTS `summary`,
++    DROP COLUMN IF EXISTS `next_action_label`,
++    DROP COLUMN IF EXISTS `due_at`;
+diff --git a/docs/nesp/PHASE2_DASHBOARD_AND_STAFFING_FORECAST.md b/docs/nesp/PHASE2_DASHBOARD_AND_STAFFING_FORECAST.md
+new file mode 100644
+index 0000000..90f0d30
+--- /dev/null
++++ b/docs/nesp/PHASE2_DASHBOARD_AND_STAFFING_FORECAST.md
+@@ -0,0 +1,47 @@
++# NESP Phase 2 Dashboard and Staffing Forecast
++
++## Dashboard Model
++
++The NESP dashboard is intentionally task-oriented. Routine hiring work should start at `index.php?m=nesp`, not by moving through several OpenCATS menus.
++
++Primary views:
++
++- Needs Craig: applications, completed phone screens, assignment decisions, completed scorecards, missing notes, and overdue items.
++- Waiting: applicant follow-up and interviewer follow-up.
++- Interviews: upcoming interview list and interviewer-owned tasks.
++- Completed: hired, hold, not selected, withdrawn, declined, and scorecard-complete records.
++- Staffing Forecast: seasonal photographer demand planning.
++- Settings: feature flags, inactive interviewer-profile staging, and audit-reviewed controls.
++
++Each candidate card shows candidate name, applied role, current stage, waiting party, factual summary, last activity, one primary action, and small secondary links.
++
++## Scoped Interviewer Workflow
++
++Interviewers see only assignments granted through `nesp_interviewer_candidate_grant`.
++
++The workflow rejects access unless:
++
++- The interviewer profile is active.
++- The profile is attached to the current OpenCATS user.
++- The candidate/job grant is active.
++- The requested candidate and job order match that grant.
++
++Scorecard submission uses the same grant check and writes to `nesp_scorecard_response`.
++
++## Staffing Forecast
++
++Forecasts use `nesp_staffing_schedule_history` rows. The included fixture file uses synthetic photographer schedule history and is not Craig-verified production history.
++
++The current calculation groups historical rows by month and estimates:
++
++- average weekly event count
++- average weekly photographer slots
++- average weekly photographer hours
++- a planning pipeline target at 125% of average slots
++- low/medium confidence based on available history rows
++
++The forecast is read-only planning guidance. It does not create job postings, send messages, change applicant stages, or enable feature flags.
++
++## Test Fixture Boundary
++
++`db/nesp_phase2_fake_fixtures.sql` is for local/test review only. It uses synthetic names and `example.test` email addresses. Do not run it in production.
+diff --git a/docs/nesp/PHASE2_IMPLEMENTATION_PLAN.md b/docs/nesp/PHASE2_IMPLEMENTATION_PLAN.md
+new file mode 100644
+index 0000000..6c4f684
+--- /dev/null
++++ b/docs/nesp/PHASE2_IMPLEMENTATION_PLAN.md
+@@ -0,0 +1,63 @@
++# NESP Phase 2 Implementation Plan
++
++## Checkpoint
++
++- Source/master checkpoint: `141324b27876e9638571079e7d95ca6f6c57225c`
++- Required development branch: `codex/phase2-hosted-hiring-workflow`
++- Backup branch to create before production deployment: `backup/pre-phase2-workflow`
++
++Codex did not create or verify a production backup. Production backup creation requires a separate controlled task with approved production access.
++
++## Safe Defaults
++
++All Phase 2 feature flags default to disabled:
++
++- `NESP_WORKFLOW_ENABLED`
++- `NESP_INTERVIEWER_POOL_ENABLED`
++- `NESP_PRESCREEN_ENABLED`
++- `NESP_VAPI_ENABLED`
++- `NESP_ZOOM_ENABLED`
++- `NESP_AI_REVIEW_ENABLED`
++
++The dashboard, interviewer workflow, scorecard forms, and staffing forecast do not send email or SMS, initiate Vapi calls, create Zoom meetings, run AI review, deploy to Render, publish postings, create real interviewer accounts, or modify production feature flags.
++
++## Build Scope
++
++1. Preserve the Phase 2 branch from the source checkpoint.
++2. Add additive Phase 2 migration SQL and rollback SQL.
++3. Convert the NESP dashboard into an ADHD-friendly task board:
++   - Needs Craig
++   - Waiting
++   - Interviews
++   - Completed
++   - Staffing Forecast
++   - Settings
++4. Add scoped interviewer views:
++   - Assigned-candidates queue
++   - Assigned-candidate detail
++   - Scorecard submission with explicit grant checks
++5. Add admin settings:
++   - Writable feature flags with CSRF and audit logging
++   - Inactive interviewer-profile staging without creating real accounts
++6. Add staffing forecast tables and screen based on imported or fixture historical photographer schedules.
++7. Add fake fixtures for local/test review only.
++8. Add unit and schema tests.
++
++## Assumptions
++
++- Historical photographer schedules are represented by `nesp_staffing_schedule_history`. The included fixture rows are synthetic and must not be treated as Craig-verified production history.
++- Interviewer profiles can be created inactive without attached OpenCATS users. Real interviewer accounts remain a controlled production task.
++- Scorecard templates are seeded disabled so Craig can review form wording before enabling workflow use.
++- Existing OpenCATS candidate and job records remain the source of candidate identity and role titles.
++
++## Acceptance Checks
++
++- Branch is not `master`.
++- `db/nesp_phase2_additive.sql` adds only Phase 2 structures/default-off flags.
++- `db/nesp_phase2_rollback.sql` removes Phase 2 additions without touching legacy OpenCATS records.
++- NESP dashboard renders task queues with one primary next action per candidate card.
++- Settings write routes require POST and a valid CSRF token.
++- Assigned-candidate detail rejects users without explicit grants.
++- Scorecard submission writes only through scoped grants.
++- Staffing forecast reads NESP staffing history rows and does not publish or message anyone.
++- Fake fixture SQL is clearly labeled test/local only.
+diff --git a/docs/nesp/PHASE2_ROLLBACK_RUNBOOK.md b/docs/nesp/PHASE2_ROLLBACK_RUNBOOK.md
+new file mode 100644
+index 0000000..515a703
+--- /dev/null
++++ b/docs/nesp/PHASE2_ROLLBACK_RUNBOOK.md
+@@ -0,0 +1,50 @@
++# NESP Phase 2 Rollback Runbook
++
++## Required Pre-Rollback Safety
++
++Before any production rollback:
++
++1. Confirm the deployment backup branch exists: `backup/pre-phase2-workflow`.
++2. Confirm an independently verified production database backup exists.
++3. Confirm no Phase 2 feature flags are intentionally enabled for active production use.
++4. Pause any controlled deployment work. Do not merge, deploy, or apply further migrations during rollback.
++
++Codex cannot claim production backup creation without approved production access and independent verification.
++
++## Application Rollback
++
++1. Revert the deployed application revision to the pre-Phase-2 commit or the verified backup branch.
++2. Confirm the app is serving the expected pre-Phase-2 revision.
++3. Confirm the NESP Phase 2 dashboard routes are no longer exposed in the deployed revision.
++
++## Database Rollback
++
++Run `db/nesp_phase2_rollback.sql` only after backup verification.
++
++The rollback removes:
++
++- Disabled Phase 2 `NESP_*` flags
++- Phase 2 workflow stages
++- Disabled standard scorecard template
++- `nesp_session_security_event`
++- `nesp_staffing_schedule_history`
++- `nesp_staffing_forecast`
++- Phase 2 dashboard helper columns from `nesp_candidate_workflow`
++- Phase 2 interviewer helper columns from `nesp_interviewer_profile`
++
++It does not delete legacy OpenCATS candidates, job orders, users, activities, calendar events, attachments, or standard pipeline records.
++
++## Fixture Cleanup
++
++If `db/nesp_phase2_fake_fixtures.sql` was run in a non-production environment, reset the local/test database from a clean fixture or delete rows with IDs starting at `920001`. Do not run the fake fixture rollback steps in production because the fixture SQL is not intended for production.
++
++## Verification
++
++After rollback:
++
++- `SELECT COUNT(*) FROM nesp_feature_flag WHERE flag_key LIKE 'NESP_%';` returns `0`.
++- `SHOW TABLES LIKE 'nesp_staffing_schedule_history';` returns no rows.
++- `SHOW TABLES LIKE 'nesp_staffing_forecast';` returns no rows.
++- `SHOW TABLES LIKE 'nesp_session_security_event';` returns no rows.
++- Legacy OpenCATS login and candidate pages still load.
++- No Vapi, Zoom, AI, email, SMS, or external job-posting action was initiated.
+diff --git a/docs/nesp/WEB_ONLY_HIRING_WORKFLOW_REQUIREMENTS.md b/docs/nesp/WEB_ONLY_HIRING_WORKFLOW_REQUIREMENTS.md
+index 69d6872..792cbd5 100644
+--- a/docs/nesp/WEB_ONLY_HIRING_WORKFLOW_REQUIREMENTS.md
++++ b/docs/nesp/WEB_ONLY_HIRING_WORKFLOW_REQUIREMENTS.md
+@@ -190,12 +190,12 @@ not be printed in logs, committed, or stored in docs.
+ 
+ New workflow features must default to disabled until Craig approves:
+ 
+-- `vapi_phone_screening_enabled`
+-- `zoom_scheduling_enabled`
+-- `ai_candidate_review_enabled`
+-- `interviewer_portal_enabled`
+-- `scorecards_enabled`
+-- `external_email_enabled`
++- `NESP_WORKFLOW_ENABLED`
++- `NESP_INTERVIEWER_POOL_ENABLED`
++- `NESP_PRESCREEN_ENABLED`
++- `NESP_VAPI_ENABLED`
++- `NESP_ZOOM_ENABLED`
++- `NESP_AI_REVIEW_ENABLED`
+ 
+ Outbound email must remain disabled unless Craig separately approves the sender
+ domain, templates, test plan, opt-out/compliance handling, and production
+diff --git a/docs/nesp/WEB_ONLY_PHASE_1_IMPLEMENTATION.md b/docs/nesp/WEB_ONLY_PHASE_1_IMPLEMENTATION.md
+index 4c1f19d..c650af6 100644
+--- a/docs/nesp/WEB_ONLY_PHASE_1_IMPLEMENTATION.md
++++ b/docs/nesp/WEB_ONLY_PHASE_1_IMPLEMENTATION.md
+@@ -39,14 +39,14 @@ files, local databases, or desktop background scripts.
+ 
+ ## Safe Defaults
+ 
+-These feature flags are seeded disabled:
++Phase 2 supersedes the original Phase 1 flag names with these disabled flags:
+ 
+-- `interviewer_portal_enabled`
+-- `scorecards_enabled`
+-- `vapi_phone_screening_enabled`
+-- `zoom_scheduling_enabled`
+-- `ai_candidate_review_enabled`
+-- `external_email_enabled`
++- `NESP_WORKFLOW_ENABLED`
++- `NESP_INTERVIEWER_POOL_ENABLED`
++- `NESP_PRESCREEN_ENABLED`
++- `NESP_VAPI_ENABLED`
++- `NESP_ZOOM_ENABLED`
++- `NESP_AI_REVIEW_ENABLED`
+ 
+ The integration-status rows for Vapi, Zoom, AI review, and applicant email are
+ also seeded as `disabled`.
+diff --git a/lib/NESPWorkflow.php b/lib/NESPWorkflow.php
+index 65bceff..61980fb 100644
+--- a/lib/NESPWorkflow.php
++++ b/lib/NESPWorkflow.php
+@@ -2,9 +2,9 @@
+ /*
+  * New England Sports Photo hosted hiring workflow foundation.
+  *
+- * Phase 1 stores durable workflow data and exposes read-only dashboard
+- * summaries. External integrations remain disabled unless future work adds
+- * reviewed controls.
++ * Phase 2 keeps the hosted workflow human-reviewed and feature-flagged while
++ * adding task queues, scoped interviewer views, scorecards, and staffing
++ * forecast helpers. External integrations remain disabled by default.
+  */
+ 
+ class NESPWorkflow
+@@ -19,12 +19,36 @@ class NESPWorkflow
+     public static function getDefaultFeatureFlags()
+     {
+         return array(
+-            array('interviewer_portal_enabled', 'Interviewer Portal', 'Scoped interviewer access to assigned candidates and interviews.', 0),
+-            array('scorecards_enabled', 'Interview Scorecards', 'Browser-based interview scorecards for assigned interviewers.', 0),
+-            array('vapi_phone_screening_enabled', 'Vapi Phone Screens', 'Craig-approved phone-screen workflow status and results.', 0),
+-            array('zoom_scheduling_enabled', 'Zoom Scheduling', 'Craig-approved Zoom interview scheduling workflow.', 0),
+-            array('ai_candidate_review_enabled', 'AI Candidate Review', 'On-demand candidate summary controlled by Craig.', 0),
+-            array('external_email_enabled', 'Applicant Email', 'Outbound applicant email delivery.', 0)
++            array('NESP_WORKFLOW_ENABLED', 'NESP Workflow', 'Craig-reviewed hiring workflow dashboard and task queues.', 0),
++            array('NESP_INTERVIEWER_POOL_ENABLED', 'Interviewer Pool', 'Scoped interviewer access to assigned candidates and interviews.', 0),
++            array('NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0),
++            array('NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0),
++            array('NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0),
++            array('NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0)
++        );
++    }
++
++    public static function getRequiredFeatureFlagKeys()
++    {
++        return array(
++            'NESP_WORKFLOW_ENABLED',
++            'NESP_INTERVIEWER_POOL_ENABLED',
++            'NESP_PRESCREEN_ENABLED',
++            'NESP_VAPI_ENABLED',
++            'NESP_ZOOM_ENABLED',
++            'NESP_AI_REVIEW_ENABLED'
++        );
++    }
++
++    public static function getDashboardNavigation()
++    {
++        return array(
++            array('key' => 'needsCraig', 'label' => 'Needs Craig', 'action' => 'dashboard'),
++            array('key' => 'waiting', 'label' => 'Waiting', 'action' => 'waiting'),
++            array('key' => 'interviews', 'label' => 'Interviews', 'action' => 'interviews'),
++            array('key' => 'completed', 'label' => 'Completed', 'action' => 'completed'),
++            array('key' => 'staffingForecast', 'label' => 'Staffing Forecast', 'action' => 'staffingForecast'),
++            array('key' => 'settings', 'label' => 'Settings', 'action' => 'settings')
+         );
+     }
+ 
+@@ -34,24 +58,30 @@ class NESPWorkflow
+             array('new', 'New', 'New application awaiting human review.', 10, 0),
+             array('needs_review', 'Needs Review', 'Craig or an authorized reviewer needs to inspect the application.', 20, 0),
+             array('follow_up_needed', 'Follow Up Needed', 'Missing information or clarification is needed.', 30, 0),
++            array('applicant_clarification_requested', 'Applicant Clarification Requested', 'Waiting on the applicant to clarify an application detail.', 35, 0),
+             array('phone_screen_pending', 'Phone Screen Pending', 'A phone screen is approved but not completed.', 40, 0),
+             array('phone_screen_complete', 'Phone Screen Complete', 'Phone-screen results are ready for human review.', 50, 0),
+             array('interview_requested', 'Interview Requested', 'Craig wants an interview scheduled.', 60, 0),
++            array('interview_confirmation_pending', 'Interview Confirmation Pending', 'Waiting for applicant confirmation or reschedule response.', 65, 0),
+             array('interview_scheduled', 'Interview Scheduled', 'A human interview has been scheduled.', 70, 0),
+             array('scorecard_pending', 'Scorecard Pending', 'An interviewer scorecard is expected.', 80, 0),
++            array('scorecard_complete', 'Scorecard Complete', 'Completed scorecard is ready for Craig decision.', 85, 0),
+             array('offer_review', 'Offer Review', 'Craig is reviewing a possible offer.', 90, 0),
+             array('hired', 'Hired', 'Final human hiring decision recorded.', 100, 1),
+-            array('declined', 'Declined', 'Final human decline decision recorded.', 110, 1)
++            array('hold', 'Hold', 'Candidate is intentionally paused for future seasonal review.', 105, 1),
++            array('not_selected', 'Not Selected', 'Final human decline decision recorded.', 110, 1),
++            array('withdrawn', 'Withdrawn', 'Candidate withdrew or stopped the process.', 120, 1),
++            array('declined', 'Declined', 'Legacy final human decline decision recorded.', 130, 1)
+         );
+     }
+ 
+     public static function getDefaultIntegrationStatuses()
+     {
+         return array(
+-            array('vapi', 'Vapi Phone Screening', 'disabled', 'Disabled in Phase 1. No calls can be placed.'),
+-            array('zoom', 'Zoom Scheduling', 'disabled', 'Disabled in Phase 1. No meetings can be created.'),
+-            array('ai_review', 'AI Candidate Review', 'disabled', 'Disabled in Phase 1. No model calls can run.'),
+-            array('email', 'Applicant Email', 'disabled', 'Disabled in Phase 1. No outbound applicant email can be sent.')
++            array('vapi', 'Vapi Phone Screening', 'disabled', 'Disabled in Phase 2. No calls can be placed.'),
++            array('zoom', 'Zoom Scheduling', 'disabled', 'Disabled in Phase 2. No meetings can be created.'),
++            array('ai_review', 'AI Candidate Review', 'disabled', 'Disabled in Phase 2. No model calls can run.'),
++            array('email', 'Applicant Email', 'disabled', 'Disabled in Phase 2. No outbound applicant email can be sent.')
+         );
+     }
+ 
+@@ -68,13 +98,83 @@ class NESPWorkflow
+         return false;
+     }
+ 
++    public static function getQueueDefinitions()
++    {
++        return array(
++            'needsCraig' => array(
++                'title' => 'Needs Craig Now',
++                'empty' => 'No Craig decisions are waiting.',
++                'stageKeys' => array(
++                    'new',
++                    'needs_review',
++                    'phone_screen_complete',
++                    'interview_requested',
++                    'scorecard_complete',
++                    'offer_review'
++                )
++            ),
++            'waitingApplicant' => array(
++                'title' => 'Waiting on Applicant',
++                'empty' => 'No applicant follow-up is waiting.',
++                'stageKeys' => array(
++                    'follow_up_needed',
++                    'applicant_clarification_requested',
++                    'phone_screen_pending',
++                    'interview_confirmation_pending'
++                )
++            ),
++            'waitingInterviewer' => array(
++                'title' => 'Waiting on Interviewer',
++                'empty' => 'No interviewer tasks are waiting.',
++                'stageKeys' => array(
++                    'interview_scheduled',
++                    'scorecard_pending'
++                )
++            ),
++            'upcomingInterviews' => array(
++                'title' => 'Upcoming Interviews',
++                'empty' => 'No upcoming interviews are scheduled.'
++            ),
++            'recentlyCompleted' => array(
++                'title' => 'Recently Completed',
++                'empty' => 'No recent completed decisions.',
++                'stageKeys' => array(
++                    'scorecard_complete',
++                    'hired',
++                    'hold',
++                    'not_selected',
++                    'withdrawn',
++                    'declined'
++                )
++            )
++        );
++    }
++
++    public static function getDefaultScorecardQuestions()
++    {
++        return array(
++            array('key' => 'reliability', 'label' => 'Reliability and schedule fit', 'type' => 'rating'),
++            array('key' => 'people_skills', 'label' => 'Comfort with athletes, families, coaches, and staff', 'type' => 'rating'),
++            array('key' => 'role_fit', 'label' => 'Role-specific skills or trainability', 'type' => 'rating'),
++            array('key' => 'notes', 'label' => 'Factual notes from the conversation', 'type' => 'textarea')
++        );
++    }
++
+     public function isSchemaInstalled()
+     {
+-        $rs = $this->_db->getAssoc(
++        $featureFlags = $this->_db->getAssoc(
+             "SHOW TABLES LIKE 'nesp_feature_flag'"
+         );
+ 
+-        return !empty($rs);
++        $staffingHistory = $this->_db->getAssoc(
++            "SHOW TABLES LIKE 'nesp_staffing_schedule_history'"
++        );
++
++        $workflowSummary = $this->_db->getAssoc(
++            "SHOW COLUMNS FROM nesp_candidate_workflow LIKE 'summary'"
++        );
++
++        return !empty($featureFlags) && !empty($staffingHistory) && !empty($workflowSummary);
+     }
+ 
+     public function getFeatureFlags()
+@@ -89,11 +189,44 @@ class NESPWorkflow
+                 date_modified
+             FROM
+                 nesp_feature_flag
++            WHERE
++                flag_key IN ("NESP_WORKFLOW_ENABLED", "NESP_INTERVIEWER_POOL_ENABLED", "NESP_PRESCREEN_ENABLED", "NESP_VAPI_ENABLED", "NESP_ZOOM_ENABLED", "NESP_AI_REVIEW_ENABLED")
+             ORDER BY
+                 display_name'
+         );
+     }
+ 
++    public function updateFeatureFlag($flagKey, $isEnabled, $actorUserID)
++    {
++        if (!in_array($flagKey, self::getRequiredFeatureFlagKeys()))
++        {
++            return false;
++        }
++
++        $sql = sprintf(
++            'UPDATE
++                nesp_feature_flag
++             SET
++                is_enabled = %s,
++                date_modified = NOW()
++             WHERE
++                flag_key = %s',
++            ((int) $isEnabled) === 1 ? '1' : '0',
++            $this->_db->makeQueryString($flagKey)
++        );
++
++        $this->_db->query($sql);
++        $this->logAuditEvent(
++            $actorUserID,
++            'feature_flag_updated',
++            'feature_flag',
++            null,
++            array('flag_key' => $flagKey, 'is_enabled' => ((int) $isEnabled) === 1 ? 1 : 0)
++        );
++
++        return true;
++    }
++
+     public function getWorkflowStages()
+     {
+         return $this->_db->getAllAssoc(
+@@ -176,6 +309,487 @@ class NESPWorkflow
+         );
+     }
+ 
++    public function getDashboardQueues()
++    {
++        $rows = $this->getDashboardCandidateRows(120);
++        $queues = array(
++            'needsCraig' => array(),
++            'waitingApplicant' => array(),
++            'waitingInterviewer' => array(),
++            'upcomingInterviews' => array(),
++            'recentlyCompleted' => array()
++        );
++        $definitions = self::getQueueDefinitions();
++
++        foreach ($rows as $row)
++        {
++            $card = $this->normalizeDashboardCard($row);
++            foreach (array('needsCraig', 'waitingApplicant', 'waitingInterviewer', 'recentlyCompleted') as $queueKey)
++            {
++                if (in_array($row['stage_key'], $definitions[$queueKey]['stageKeys']))
++                {
++                    $queues[$queueKey][] = $card;
++                }
++            }
++
++            if ($row['scheduled_start'] !== null && $row['scheduled_start'] !== ''
++                && in_array($row['interview_status_key'], array('scheduled', 'confirmed', 'needs_notes')))
++            {
++                $queues['upcomingInterviews'][] = $card;
++            }
++
++            if ($row['due_at'] !== null && $row['due_at'] !== ''
++                && strtotime($row['due_at']) < time()
++                && !in_array($row['stage_key'], array('hired', 'hold', 'not_selected', 'withdrawn', 'declined')))
++            {
++                $card['summary'] = 'Overdue item: ' . $card['summary'];
++                array_unshift($queues['needsCraig'], $card);
++            }
++        }
++
++        foreach ($queues as $queueKey => $cards)
++        {
++            $queues[$queueKey] = array_slice($cards, 0, 12);
++        }
++
++        return $queues;
++    }
++
++    public function getDashboardCandidateRows($limit)
++    {
++        $limit = max(1, min(250, (int) $limit));
++
++        return $this->_db->getAllAssoc(
++            sprintf(
++                'SELECT
++                    cw.candidate_workflow_id,
++                    cw.candidate_id,
++                    cw.joborder_id,
++                    cw.waiting_on_key,
++                    cw.summary,
++                    cw.next_action_label,
++                    cw.due_at,
++                    cw.date_modified,
++                    c.first_name,
++                    c.last_name,
++                    jo.title AS role_title,
++                    ws.stage_key,
++                    ws.display_name AS stage_name,
++                    i.interview_id,
++                    i.scheduled_start,
++                    i.scheduled_end,
++                    i.status_key AS interview_status_key,
++                    ip.display_name AS interviewer_name,
++                    sr.status_key AS scorecard_status_key,
++                    sr.overall_recommendation
++                FROM
++                    nesp_candidate_workflow cw
++                INNER JOIN candidate c
++                    ON c.candidate_id = cw.candidate_id
++                INNER JOIN joborder jo
++                    ON jo.joborder_id = cw.joborder_id
++                INNER JOIN nesp_workflow_stage ws
++                    ON ws.workflow_stage_id = cw.workflow_stage_id
++                LEFT JOIN nesp_interview i
++                    ON i.interview_id = (
++                        SELECT MAX(i2.interview_id)
++                        FROM nesp_interview i2
++                        WHERE i2.candidate_id = cw.candidate_id
++                          AND i2.joborder_id = cw.joborder_id
++                    )
++                LEFT JOIN nesp_interviewer_profile ip
++                    ON ip.interviewer_profile_id = i.interviewer_profile_id
++                LEFT JOIN nesp_scorecard_response sr
++                    ON sr.scorecard_response_id = (
++                        SELECT MAX(sr2.scorecard_response_id)
++                        FROM nesp_scorecard_response sr2
++                        WHERE sr2.candidate_id = cw.candidate_id
++                          AND sr2.joborder_id = cw.joborder_id
++                    )
++                WHERE
++                    c.is_active = 1
++                ORDER BY
++                    CASE WHEN cw.due_at IS NULL THEN 1 ELSE 0 END,
++                    cw.due_at ASC,
++                    cw.date_modified DESC
++                LIMIT %s',
++                $this->_db->makeQueryInteger($limit)
++            )
++        );
++    }
++
++    public function getUpcomingInterviews($limit)
++    {
++        $limit = max(1, min(100, (int) $limit));
++
++        return $this->_db->getAllAssoc(
++            sprintf(
++                'SELECT
++                    i.interview_id,
++                    i.candidate_id,
++                    i.joborder_id,
++                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
++                    jo.title AS role_title,
++                    ip.display_name AS interviewer_name,
++                    i.scheduled_start,
++                    i.scheduled_end,
++                    TIMESTAMPDIFF(MINUTE, i.scheduled_start, i.scheduled_end) AS duration_minutes,
++                    i.status_key
++                FROM
++                    nesp_interview i
++                INNER JOIN candidate c
++                    ON c.candidate_id = i.candidate_id
++                INNER JOIN joborder jo
++                    ON jo.joborder_id = i.joborder_id
++                LEFT JOIN nesp_interviewer_profile ip
++                    ON ip.interviewer_profile_id = i.interviewer_profile_id
++                WHERE
++                    i.scheduled_start IS NOT NULL
++                    AND i.status_key IN ("scheduled", "confirmed", "needs_notes")
++                ORDER BY
++                    i.scheduled_start ASC
++                LIMIT %s',
++                $this->_db->makeQueryInteger($limit)
++            )
++        );
++    }
++
++    public function getInterviewerProfiles()
++    {
++        return $this->_db->getAllAssoc(
++            'SELECT
++                ip.interviewer_profile_id,
++                ip.user_id,
++                ip.display_name,
++                ip.email,
++                ip.role_key,
++                ip.is_active,
++                ip.can_view_resume,
++                ip.can_add_notes,
++                ip.can_submit_scorecard,
++                ip.date_modified,
++                COUNT(cg.grant_id) AS active_grants
++             FROM
++                nesp_interviewer_profile ip
++             LEFT JOIN nesp_interviewer_candidate_grant cg
++                ON cg.interviewer_profile_id = ip.interviewer_profile_id
++                AND cg.date_revoked IS NULL
++             GROUP BY
++                ip.interviewer_profile_id
++             ORDER BY
++                ip.is_active DESC,
++                ip.display_name ASC'
++        );
++    }
++
++    public function createInactiveInterviewerProfile($displayName, $email, $roleKey, $actorUserID)
++    {
++        $displayName = trim($displayName);
++        $email = trim($email);
++        $roleKey = trim($roleKey) === '' ? 'interviewer' : trim($roleKey);
++
++        if ($displayName === '')
++        {
++            return false;
++        }
++
++        $sql = sprintf(
++            'INSERT INTO nesp_interviewer_profile
++                (user_id, display_name, email, role_key, is_active, can_view_resume, can_add_notes, can_submit_scorecard, date_created, date_modified)
++             VALUES
++                (NULL, %s, %s, %s, 0, 0, 1, 1, NOW(), NOW())',
++            $this->_db->makeQueryString($displayName),
++            $this->_db->makeQueryString($email),
++            $this->_db->makeQueryString($roleKey)
++        );
++
++        $this->_db->query($sql);
++        $profileID = $this->_db->getLastInsertID();
++        $this->logAuditEvent(
++            $actorUserID,
++            'interviewer_profile_created_inactive',
++            'interviewer_profile',
++            $profileID,
++            array('display_name' => $displayName, 'role_key' => $roleKey)
++        );
++
++        return $profileID;
++    }
++
++    public function getAssignedCandidatesForUser($userID)
++    {
++        return $this->_db->getAllAssoc(
++            sprintf(
++                'SELECT
++                    cg.grant_id,
++                    cg.candidate_id,
++                    cg.joborder_id,
++                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
++                    jo.title AS role_title,
++                    ws.display_name AS stage_name,
++                    ws.stage_key,
++                    cw.summary,
++                    cw.waiting_on_key,
++                    cw.date_modified AS last_activity,
++                    i.interview_id,
++                    i.scheduled_start,
++                    i.scheduled_end,
++                    i.status_key AS interview_status_key,
++                    sr.status_key AS scorecard_status_key
++                FROM
++                    nesp_interviewer_profile ip
++                INNER JOIN nesp_interviewer_candidate_grant cg
++                    ON cg.interviewer_profile_id = ip.interviewer_profile_id
++                    AND cg.date_revoked IS NULL
++                INNER JOIN candidate c
++                    ON c.candidate_id = cg.candidate_id
++                INNER JOIN joborder jo
++                    ON jo.joborder_id = cg.joborder_id
++                LEFT JOIN nesp_candidate_workflow cw
++                    ON cw.candidate_id = cg.candidate_id
++                    AND cw.joborder_id = cg.joborder_id
++                LEFT JOIN nesp_workflow_stage ws
++                    ON ws.workflow_stage_id = cw.workflow_stage_id
++                LEFT JOIN nesp_interview i
++                    ON i.interview_id = (
++                        SELECT MAX(i2.interview_id)
++                        FROM nesp_interview i2
++                        WHERE i2.candidate_id = cg.candidate_id
++                          AND i2.joborder_id = cg.joborder_id
++                          AND i2.interviewer_profile_id = ip.interviewer_profile_id
++                    )
++                LEFT JOIN nesp_scorecard_response sr
++                    ON sr.scorecard_response_id = (
++                        SELECT MAX(sr2.scorecard_response_id)
++                        FROM nesp_scorecard_response sr2
++                        WHERE sr2.candidate_id = cg.candidate_id
++                          AND sr2.joborder_id = cg.joborder_id
++                          AND sr2.interviewer_profile_id = ip.interviewer_profile_id
++                    )
++                WHERE
++                    ip.user_id = %s
++                    AND ip.is_active = 1
++                    AND c.is_active = 1
++                ORDER BY
++                    i.scheduled_start ASC,
++                    cw.date_modified DESC',
++                $this->_db->makeQueryInteger($userID)
++            )
++        );
++    }
++
++    public function getAssignedCandidateDetail($userID, $candidateID, $jobOrderID)
++    {
++        if (!$this->userCanAccessCandidate($userID, $candidateID, $jobOrderID))
++        {
++            return array();
++        }
++
++        $rs = $this->_db->getAssoc(
++            sprintf(
++                'SELECT
++                    cg.grant_id,
++                    cg.candidate_id,
++                    cg.joborder_id,
++                    cg.can_view_resume,
++                    cg.can_add_notes,
++                    cg.can_submit_scorecard,
++                    ip.interviewer_profile_id,
++                    CONCAT(c.first_name, " ", c.last_name) AS candidate_name,
++                    c.email1,
++                    c.phone_cell,
++                    c.key_skills,
++                    c.notes,
++                    jo.title AS role_title,
++                    ws.display_name AS stage_name,
++                    ws.stage_key,
++                    cw.summary,
++                    cw.waiting_on_key,
++                    cw.date_modified AS last_activity
++                FROM
++                    nesp_interviewer_profile ip
++                INNER JOIN nesp_interviewer_candidate_grant cg
++                    ON cg.interviewer_profile_id = ip.interviewer_profile_id
++                    AND cg.date_revoked IS NULL
++                INNER JOIN candidate c
++                    ON c.candidate_id = cg.candidate_id
++                INNER JOIN joborder jo
++                    ON jo.joborder_id = cg.joborder_id
++                LEFT JOIN nesp_candidate_workflow cw
++                    ON cw.candidate_id = cg.candidate_id
++                    AND cw.joborder_id = cg.joborder_id
++                LEFT JOIN nesp_workflow_stage ws
++                    ON ws.workflow_stage_id = cw.workflow_stage_id
++                WHERE
++                    ip.user_id = %s
++                    AND ip.is_active = 1
++                    AND cg.candidate_id = %s
++                    AND cg.joborder_id = %s
++                LIMIT 1',
++                $this->_db->makeQueryInteger($userID),
++                $this->_db->makeQueryInteger($candidateID),
++                $this->_db->makeQueryInteger($jobOrderID)
++            )
++        );
++
++        if (empty($rs))
++        {
++            return array();
++        }
++
++        $rs['interviews'] = $this->_db->getAllAssoc(
++            sprintf(
++                'SELECT interview_id, scheduled_start, scheduled_end, status_key
++                 FROM nesp_interview
++                 WHERE candidate_id = %s
++                   AND joborder_id = %s
++                   AND interviewer_profile_id = %s
++                 ORDER BY scheduled_start DESC',
++                $this->_db->makeQueryInteger($candidateID),
++                $this->_db->makeQueryInteger($jobOrderID),
++                $this->_db->makeQueryInteger($rs['interviewer_profile_id'])
++            )
++        );
++
++        $rs['scorecard'] = $this->_db->getAssoc(
++            sprintf(
++                'SELECT scorecard_response_id, status_key, overall_recommendation, answers_json, submitted_at
++                 FROM nesp_scorecard_response
++                 WHERE candidate_id = %s
++                   AND joborder_id = %s
++                   AND interviewer_profile_id = %s
++                 ORDER BY scorecard_response_id DESC
++                 LIMIT 1',
++                $this->_db->makeQueryInteger($candidateID),
++                $this->_db->makeQueryInteger($jobOrderID),
++                $this->_db->makeQueryInteger($rs['interviewer_profile_id'])
++            )
++        );
++
++        return $rs;
++    }
++
++    public function submitScorecard($userID, $candidateID, $jobOrderID, $answers, $recommendation)
++    {
++        $detail = $this->getAssignedCandidateDetail($userID, $candidateID, $jobOrderID);
++        if (empty($detail) || ((int) $detail['can_submit_scorecard']) !== 1)
++        {
++            return false;
++        }
++
++        $template = $this->getEnabledScorecardTemplate();
++        $answersJSON = json_encode($answers);
++        if ($answersJSON === false)
++        {
++            $answersJSON = '{}';
++        }
++
++        $interviewID = 'NULL';
++        if (!empty($detail['interviews']))
++        {
++            $interviewID = $this->_db->makeQueryInteger($detail['interviews'][0]['interview_id']);
++        }
++
++        $sql = sprintf(
++            'INSERT INTO nesp_scorecard_response
++                (scorecard_template_id, interview_id, candidate_id, joborder_id, interviewer_profile_id, answers_json, overall_recommendation, status_key, submitted_at, date_created, date_modified)
++             VALUES
++                (%s, %s, %s, %s, %s, %s, %s, "submitted", NOW(), NOW(), NOW())',
++            empty($template) ? 'NULL' : $this->_db->makeQueryInteger($template['scorecard_template_id']),
++            $interviewID,
++            $this->_db->makeQueryInteger($candidateID),
++            $this->_db->makeQueryInteger($jobOrderID),
++            $this->_db->makeQueryInteger($detail['interviewer_profile_id']),
++            $this->_db->makeQueryString($answersJSON),
++            $this->_db->makeQueryString($recommendation)
++        );
++
++        $this->_db->query($sql);
++        $responseID = $this->_db->getLastInsertID();
++        $this->logAuditEvent(
++            $userID,
++            'scorecard_submitted',
++            'scorecard_response',
++            $responseID,
++            array('candidate_id' => (int) $candidateID, 'joborder_id' => (int) $jobOrderID)
++        );
++
++        return $responseID;
++    }
++
++    public function getEnabledScorecardTemplate()
++    {
++        return $this->_db->getAssoc(
++            "SELECT scorecard_template_id, template_key, display_name, questions_json
++             FROM nesp_scorecard_template
++             WHERE template_key = 'nesp_standard_interview'
++             ORDER BY is_enabled DESC, scorecard_template_id ASC
++             LIMIT 1"
++        );
++    }
++
++    public function getStaffingForecast()
++    {
++        $history = $this->_db->getAllAssoc(
++            'SELECT
++                schedule_history_id,
++                season_year,
++                season_name,
++                week_start,
++                event_count,
++                photographer_slots,
++                photographer_hours,
++                source_label,
++                notes
++             FROM
++                nesp_staffing_schedule_history
++             ORDER BY
++                week_start ASC'
++        );
++
++        $months = array();
++        foreach ($history as $row)
++        {
++            $monthKey = date('m', strtotime($row['week_start']));
++            if (!isset($months[$monthKey]))
++            {
++                $months[$monthKey] = array(
++                    'month' => date('F', strtotime($row['week_start'])),
++                    'weeks' => 0,
++                    'events' => 0,
++                    'slots' => 0,
++                    'hours' => 0
++                );
++            }
++
++            $months[$monthKey]['weeks']++;
++            $months[$monthKey]['events'] += (int) $row['event_count'];
++            $months[$monthKey]['slots'] += (int) $row['photographer_slots'];
++            $months[$monthKey]['hours'] += (float) $row['photographer_hours'];
++        }
++
++        foreach ($months as $monthKey => $month)
++        {
++            $weeks = max(1, (int) $month['weeks']);
++            $avgSlots = $month['slots'] / $weeks;
++            $months[$monthKey]['avg_events'] = round($month['events'] / $weeks, 1);
++            $months[$monthKey]['avg_slots'] = round($avgSlots, 1);
++            $months[$monthKey]['avg_hours'] = round($month['hours'] / $weeks, 1);
++            $months[$monthKey]['recommended_pipeline'] = (int) ceil($avgSlots * 1.25);
++            $months[$monthKey]['confidence'] = $weeks >= 6 ? 'medium' : 'low';
++        }
++
++        return array(
++            'history' => $history,
++            'months' => array_values($months),
++            'assumptions' => array(
++                'Historical schedule rows are opt-in fixtures unless Craig imports verified schedule history.',
++                'Pipeline target uses 125% of average weekly photographer slots to leave room for declines, conflicts, and weather movement.',
++                'Forecast output is planning guidance only and does not publish jobs, contact applicants, or change feature flags.'
++            )
++        );
++    }
++
+     public function getRecentAuditEvents($limit)
+     {
+         $limit = max(1, min(100, (int) $limit));
+@@ -226,6 +840,87 @@ class NESPWorkflow
+         return !empty($rs);
+     }
+ 
++    private function normalizeDashboardCard($row)
++    {
++        $candidateName = trim($row['first_name'] . ' ' . $row['last_name']);
++        $summary = trim($row['summary']);
++        if ($summary === '')
++        {
++            $summary = 'Workflow item is waiting in the ' . $row['stage_name'] . ' stage.';
++        }
++
++        $waitingOn = trim($row['waiting_on_key']);
++        if ($waitingOn === '')
++        {
++            $waitingOn = $this->inferWaitingOn($row['stage_key']);
++        }
++
++        $nextAction = trim($row['next_action_label']);
++        if ($nextAction === '')
++        {
++            $nextAction = $this->inferNextAction($row['stage_key']);
++        }
++
++        return array(
++            'candidate_id' => (int) $row['candidate_id'],
++            'joborder_id' => (int) $row['joborder_id'],
++            'candidate_name' => $candidateName,
++            'role_title' => $row['role_title'],
++            'stage_name' => $row['stage_name'],
++            'stage_key' => $row['stage_key'],
++            'waiting_on' => $waitingOn,
++            'summary' => $summary,
++            'last_activity' => $row['date_modified'],
++            'next_action_label' => $nextAction,
++            'candidate_url' => CATSUtility::getIndexName() . '?m=candidates&amp;a=show&amp;candidateID=' . (int) $row['candidate_id'],
++            'job_url' => CATSUtility::getIndexName() . '?m=joborders&amp;a=show&amp;jobOrderID=' . (int) $row['joborder_id'],
++            'scheduled_start' => $row['scheduled_start'],
++            'scheduled_end' => $row['scheduled_end'],
++            'interviewer_name' => $row['interviewer_name'],
++            'interview_status_key' => $row['interview_status_key'],
++            'scorecard_status_key' => $row['scorecard_status_key'],
++            'overall_recommendation' => $row['overall_recommendation']
++        );
++    }
++
++    private function inferWaitingOn($stageKey)
++    {
++        if (in_array($stageKey, array('follow_up_needed', 'applicant_clarification_requested', 'phone_screen_pending', 'interview_confirmation_pending')))
++        {
++            return 'Applicant';
++        }
++        if (in_array($stageKey, array('interview_scheduled', 'scorecard_pending')))
++        {
++            return 'Interviewer';
++        }
++        return 'Craig';
++    }
++
++    private function inferNextAction($stageKey)
++    {
++        $actions = array(
++            'new' => 'Review application',
++            'needs_review' => 'Make review decision',
++            'follow_up_needed' => 'Check follow-up',
++            'applicant_clarification_requested' => 'Review applicant reply',
++            'phone_screen_pending' => 'Review phone screen status',
++            'phone_screen_complete' => 'Review phone screen',
++            'interview_requested' => 'Assign interviewer',
++            'interview_confirmation_pending' => 'Check confirmation',
++            'interview_scheduled' => 'Open interview',
++            'scorecard_pending' => 'Check scorecard',
++            'scorecard_complete' => 'Make decision',
++            'offer_review' => 'Review offer',
++            'hired' => 'Open record',
++            'hold' => 'Open record',
++            'not_selected' => 'Open record',
++            'withdrawn' => 'Open record',
++            'declined' => 'Open record'
++        );
++
++        return isset($actions[$stageKey]) ? $actions[$stageKey] : 'Open candidate';
++    }
++
+     public function logAuditEvent($actorUserID, $eventType, $entityType, $entityID, $metadata)
+     {
+         $metadataJSON = json_encode($metadata);
+diff --git a/modules/install/Schema.php b/modules/install/Schema.php
+index 34f3bbb..428148d 100755
+--- a/modules/install/Schema.php
++++ b/modules/install/Schema.php
+@@ -2081,6 +2081,10 @@ class CATSSchema
+                   `joborder_id` INT(11) NOT NULL,
+                   `workflow_stage_id` INT(11) NOT NULL,
+                   `assigned_owner_user_id` INT(11),
++                  `waiting_on_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Craig',
++                  `summary` TEXT COLLATE utf8mb4_unicode_ci,
++                  `next_action_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++                  `due_at` DATETIME,
+                   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                   PRIMARY KEY (`candidate_workflow_id`),
+@@ -2102,6 +2106,8 @@ class CATSSchema
+                   `can_view_ai_review` TINYINT(1) NOT NULL DEFAULT '0',
+                   `can_change_stage` TINYINT(1) NOT NULL DEFAULT '0',
+                   `can_view_other_interviewer_notes` TINYINT(1) NOT NULL DEFAULT '0',
++                  `can_add_notes` TINYINT(1) NOT NULL DEFAULT '1',
++                  `can_submit_scorecard` TINYINT(1) NOT NULL DEFAULT '1',
+                   `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                   `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
+                   PRIMARY KEY (`interviewer_profile_id`),
+@@ -2259,35 +2265,83 @@ class CATSSchema
+                   KEY `IDX_date_created` (`date_created`)
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ 
++                CREATE TABLE IF NOT EXISTS `nesp_session_security_event` (
++                  `session_security_event_id` INT(11) NOT NULL AUTO_INCREMENT,
++                  `user_id` INT(11),
++                  `event_type` VARCHAR(96) COLLATE utf8mb4_unicode_ci NOT NULL,
++                  `ip_address` VARCHAR(45) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++                  `user_agent` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++                  `metadata_json` TEXT COLLATE utf8mb4_unicode_ci,
++                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++                  PRIMARY KEY (`session_security_event_id`),
++                  KEY `IDX_user_id` (`user_id`),
++                  KEY `IDX_event_type` (`event_type`),
++                  KEY `IDX_date_created` (`date_created`)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++                CREATE TABLE IF NOT EXISTS `nesp_staffing_schedule_history` (
++                  `schedule_history_id` INT(11) NOT NULL AUTO_INCREMENT,
++                  `season_year` INT(4) NOT NULL,
++                  `season_name` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++                  `week_start` DATE NOT NULL,
++                  `event_count` INT(11) NOT NULL DEFAULT '0',
++                  `photographer_slots` INT(11) NOT NULL DEFAULT '0',
++                  `photographer_hours` DECIMAL(8,2) NOT NULL DEFAULT '0.00',
++                  `source_label` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++                  `notes` TEXT COLLATE utf8mb4_unicode_ci,
++                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++                  PRIMARY KEY (`schedule_history_id`),
++                  KEY `IDX_week_start` (`week_start`),
++                  KEY `IDX_season` (`season_year`, `season_name`)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++                CREATE TABLE IF NOT EXISTS `nesp_staffing_forecast` (
++                  `staffing_forecast_id` INT(11) NOT NULL AUTO_INCREMENT,
++                  `forecast_year` INT(4) NOT NULL,
++                  `forecast_name` VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
++                  `target_week_start` DATE NOT NULL,
++                  `expected_event_count` INT(11) NOT NULL DEFAULT '0',
++                  `required_photographers` INT(11) NOT NULL DEFAULT '0',
++                  `expected_hours` DECIMAL(8,2) NOT NULL DEFAULT '0.00',
++                  `confidence_key` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'low',
++                  `notes` TEXT COLLATE utf8mb4_unicode_ci,
++                  `date_created` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++                  `date_modified` DATETIME NOT NULL DEFAULT '1000-01-01 00:00:00',
++                  PRIMARY KEY (`staffing_forecast_id`),
++                  KEY `IDX_target_week_start` (`target_week_start`),
++                  KEY `IDX_forecast_year` (`forecast_year`)
++                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
+                 INSERT INTO nesp_feature_flag
+                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+-                SELECT 'interviewer_portal_enabled', 'Interviewer Portal', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW()
+-                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'interviewer_portal_enabled');
++                SELECT 'NESP_WORKFLOW_ENABLED', 'NESP Workflow', 'Craig-reviewed hiring workflow dashboard and task queues.', 0, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_WORKFLOW_ENABLED');
+ 
+                 INSERT INTO nesp_feature_flag
+                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+-                SELECT 'scorecards_enabled', 'Interview Scorecards', 'Browser-based interview scorecards for assigned interviewers.', 0, 1, NOW(), NOW()
+-                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'scorecards_enabled');
++                SELECT 'NESP_INTERVIEWER_POOL_ENABLED', 'Interviewer Pool', 'Scoped interviewer access to assigned candidates and interviews.', 0, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_INTERVIEWER_POOL_ENABLED');
+ 
+                 INSERT INTO nesp_feature_flag
+                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+-                SELECT 'vapi_phone_screening_enabled', 'Vapi Phone Screens', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW()
+-                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'vapi_phone_screening_enabled');
++                SELECT 'NESP_PRESCREEN_ENABLED', 'Prescreen Workflow', 'Craig-approved phone-screen workflow status and results.', 0, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_PRESCREEN_ENABLED');
+ 
+                 INSERT INTO nesp_feature_flag
+                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+-                SELECT 'zoom_scheduling_enabled', 'Zoom Scheduling', 'Craig-approved Zoom interview scheduling workflow.', 0, 1, NOW(), NOW()
+-                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'zoom_scheduling_enabled');
++                SELECT 'NESP_VAPI_ENABLED', 'Vapi Phone Screens', 'Disabled integration flag. No calls are placed by this module.', 0, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_VAPI_ENABLED');
+ 
+                 INSERT INTO nesp_feature_flag
+                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+-                SELECT 'ai_candidate_review_enabled', 'AI Candidate Review', 'On-demand candidate summary controlled by Craig.', 0, 1, NOW(), NOW()
+-                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'ai_candidate_review_enabled');
++                SELECT 'NESP_ZOOM_ENABLED', 'Zoom Scheduling', 'Disabled integration flag. No meetings are created by this module.', 0, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_ZOOM_ENABLED');
+ 
+                 INSERT INTO nesp_feature_flag
+                     (flag_key, display_name, description, is_enabled, requires_admin_approval, date_created, date_modified)
+-                SELECT 'external_email_enabled', 'Applicant Email', 'Outbound applicant email delivery.', 0, 1, NOW(), NOW()
+-                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'external_email_enabled');
++                SELECT 'NESP_AI_REVIEW_ENABLED', 'AI Candidate Review', 'Disabled integration flag. No model calls are made by this module.', 0, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_feature_flag WHERE flag_key = 'NESP_AI_REVIEW_ENABLED');
+ 
+                 INSERT INTO nesp_workflow_stage
+                     (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+@@ -2304,6 +2358,11 @@ class CATSSchema
+                 SELECT 'follow_up_needed', 'Follow Up Needed', 'Missing information or clarification is needed.', 30, 0, 1, NOW(), NOW()
+                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'follow_up_needed');
+ 
++                INSERT INTO nesp_workflow_stage
++                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
++                SELECT 'applicant_clarification_requested', 'Applicant Clarification Requested', 'Waiting on the applicant to clarify an application detail.', 35, 0, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'applicant_clarification_requested');
++
+                 INSERT INTO nesp_workflow_stage
+                     (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                 SELECT 'phone_screen_pending', 'Phone Screen Pending', 'A phone screen is approved but not completed.', 40, 0, 1, NOW(), NOW()
+@@ -2319,6 +2378,11 @@ class CATSSchema
+                 SELECT 'interview_requested', 'Interview Requested', 'Craig wants an interview scheduled.', 60, 0, 1, NOW(), NOW()
+                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'interview_requested');
+ 
++                INSERT INTO nesp_workflow_stage
++                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
++                SELECT 'interview_confirmation_pending', 'Interview Confirmation Pending', 'Waiting for applicant confirmation or reschedule response.', 65, 0, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'interview_confirmation_pending');
++
+                 INSERT INTO nesp_workflow_stage
+                     (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                 SELECT 'interview_scheduled', 'Interview Scheduled', 'A human interview has been scheduled.', 70, 0, 1, NOW(), NOW()
+@@ -2329,6 +2393,11 @@ class CATSSchema
+                 SELECT 'scorecard_pending', 'Scorecard Pending', 'An interviewer scorecard is expected.', 80, 0, 1, NOW(), NOW()
+                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'scorecard_pending');
+ 
++                INSERT INTO nesp_workflow_stage
++                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
++                SELECT 'scorecard_complete', 'Scorecard Complete', 'Completed scorecard is ready for Craig decision.', 85, 0, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'scorecard_complete');
++
+                 INSERT INTO nesp_workflow_stage
+                     (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+                 SELECT 'offer_review', 'Offer Review', 'Craig is reviewing a possible offer.', 90, 0, 1, NOW(), NOW()
+@@ -2341,9 +2410,29 @@ class CATSSchema
+ 
+                 INSERT INTO nesp_workflow_stage
+                     (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
+-                SELECT 'declined', 'Declined', 'Final human decline decision recorded.', 110, 1, 1, NOW(), NOW()
++                SELECT 'hold', 'Hold', 'Candidate is intentionally paused for future seasonal review.', 105, 1, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'hold');
++
++                INSERT INTO nesp_workflow_stage
++                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
++                SELECT 'not_selected', 'Not Selected', 'Final human decline decision recorded.', 110, 1, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'not_selected');
++
++                INSERT INTO nesp_workflow_stage
++                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
++                SELECT 'withdrawn', 'Withdrawn', 'Candidate withdrew or stopped the process.', 120, 1, 1, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'withdrawn');
++
++                INSERT INTO nesp_workflow_stage
++                    (stage_key, display_name, description, sort_order, is_terminal, is_enabled, date_created, date_modified)
++                SELECT 'declined', 'Declined', 'Legacy final human decline decision recorded.', 130, 1, 1, NOW(), NOW()
+                 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_workflow_stage WHERE stage_key = 'declined');
+ 
++                INSERT INTO nesp_scorecard_template
++                    (template_key, display_name, questions_json, is_enabled, date_created, date_modified)
++                SELECT 'nesp_standard_interview', 'NESP Standard Interview Scorecard', '[{\"key\":\"reliability\",\"label\":\"Reliability and schedule fit\",\"type\":\"rating\"},{\"key\":\"people_skills\",\"label\":\"Comfort with athletes, families, coaches, and staff\",\"type\":\"rating\"},{\"key\":\"role_fit\",\"label\":\"Role-specific skills or trainability\",\"type\":\"rating\"},{\"key\":\"notes\",\"label\":\"Factual notes from the conversation\",\"type\":\"textarea\"}]', 0, NOW(), NOW()
++                FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM nesp_scorecard_template WHERE template_key = 'nesp_standard_interview');
++
+                 INSERT INTO nesp_integration_status
+                     (integration_key, display_name, status_key, message, date_created, date_modified)
+                 SELECT 'vapi', 'Vapi Phone Screening', 'disabled', 'Disabled in Phase 1. No calls can be placed.', NOW(), NOW()
+diff --git a/modules/nesp/AssignedCandidate.tpl b/modules/nesp/AssignedCandidate.tpl
+new file mode 100644
+index 0000000..87010b1
+--- /dev/null
++++ b/modules/nesp/AssignedCandidate.tpl
+@@ -0,0 +1,92 @@
++<?php TemplateUtility::printHeader('Assigned Candidate', array('modules/nesp/nespWorkflow.css')); ?>
++<?php TemplateUtility::printHeaderBlock(); ?>
++<?php TemplateUtility::printTabs($this->active, $this->subActive); ?>
++    <div id="main" class="nesp-workflow">
++        <?php TemplateUtility::printQuickSearch(); ?>
++        <div id="contents">
++            <div class="nesp-page-title">
++                <h2><?php $this->_($this->candidate['candidate_name']); ?></h2>
++                <p><?php $this->_($this->candidate['role_title']); ?> assignment. Candidate access is limited to this explicit grant.</p>
++            </div>
++
++            <div class="nesp-two-column">
++                <div class="nesp-panel">
++                    <h3>Assignment Snapshot</h3>
++                    <table class="nesp-table">
++                        <tr><th>Stage</th><td><?php $this->_($this->candidate['stage_name']); ?></td></tr>
++                        <tr><th>Waiting on</th><td><?php $this->_($this->candidate['waiting_on_key']); ?></td></tr>
++                        <tr><th>Last activity</th><td><?php $this->_($this->candidate['last_activity']); ?></td></tr>
++                        <tr><th>Summary</th><td><?php $this->_($this->candidate['summary']); ?></td></tr>
++                        <?php if ((int) $this->candidate['can_view_resume'] === 1): ?>
++                        <tr><th>Skills</th><td><?php $this->_($this->candidate['key_skills']); ?></td></tr>
++                        <tr><th>Notes</th><td><?php $this->_($this->candidate['notes']); ?></td></tr>
++                        <?php endif; ?>
++                    </table>
++                </div>
++
++                <div class="nesp-panel">
++                    <h3>Interviews</h3>
++                    <table class="nesp-table">
++                        <tr>
++                            <th>Date</th>
++                            <th>Time</th>
++                            <th>Status</th>
++                        </tr>
++                        <?php foreach ($this->candidate['interviews'] as $interview): ?>
++                        <tr>
++                            <td><?php $this->_($interview['scheduled_start'] ? date('M j, Y', strtotime($interview['scheduled_start'])) : ''); ?></td>
++                            <td><?php $this->_($interview['scheduled_start'] ? date('g:i A', strtotime($interview['scheduled_start'])) : ''); ?></td>
++                            <td><?php $this->_($interview['status_key']); ?></td>
++                        </tr>
++                        <?php endforeach; ?>
++                        <?php if (!count($this->candidate['interviews'])): ?>
++                        <tr><td colspan="3">No interview record is attached to this assignment.</td></tr>
++                        <?php endif; ?>
++                    </table>
++                </div>
++            </div>
++
++            <div class="nesp-panel">
++                <h3>Scorecard</h3>
++                <?php if (!empty($this->candidate['scorecard']) && $this->candidate['scorecard']['status_key'] === 'submitted'): ?>
++                    <div class="nesp-empty">Scorecard submitted: <?php $this->_($this->candidate['scorecard']['overall_recommendation']); ?></div>
++                <?php elseif ((int) $this->candidate['can_submit_scorecard'] === 1): ?>
++                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=submitScorecard" class="nesp-scorecard-form">
++                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
++                        <input type="hidden" name="candidateID" value="<?php echo((int) $this->candidate['candidate_id']); ?>" />
++                        <input type="hidden" name="jobOrderID" value="<?php echo((int) $this->candidate['joborder_id']); ?>" />
++                        <?php foreach ($this->scorecardQuestions as $question): ?>
++                            <label>
++                                <?php $this->_($question['label']); ?>
++                                <?php if ($question['type'] === 'rating'): ?>
++                                    <select name="answers[<?php $this->_($question['key']); ?>]">
++                                        <option value="">Select</option>
++                                        <option value="1">1 - concern</option>
++                                        <option value="2">2 - mixed</option>
++                                        <option value="3">3 - solid</option>
++                                        <option value="4">4 - strong</option>
++                                        <option value="5">5 - excellent</option>
++                                    </select>
++                                <?php else: ?>
++                                    <textarea name="answers[<?php $this->_($question['key']); ?>]" rows="4"></textarea>
++                                <?php endif; ?>
++                            </label>
++                        <?php endforeach; ?>
++                        <label>
++                            Overall recommendation
++                            <select name="overallRecommendation">
++                                <option value="advance">Advance</option>
++                                <option value="hold">Hold</option>
++                                <option value="not_selected">Not selected</option>
++                                <option value="needs_craig_review">Needs Craig review</option>
++                            </select>
++                        </label>
++                        <button type="submit" class="nesp-primary-button">Submit Scorecard</button>
++                    </form>
++                <?php else: ?>
++                    <div class="nesp-empty">This assignment does not allow scorecard submission.</div>
++                <?php endif; ?>
++            </div>
++        </div>
++    </div>
++<?php TemplateUtility::printFooter(); ?>
+diff --git a/modules/nesp/AssignedCandidates.tpl b/modules/nesp/AssignedCandidates.tpl
+new file mode 100644
+index 0000000..3154622
+--- /dev/null
++++ b/modules/nesp/AssignedCandidates.tpl
+@@ -0,0 +1,37 @@
++<?php TemplateUtility::printHeader('Assigned Candidates', array('modules/nesp/nespWorkflow.css')); ?>
++<?php TemplateUtility::printHeaderBlock(); ?>
++<?php TemplateUtility::printTabs($this->active, $this->subActive); ?>
++    <div id="main" class="nesp-workflow">
++        <?php TemplateUtility::printQuickSearch(); ?>
++        <div id="contents">
++            <div class="nesp-page-title">
++                <h2>My Assigned Candidates</h2>
++                <p>Scoped interviewer view. Only explicitly granted candidate and role assignments appear here.</p>
++            </div>
++
++            <?php if (count($this->assignedCandidates)): ?>
++                <div class="nesp-task-grid">
++                    <?php foreach ($this->assignedCandidates as $candidate): ?>
++                    <div class="nesp-task-card">
++                        <div class="nesp-task-topline">
++                            <strong><?php $this->_($candidate['candidate_name']); ?></strong>
++                            <span><?php $this->_($candidate['stage_name']); ?></span>
++                        </div>
++                        <div class="nesp-task-role"><?php $this->_($candidate['role_title']); ?></div>
++                        <p><?php $this->_($candidate['summary']); ?></p>
++                        <dl>
++                            <dt>Interview</dt>
++                            <dd><?php $this->_($candidate['scheduled_start']); ?></dd>
++                            <dt>Scorecard</dt>
++                            <dd><?php $this->_($candidate['scorecard_status_key']); ?></dd>
++                        </dl>
++                        <a class="nesp-primary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=assignedCandidate&amp;candidateID=<?php echo((int) $candidate['candidate_id']); ?>&amp;jobOrderID=<?php echo((int) $candidate['joborder_id']); ?>">Open Assignment</a>
++                    </div>
++                    <?php endforeach; ?>
++                </div>
++            <?php else: ?>
++                <div class="nesp-empty">No candidate assignments are available for your account.</div>
++            <?php endif; ?>
++        </div>
++    </div>
++<?php TemplateUtility::printFooter(); ?>
+diff --git a/modules/nesp/Dashboard.tpl b/modules/nesp/Dashboard.tpl
+index 718ba68..d117bdc 100644
+--- a/modules/nesp/Dashboard.tpl
++++ b/modules/nesp/Dashboard.tpl
+@@ -1,4 +1,4 @@
+-<?php TemplateUtility::printHeader('NESP Hiring', array('modules/nesp/nespWorkflow.css')); ?>
++<?php TemplateUtility::printHeader('NESP Hiring Dashboard', array('modules/nesp/nespWorkflow.css')); ?>
+ <?php TemplateUtility::printHeaderBlock(); ?>
+ <?php TemplateUtility::printTabs($this->active, $this->subActive); ?>
+     <div id="main" class="nesp-workflow">
+@@ -6,43 +6,130 @@
+         <div id="contents">
+             <div class="nesp-page-title">
+                 <h2>NESP Hiring Dashboard</h2>
+-                <p>Browser-based workflow foundation. All Phase 1 integrations are intentionally off.</p>
++                <p>Task-first hiring view for Craig, applicants, interviewers, and seasonal staffing. Production integrations stay disabled unless Craig turns them on later.</p>
+             </div>
+ 
+             <div class="nesp-safety-banner">
+-                Human-reviewed only: no automatic rejection, ranking, hiring, applicant email, phone calls, Zoom meetings, or AI review is enabled.
++                Human-reviewed only: no automatic rejection, ranking, applicant email, phone calls, Zoom meetings, AI review, or external posting happens from this dashboard.
+             </div>
+ 
+-            <div class="nesp-card-grid">
+-                <div class="nesp-card">
+-                    <span class="nesp-card-label">Public Jobs</span>
+-                    <strong><?php $this->_($this->summary['publicJobs']); ?></strong>
+-                </div>
+-                <div class="nesp-card">
+-                    <span class="nesp-card-label">Active Candidates</span>
+-                    <strong><?php $this->_($this->summary['allCandidates']); ?></strong>
+-                </div>
++            <div class="nesp-dashboard-nav">
++                <a class="<?php echo($this->viewKey === 'dashboard' ? 'active' : ''); ?>" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp">Needs Craig</a>
++                <a class="<?php echo($this->viewKey === 'waiting' ? 'active' : ''); ?>" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=waiting">Waiting</a>
++                <a class="<?php echo($this->viewKey === 'interviews' ? 'active' : ''); ?>" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=interviews">Interviews</a>
++                <a class="<?php echo($this->viewKey === 'completed' ? 'active' : ''); ?>" href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=completed">Completed</a>
++                <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=staffingForecast">Staffing Forecast</a>
++                <?php if ($this->getUserAccessLevel('settings.administration') >= ACCESS_LEVEL_SA): ?>
++                    <a href="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=settings">Settings</a>
++                <?php endif; ?>
++            </div>
++
++            <div class="nesp-card-grid nesp-card-grid-compact">
+                 <div class="nesp-card">
+-                    <span class="nesp-card-label">Tracked in NESP Workflow</span>
+-                    <strong><?php $this->_($this->summary['workflowTrackedCandidates']); ?></strong>
++                    <span class="nesp-card-label">Needs Craig</span>
++                    <strong><?php $this->_(count($this->queues['needsCraig'])); ?></strong>
+                 </div>
+                 <div class="nesp-card">
+-                    <span class="nesp-card-label">Needs Review</span>
+-                    <strong><?php $this->_($this->summary['needsReview']); ?></strong>
++                    <span class="nesp-card-label">Waiting on Applicant</span>
++                    <strong><?php $this->_(count($this->queues['waitingApplicant'])); ?></strong>
+                 </div>
+                 <div class="nesp-card">
+-                    <span class="nesp-card-label">Enabled Integrations</span>
+-                    <strong><?php $this->_($this->summary['integrationsEnabled']); ?></strong>
++                    <span class="nesp-card-label">Waiting on Interviewer</span>
++                    <strong><?php $this->_(count($this->queues['waitingInterviewer'])); ?></strong>
+                 </div>
+                 <div class="nesp-card">
+-                    <span class="nesp-card-label">Audit Events This Week</span>
+-                    <strong><?php $this->_($this->summary['recentAuditEvents']); ?></strong>
++                    <span class="nesp-card-label">Upcoming Interviews</span>
++                    <strong><?php $this->_(count($this->upcomingInterviews)); ?></strong>
+                 </div>
+             </div>
+ 
++            <?php
++                $sections = array();
++                if ($this->viewKey === 'waiting')
++                {
++                    $sections = array('waitingApplicant', 'waitingInterviewer');
++                }
++                else if ($this->viewKey === 'interviews')
++                {
++                    $sections = array('upcomingInterviews', 'waitingInterviewer');
++                }
++                else if ($this->viewKey === 'completed')
++                {
++                    $sections = array('recentlyCompleted');
++                }
++                else
++                {
++                    $sections = array('needsCraig', 'waitingApplicant', 'waitingInterviewer', 'upcomingInterviews', 'recentlyCompleted');
++                }
++            ?>
++
++            <?php foreach ($sections as $sectionKey): ?>
++                <div class="nesp-queue-section">
++                    <h3><?php $this->_($this->queueDefinitions[$sectionKey]['title']); ?></h3>
++                    <?php if ($sectionKey === 'upcomingInterviews'): ?>
++                        <?php if (count($this->upcomingInterviews)): ?>
++                            <table class="nesp-table nesp-interview-table">
++                                <tr>
++                                    <th>Candidate</th>
++                                    <th>Role</th>
++                                    <th>Interviewer</th>
++                                    <th>Date</th>
++                                    <th>Time</th>
++                                    <th>Duration</th>
++                                    <th>Status</th>
++                                    <th>Action</th>
++                                </tr>
++                                <?php foreach ($this->upcomingInterviews as $interview): ?>
++                                <tr>
++                                    <td><?php $this->_($interview['candidate_name']); ?></td>
++                                    <td><?php $this->_($interview['role_title']); ?></td>
++                                    <td><?php $this->_($interview['interviewer_name']); ?></td>
++                                    <td><?php $this->_(date('M j, Y', strtotime($interview['scheduled_start']))); ?></td>
++                                    <td><?php $this->_(date('g:i A', strtotime($interview['scheduled_start']))); ?></td>
++                                    <td><?php $this->_((int) $interview['duration_minutes'] . ' min'); ?></td>
++                                    <td><?php $this->_($interview['status_key']); ?></td>
++                                    <td><a class="nesp-secondary-action" href="<?php echo(CATSUtility::getIndexName()); ?>?m=candidates&amp;a=show&amp;candidateID=<?php echo((int) $interview['candidate_id']); ?>">Open</a></td>
++                                </tr>
++                                <?php endforeach; ?>
++                            </table>
++                        <?php else: ?>
++                            <div class="nesp-empty"><?php $this->_($this->queueDefinitions[$sectionKey]['empty']); ?></div>
++                        <?php endif; ?>
++                    <?php else: ?>
++                        <?php if (count($this->queues[$sectionKey])): ?>
++                            <div class="nesp-task-grid">
++                                <?php foreach ($this->queues[$sectionKey] as $card): ?>
++                                    <div class="nesp-task-card">
++                                        <div class="nesp-task-topline">
++                                            <strong><?php $this->_($card['candidate_name']); ?></strong>
++                                            <span><?php $this->_($card['stage_name']); ?></span>
++                                        </div>
++                                        <div class="nesp-task-role"><?php $this->_($card['role_title']); ?></div>
++                                        <p><?php $this->_($card['summary']); ?></p>
++                                        <dl>
++                                            <dt>Waiting on</dt>
++                                            <dd><?php $this->_($card['waiting_on']); ?></dd>
++                                            <dt>Last activity</dt>
++                                            <dd><?php $this->_($card['last_activity']); ?></dd>
++                                        </dl>
++                                        <a class="nesp-primary-action" href="<?php echo($card['candidate_url']); ?>"><?php $this->_($card['next_action_label']); ?></a>
++                                        <div class="nesp-secondary-actions">
++                                            <a href="<?php echo($card['candidate_url']); ?>">Candidate</a>
++                                            <a href="<?php echo($card['job_url']); ?>">Role</a>
++                                        </div>
++                                    </div>
++                                <?php endforeach; ?>
++                            </div>
++                        <?php else: ?>
++                            <div class="nesp-empty"><?php $this->_($this->queueDefinitions[$sectionKey]['empty']); ?></div>
++                        <?php endif; ?>
++                    <?php endif; ?>
++                </div>
++            <?php endforeach; ?>
++
+             <div class="nesp-two-column">
+                 <div class="nesp-panel">
+-                    <h3>Integration Status</h3>
++                    <h3>Feature Flag Safety</h3>
+                     <table class="nesp-table">
+                         <tr>
+                             <th>Integration</th>
+@@ -60,19 +147,12 @@
+                 </div>
+ 
+                 <div class="nesp-panel">
+-                    <h3>Workflow Stages</h3>
+-                    <table class="nesp-table">
+-                        <tr>
+-                            <th>Stage</th>
+-                            <th>Use</th>
+-                        </tr>
+-                        <?php foreach ($this->workflowStages as $stage): ?>
+-                        <tr>
+-                            <td><?php $this->_($stage['display_name']); ?></td>
+-                            <td><?php $this->_($stage['description']); ?></td>
+-                        </tr>
+-                        <?php endforeach; ?>
+-                    </table>
++                    <h3>Workflow Coverage</h3>
++                    <ul class="nesp-list">
++                        <li><?php $this->_($this->summary['workflowTrackedCandidates']); ?> candidates tracked in NESP workflow.</li>
++                        <li><?php $this->_($this->summary['recentAuditEvents']); ?> audit events recorded this week.</li>
++                        <li><?php $this->_($this->summary['integrationsEnabled']); ?> integration flags enabled.</li>
++                    </ul>
+                 </div>
+             </div>
+         </div>
+diff --git a/modules/nesp/NESPUI.php b/modules/nesp/NESPUI.php
+index c3d4455..6a7634f 100644
+--- a/modules/nesp/NESPUI.php
++++ b/modules/nesp/NESPUI.php
+@@ -19,10 +19,12 @@ class NESPUI extends UserInterface
+         $this->_moduleName = 'nesp';
+         $this->_moduleTabText = 'NESP Hiring*al=' . ACCESS_LEVEL_READ;
+         $this->_subTabs = array(
+-            'Dashboard' => CATSUtility::getIndexName() . '?m=nesp*al=' . ACCESS_LEVEL_READ,
+-            'Feature Flags' => CATSUtility::getIndexName() . '?m=nesp&amp;a=featureFlags*al=' . ACCESS_LEVEL_SA,
+-            'Interviewer Access' => CATSUtility::getIndexName() . '?m=nesp&amp;a=interviewerAccess*al=' . ACCESS_LEVEL_SA,
+-            'Audit Log' => CATSUtility::getIndexName() . '?m=nesp&amp;a=auditLog*al=' . ACCESS_LEVEL_SA
++            'Needs Craig' => CATSUtility::getIndexName() . '?m=nesp*al=' . ACCESS_LEVEL_READ,
++            'Waiting' => CATSUtility::getIndexName() . '?m=nesp&amp;a=waiting*al=' . ACCESS_LEVEL_READ,
++            'Interviews' => CATSUtility::getIndexName() . '?m=nesp&amp;a=interviews*al=' . ACCESS_LEVEL_READ,
++            'Completed' => CATSUtility::getIndexName() . '?m=nesp&amp;a=completed*al=' . ACCESS_LEVEL_READ,
++            'Staffing Forecast' => CATSUtility::getIndexName() . '?m=nesp&amp;a=staffingForecast*al=' . ACCESS_LEVEL_READ,
++            'Settings' => CATSUtility::getIndexName() . '?m=nesp&amp;a=settings*al=' . ACCESS_LEVEL_SA
+         );
+ 
+         $this->_workflow = new NESPWorkflow();
+@@ -41,8 +43,21 @@ class NESPUI extends UserInterface
+         switch ($action)
+         {
+             case 'featureFlags':
++            case 'settings':
+                 $this->adminOnly();
+-                $this->featureFlags();
++                $this->settings();
++                break;
++
++            case 'saveFeatureFlags':
++                $this->adminOnly();
++                $this->requirePostCSRF();
++                $this->saveFeatureFlags();
++                break;
++
++            case 'createInterviewer':
++                $this->adminOnly();
++                $this->requirePostCSRF();
++                $this->createInterviewer();
+                 break;
+ 
+             case 'interviewerAccess':
+@@ -55,36 +70,95 @@ class NESPUI extends UserInterface
+                 $this->auditLog();
+                 break;
+ 
++            case 'assignedCandidates':
++                $this->assignedCandidates();
++                break;
++
++            case 'assignedCandidate':
++                $this->assignedCandidate();
++                break;
++
++            case 'submitScorecard':
++                $this->requirePostCSRF();
++                $this->submitScorecard();
++                break;
++
++            case 'staffingForecast':
++                $this->staffingForecast();
++                break;
++
++            case 'waiting':
++            case 'interviews':
++            case 'completed':
+             case 'dashboard':
+             default:
+-                $this->dashboard();
++                $this->dashboard($action);
+                 break;
+         }
+     }
+ 
+-    private function dashboard()
++    private function dashboard($viewKey = 'dashboard')
+     {
++        $queues = $this->_workflow->getDashboardQueues();
+         $this->_template->assign('active', $this);
+-        $this->_template->assign('subActive', 'Dashboard');
++        $this->_template->assign('subActive', $this->subTabFromView($viewKey));
++        $this->_template->assign('viewKey', $viewKey);
+         $this->_template->assign('summary', $this->_workflow->getDashboardSummary());
++        $this->_template->assign('queueDefinitions', NESPWorkflow::getQueueDefinitions());
++        $this->_template->assign('queues', $queues);
++        $this->_template->assign('upcomingInterviews', $this->_workflow->getUpcomingInterviews(20));
+         $this->_template->assign('integrationStatuses', $this->_workflow->getIntegrationStatuses());
+         $this->_template->assign('workflowStages', $this->_workflow->getWorkflowStages());
+         $this->_template->display('./modules/nesp/Dashboard.tpl');
+     }
+ 
+-    private function featureFlags()
++    private function settings()
+     {
+         $this->_template->assign('active', $this);
+-        $this->_template->assign('subActive', 'Feature Flags');
++        $this->_template->assign('subActive', 'Settings');
+         $this->_template->assign('featureFlags', $this->_workflow->getFeatureFlags());
+-        $this->_template->display('./modules/nesp/FeatureFlags.tpl');
++        $this->_template->assign('interviewerProfiles', $this->_workflow->getInterviewerProfiles());
++        $this->_template->assign('summary', $this->_workflow->getInterviewerAccessSummary());
++        $this->_template->display('./modules/nesp/Settings.tpl');
++    }
++
++    private function saveFeatureFlags()
++    {
++        $enabledFlags = isset($_POST['featureFlags']) && is_array($_POST['featureFlags'])
++            ? $_POST['featureFlags'] : array();
++
++        foreach (NESPWorkflow::getRequiredFeatureFlagKeys() as $flagKey)
++        {
++            $this->_workflow->updateFeatureFlag(
++                $flagKey,
++                in_array($flagKey, $enabledFlags) ? 1 : 0,
++                $this->_userID
++            );
++        }
++
++        CATSUtility::transferRelativeURI('m=nesp&a=settings');
++    }
++
++    private function createInterviewer()
++    {
++        $displayName = isset($_POST['displayName']) ? $_POST['displayName'] : '';
++        $email = isset($_POST['email']) ? $_POST['email'] : '';
++        $roleKey = isset($_POST['roleKey']) ? $_POST['roleKey'] : 'interviewer';
++
++        if ($this->_workflow->createInactiveInterviewerProfile($displayName, $email, $roleKey, $this->_userID) === false)
++        {
++            CommonErrors::fatal(COMMONERROR_MISSINGFIELDS, $this, 'Interviewer display name is required.');
++        }
++
++        CATSUtility::transferRelativeURI('m=nesp&a=settings');
+     }
+ 
+     private function interviewerAccess()
+     {
+         $this->_template->assign('active', $this);
+-        $this->_template->assign('subActive', 'Interviewer Access');
++        $this->_template->assign('subActive', 'Settings');
+         $this->_template->assign('summary', $this->_workflow->getInterviewerAccessSummary());
++        $this->_template->assign('interviewerProfiles', $this->_workflow->getInterviewerProfiles());
+         $this->_template->display('./modules/nesp/InterviewerAccess.tpl');
+     }
+ 
+@@ -96,6 +170,65 @@ class NESPUI extends UserInterface
+         $this->_template->display('./modules/nesp/AuditLog.tpl');
+     }
+ 
++    private function assignedCandidates()
++    {
++        $this->_template->assign('active', $this);
++        $this->_template->assign('subActive', 'Interviews');
++        $this->_template->assign('assignedCandidates', $this->_workflow->getAssignedCandidatesForUser($this->_userID));
++        $this->_template->display('./modules/nesp/AssignedCandidates.tpl');
++    }
++
++    private function assignedCandidate()
++    {
++        $candidateID = isset($_GET['candidateID']) ? (int) $_GET['candidateID'] : 0;
++        $jobOrderID = isset($_GET['jobOrderID']) ? (int) $_GET['jobOrderID'] : 0;
++
++        if ($candidateID <= 0 || $jobOrderID <= 0)
++        {
++            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid assigned candidate.');
++        }
++
++        $detail = $this->_workflow->getAssignedCandidateDetail($this->_userID, $candidateID, $jobOrderID);
++        if (empty($detail))
++        {
++            CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'This candidate is not assigned to you.');
++        }
++
++        $this->_template->assign('active', $this);
++        $this->_template->assign('subActive', 'Interviews');
++        $this->_template->assign('candidate', $detail);
++        $this->_template->assign('scorecardQuestions', NESPWorkflow::getDefaultScorecardQuestions());
++        $this->_template->display('./modules/nesp/AssignedCandidate.tpl');
++    }
++
++    private function submitScorecard()
++    {
++        $candidateID = isset($_POST['candidateID']) ? (int) $_POST['candidateID'] : 0;
++        $jobOrderID = isset($_POST['jobOrderID']) ? (int) $_POST['jobOrderID'] : 0;
++        $answers = isset($_POST['answers']) && is_array($_POST['answers']) ? $_POST['answers'] : array();
++        $recommendation = isset($_POST['overallRecommendation']) ? $_POST['overallRecommendation'] : '';
++
++        if ($candidateID <= 0 || $jobOrderID <= 0)
++        {
++            CommonErrors::fatal(COMMONERROR_BADINDEX, $this, 'Invalid scorecard candidate.');
++        }
++
++        if ($this->_workflow->submitScorecard($this->_userID, $candidateID, $jobOrderID, $answers, $recommendation) === false)
++        {
++            CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'You cannot submit a scorecard for this candidate.');
++        }
++
++        CATSUtility::transferRelativeURI('m=nesp&a=assignedCandidate&candidateID=' . $candidateID . '&jobOrderID=' . $jobOrderID);
++    }
++
++    private function staffingForecast()
++    {
++        $this->_template->assign('active', $this);
++        $this->_template->assign('subActive', 'Staffing Forecast');
++        $this->_template->assign('forecast', $this->_workflow->getStaffingForecast());
++        $this->_template->display('./modules/nesp/StaffingForecast.tpl');
++    }
++
+     private function schemaMissing()
+     {
+         $this->_template->assign('active', $this);
+@@ -110,6 +243,37 @@ class NESPUI extends UserInterface
+             CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'Administrator access is required.');
+         }
+     }
++
++    private function requirePostCSRF()
++    {
++        if ($_SERVER['REQUEST_METHOD'] !== 'POST')
++        {
++            CommonErrors::fatal(COMMONERROR_BADFIELDS, $this, 'Invalid request method.');
++        }
++
++        $token = isset($_POST['csrfToken']) ? $_POST['csrfToken'] : null;
++        if (!isset($_SESSION['CATS']) || !$_SESSION['CATS']->isCSRFTokenValid($token))
++        {
++            CommonErrors::fatal(COMMONERROR_PERMISSION, $this, 'Invalid request token.');
++        }
++    }
++
++    private function subTabFromView($viewKey)
++    {
++        if ($viewKey === 'waiting')
++        {
++            return 'Waiting';
++        }
++        if ($viewKey === 'interviews')
++        {
++            return 'Interviews';
++        }
++        if ($viewKey === 'completed')
++        {
++            return 'Completed';
++        }
++        return 'Needs Craig';
++    }
+ }
+ 
+ ?>
+diff --git a/modules/nesp/SchemaMissing.tpl b/modules/nesp/SchemaMissing.tpl
+index 76ccfea..d6d4197 100644
+--- a/modules/nesp/SchemaMissing.tpl
++++ b/modules/nesp/SchemaMissing.tpl
+@@ -9,7 +9,7 @@
+                 <p>The NESP workflow database migration has not been applied yet.</p>
+             </div>
+             <div class="nesp-safety-banner">
+-                The workflow is unavailable until migration 394 is installed. No integrations have been enabled.
++                The workflow is unavailable until the Phase 2 additive migration is applied. No integrations have been enabled.
+             </div>
+         </div>
+     </div>
+diff --git a/modules/nesp/Settings.tpl b/modules/nesp/Settings.tpl
+new file mode 100644
+index 0000000..0c828ab
+--- /dev/null
++++ b/modules/nesp/Settings.tpl
+@@ -0,0 +1,110 @@
++<?php TemplateUtility::printHeader('NESP Settings', array('modules/nesp/nespWorkflow.css')); ?>
++<?php TemplateUtility::printHeaderBlock(); ?>
++<?php TemplateUtility::printTabs($this->active, $this->subActive); ?>
++    <div id="main" class="nesp-workflow">
++        <?php TemplateUtility::printQuickSearch(); ?>
++        <div id="contents">
++            <div class="nesp-page-title">
++                <h2>NESP Settings</h2>
++                <p>Feature flags, scoped interviewer setup, and audit-reviewed controls. All Phase 2 production flags default off.</p>
++            </div>
++
++            <div class="nesp-safety-banner">
++                Turning on a flag here changes only database feature state. It does not deploy, run migrations, create Zoom meetings, initiate Vapi calls, send messages, or run AI review.
++            </div>
++
++            <div class="nesp-two-column">
++                <div class="nesp-panel">
++                    <h3>Feature Flags</h3>
++                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=saveFeatureFlags">
++                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
++                        <table class="nesp-table">
++                            <tr>
++                                <th>Enabled</th>
++                                <th>Feature</th>
++                                <th>Purpose</th>
++                            </tr>
++                            <?php foreach ($this->featureFlags as $flag): ?>
++                            <tr>
++                                <td>
++                                    <input type="checkbox" name="featureFlags[]" value="<?php $this->_($flag['flag_key']); ?>"<?php if ((int) $flag['is_enabled'] === 1): ?> checked="checked"<?php endif; ?> />
++                                </td>
++                                <td>
++                                    <strong><?php $this->_($flag['display_name']); ?></strong><br />
++                                    <span class="nesp-muted"><?php $this->_($flag['flag_key']); ?></span>
++                                </td>
++                                <td><?php $this->_($flag['description']); ?></td>
++                            </tr>
++                            <?php endforeach; ?>
++                        </table>
++                        <button type="submit" class="nesp-primary-button">Save Feature Flags</button>
++                    </form>
++                </div>
++
++                <div class="nesp-panel">
++                    <h3>Interviewer Pool</h3>
++                    <div class="nesp-card-grid nesp-card-grid-tight">
++                        <div class="nesp-card">
++                            <span class="nesp-card-label">Active Interviewers</span>
++                            <strong><?php $this->_($this->summary['activeInterviewers']); ?></strong>
++                        </div>
++                        <div class="nesp-card">
++                            <span class="nesp-card-label">Candidate Grants</span>
++                            <strong><?php $this->_($this->summary['candidateGrants']); ?></strong>
++                        </div>
++                    </div>
++
++                    <form method="post" action="<?php echo(CATSUtility::getIndexName()); ?>?m=nesp&amp;a=createInterviewer" class="nesp-form">
++                        <input type="hidden" name="csrfToken" value="<?php echo(htmlspecialchars($_SESSION['CATS']->getCSRFToken(), ENT_QUOTES, 'UTF-8')); ?>" />
++                        <label>
++                            Display name
++                            <input type="text" name="displayName" />
++                        </label>
++                        <label>
++                            Email
++                            <input type="text" name="email" />
++                        </label>
++                        <label>
++                            Role
++                            <select name="roleKey">
++                                <option value="interviewer">Interviewer</option>
++                                <option value="lead_interviewer">Lead interviewer</option>
++                                <option value="field_trainer">Field trainer</option>
++                            </select>
++                        </label>
++                        <button type="submit" class="nesp-secondary-button">Create Inactive Profile</button>
++                    </form>
++                </div>
++            </div>
++
++            <div class="nesp-panel">
++                <h3>Interviewer Profiles</h3>
++                <table class="nesp-table">
++                    <tr>
++                        <th>Name</th>
++                        <th>Email</th>
++                        <th>Role</th>
++                        <th>Status</th>
++                        <th>Active Grants</th>
++                        <th>Last Change</th>
++                    </tr>
++                    <?php foreach ($this->interviewerProfiles as $profile): ?>
++                    <tr>
++                        <td><?php $this->_($profile['display_name']); ?></td>
++                        <td><?php $this->_($profile['email']); ?></td>
++                        <td><?php $this->_($profile['role_key']); ?></td>
++                        <td><?php echo(((int) $profile['is_active'] === 1) ? 'Active' : 'Inactive'); ?></td>
++                        <td><?php $this->_($profile['active_grants']); ?></td>
++                        <td><?php $this->_($profile['date_modified']); ?></td>
++                    </tr>
++                    <?php endforeach; ?>
++                    <?php if (!count($this->interviewerProfiles)): ?>
++                    <tr>
++                        <td colspan="6">No interviewer profiles have been created.</td>
++                    </tr>
++                    <?php endif; ?>
++                </table>
++            </div>
++        </div>
++    </div>
++<?php TemplateUtility::printFooter(); ?>
+diff --git a/modules/nesp/StaffingForecast.tpl b/modules/nesp/StaffingForecast.tpl
+new file mode 100644
+index 0000000..892cc71
+--- /dev/null
++++ b/modules/nesp/StaffingForecast.tpl
+@@ -0,0 +1,82 @@
++<?php TemplateUtility::printHeader('NESP Staffing Forecast', array('modules/nesp/nespWorkflow.css')); ?>
++<?php TemplateUtility::printHeaderBlock(); ?>
++<?php TemplateUtility::printTabs($this->active, $this->subActive); ?>
++    <div id="main" class="nesp-workflow">
++        <?php TemplateUtility::printQuickSearch(); ?>
++        <div id="contents">
++            <div class="nesp-page-title">
++                <h2>Staffing Forecast</h2>
++                <p>Seasonal photographer planning view based on imported or fixture historical schedule rows.</p>
++            </div>
++
++            <div class="nesp-safety-banner">
++                Forecasts are planning guidance only. This screen does not contact applicants, publish postings, send messages, or change production feature flags.
++            </div>
++
++            <div class="nesp-panel">
++                <h3>Monthly Photographer Demand</h3>
++                <table class="nesp-table">
++                    <tr>
++                        <th>Month</th>
++                        <th>Weeks in History</th>
++                        <th>Avg Events</th>
++                        <th>Avg Photographer Slots</th>
++                        <th>Avg Hours</th>
++                        <th>Pipeline Target</th>
++                        <th>Confidence</th>
++                    </tr>
++                    <?php foreach ($this->forecast['months'] as $month): ?>
++                    <tr>
++                        <td><?php $this->_($month['month']); ?></td>
++                        <td><?php $this->_($month['weeks']); ?></td>
++                        <td><?php $this->_($month['avg_events']); ?></td>
++                        <td><?php $this->_($month['avg_slots']); ?></td>
++                        <td><?php $this->_($month['avg_hours']); ?></td>
++                        <td><?php $this->_($month['recommended_pipeline']); ?></td>
++                        <td><?php $this->_($month['confidence']); ?></td>
++                    </tr>
++                    <?php endforeach; ?>
++                    <?php if (!count($this->forecast['months'])): ?>
++                    <tr><td colspan="7">No staffing history has been imported.</td></tr>
++                    <?php endif; ?>
++                </table>
++            </div>
++
++            <div class="nesp-two-column">
++                <div class="nesp-panel">
++                    <h3>Assumptions</h3>
++                    <ul class="nesp-list">
++                        <?php foreach ($this->forecast['assumptions'] as $assumption): ?>
++                            <li><?php $this->_($assumption); ?></li>
++                        <?php endforeach; ?>
++                    </ul>
++                </div>
++
++                <div class="nesp-panel">
++                    <h3>History Rows</h3>
++                    <table class="nesp-table">
++                        <tr>
++                            <th>Week</th>
++                            <th>Season</th>
++                            <th>Events</th>
++                            <th>Slots</th>
++                            <th>Hours</th>
++                        </tr>
++                        <?php foreach ($this->forecast['history'] as $row): ?>
++                        <tr>
++                            <td><?php $this->_($row['week_start']); ?></td>
++                            <td><?php $this->_($row['season_year'] . ' ' . $row['season_name']); ?></td>
++                            <td><?php $this->_($row['event_count']); ?></td>
++                            <td><?php $this->_($row['photographer_slots']); ?></td>
++                            <td><?php $this->_($row['photographer_hours']); ?></td>
++                        </tr>
++                        <?php endforeach; ?>
++                        <?php if (!count($this->forecast['history'])): ?>
++                        <tr><td colspan="5">No history rows are available.</td></tr>
++                        <?php endif; ?>
++                    </table>
++                </div>
++            </div>
++        </div>
++    </div>
++<?php TemplateUtility::printFooter(); ?>
+diff --git a/modules/nesp/nespWorkflow.css b/modules/nesp/nespWorkflow.css
+index f02974b..5845dfb 100644
+--- a/modules/nesp/nespWorkflow.css
++++ b/modules/nesp/nespWorkflow.css
+@@ -43,6 +43,14 @@
+     margin: 0 0 18px;
+ }
+ 
++.nesp-card-grid-compact {
++    grid-template-columns: repeat(4, minmax(0, 1fr));
++}
++
++.nesp-card-grid-tight {
++    grid-template-columns: repeat(2, minmax(0, 1fr));
++}
++
+ .nesp-card,
+ .nesp-panel {
+     border: 1px solid #d7dee8;
+@@ -77,6 +85,179 @@
+     font-size: 17px;
+ }
+ 
++.nesp-dashboard-nav {
++    display: flex;
++    flex-wrap: wrap;
++    gap: 6px;
++    margin: 0 0 16px;
++}
++
++.nesp-dashboard-nav a {
++    border: 1px solid #b9c5d3;
++    background: #f7f9fc;
++    color: #24384d;
++    padding: 7px 10px;
++    text-decoration: none;
++    font-size: 12px;
++    font-weight: bold;
++}
++
++.nesp-dashboard-nav a.active,
++.nesp-dashboard-nav a:hover {
++    border-color: #315f93;
++    background: #315f93;
++    color: #ffffff;
++}
++
++.nesp-queue-section {
++    margin: 0 0 18px;
++}
++
++.nesp-queue-section h3 {
++    margin: 0 0 10px;
++    color: #071e41;
++    font-size: 18px;
++}
++
++.nesp-task-grid {
++    display: grid;
++    grid-template-columns: repeat(3, minmax(0, 1fr));
++    gap: 12px;
++}
++
++.nesp-task-card {
++    border: 1px solid #cfd8e4;
++    background: #ffffff;
++    padding: 12px;
++    min-height: 210px;
++    display: flex;
++    flex-direction: column;
++}
++
++.nesp-task-topline {
++    display: flex;
++    align-items: flex-start;
++    justify-content: space-between;
++    gap: 10px;
++    margin: 0 0 6px;
++}
++
++.nesp-task-topline strong {
++    color: #071e41;
++    font-size: 15px;
++    line-height: 1.25;
++}
++
++.nesp-task-topline span {
++    flex: 0 0 auto;
++    background: #edf1f6;
++    color: #425466;
++    font-size: 11px;
++    padding: 3px 6px;
++}
++
++.nesp-task-role,
++.nesp-muted {
++    color: #596b7d;
++    font-size: 12px;
++    line-height: 1.35;
++}
++
++.nesp-task-card p {
++    color: #283747;
++    font-size: 13px;
++    line-height: 1.45;
++    margin: 10px 0;
++}
++
++.nesp-task-card dl {
++    display: grid;
++    grid-template-columns: 86px minmax(0, 1fr);
++    gap: 5px 8px;
++    margin: auto 0 12px;
++    font-size: 12px;
++    line-height: 1.35;
++}
++
++.nesp-task-card dt {
++    color: #66778a;
++    font-weight: bold;
++}
++
++.nesp-task-card dd {
++    margin: 0;
++    color: #1b2733;
++}
++
++.nesp-primary-action,
++.nesp-primary-button,
++.nesp-secondary-button {
++    display: inline-block;
++    border: 1px solid #315f93;
++    background: #315f93;
++    color: #ffffff;
++    padding: 9px 12px;
++    text-align: center;
++    text-decoration: none;
++    font-size: 13px;
++    font-weight: bold;
++    cursor: pointer;
++}
++
++.nesp-secondary-button {
++    border-color: #4f6578;
++    background: #4f6578;
++}
++
++.nesp-secondary-action,
++.nesp-secondary-actions a {
++    color: #315f93;
++    font-size: 12px;
++    font-weight: bold;
++    text-decoration: none;
++}
++
++.nesp-secondary-actions {
++    display: flex;
++    gap: 12px;
++    margin-top: 8px;
++}
++
++.nesp-empty {
++    border: 1px dashed #c9d3df;
++    background: #f7f9fc;
++    color: #536579;
++    padding: 14px;
++    font-size: 13px;
++}
++
++.nesp-form,
++.nesp-scorecard-form {
++    display: grid;
++    gap: 10px;
++    margin-top: 12px;
++}
++
++.nesp-form label,
++.nesp-scorecard-form label {
++    display: grid;
++    gap: 5px;
++    color: #253647;
++    font-size: 12px;
++    font-weight: bold;
++}
++
++.nesp-form input,
++.nesp-form select,
++.nesp-scorecard-form select,
++.nesp-scorecard-form textarea {
++    box-sizing: border-box;
++    width: 100%;
++    border: 1px solid #b8c5d3;
++    padding: 7px;
++    font-size: 13px;
++}
++
+ .nesp-table {
+     width: 100%;
+     border-collapse: collapse;
+@@ -130,7 +311,10 @@
+     }
+ 
+     .nesp-card-grid,
+-    .nesp-two-column {
++    .nesp-card-grid-compact,
++    .nesp-card-grid-tight,
++    .nesp-two-column,
++    .nesp-task-grid {
+         grid-template-columns: 1fr;
+     }
+ 
+diff --git a/src/OpenCATS/Tests/IntegrationTests/NESPWorkflowSchemaTest.php b/src/OpenCATS/Tests/IntegrationTests/NESPWorkflowSchemaTest.php
+index 8143c93..96df156 100644
+--- a/src/OpenCATS/Tests/IntegrationTests/NESPWorkflowSchemaTest.php
++++ b/src/OpenCATS/Tests/IntegrationTests/NESPWorkflowSchemaTest.php
+@@ -18,7 +18,10 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
+             'nesp_vapi_phone_screen',
+             'nesp_zoom_interview',
+             'nesp_ai_candidate_review',
+-            'nesp_audit_event'
++            'nesp_audit_event',
++            'nesp_session_security_event',
++            'nesp_staffing_schedule_history',
++            'nesp_staffing_forecast'
+         );
+ 
+         foreach ($expectedTables as $table)
+@@ -31,10 +34,22 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
+     {
+         $this->assertSame(6, $this->countRows('nesp_feature_flag'));
+         $this->assertSame(0, $this->countRowsWhere('nesp_feature_flag', 'is_enabled = 1'));
+-        $this->assertSame(11, $this->countRows('nesp_workflow_stage'));
++        $this->assertSame(17, $this->countRows('nesp_workflow_stage'));
+         $this->assertSame(4, $this->countRowsWhere('nesp_integration_status', "status_key = 'disabled'"));
+         $this->assertSame(0, $this->countRows('nesp_interviewer_profile'));
+         $this->assertSame(0, $this->countRows('nesp_candidate_workflow'));
++        $this->assertSame(1, $this->countRowsWhere('nesp_scorecard_template', "template_key = 'nesp_standard_interview' AND is_enabled = 0"));
++        $this->assertSame(6, $this->countRowsWhere('nesp_feature_flag', "flag_key LIKE 'NESP_%'"));
++    }
++
++    public function testNESPPhase2ColumnsArePresent()
++    {
++        $this->assertSame(1, $this->countMatchingColumns('nesp_candidate_workflow', 'waiting_on_key'));
++        $this->assertSame(1, $this->countMatchingColumns('nesp_candidate_workflow', 'summary'));
++        $this->assertSame(1, $this->countMatchingColumns('nesp_candidate_workflow', 'next_action_label'));
++        $this->assertSame(1, $this->countMatchingColumns('nesp_candidate_workflow', 'due_at'));
++        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'can_add_notes'));
++        $this->assertSame(1, $this->countMatchingColumns('nesp_interviewer_profile', 'can_submit_scorecard'));
+     }
+ 
+     private function countMatchingTables($table)
+@@ -54,6 +69,22 @@ class NESPWorkflowSchemaTest extends DatabaseTestCase
+         return $this->countRowsWhere($table, '1 = 1');
+     }
+ 
++    private function countMatchingColumns($table, $column)
++    {
++        global $mySQLConnection;
++
++        $result = mysqli_query(
++            $mySQLConnection,
++            sprintf(
++                "SHOW COLUMNS FROM `%s` LIKE '%s'",
++                mysqli_real_escape_string($mySQLConnection, $table),
++                mysqli_real_escape_string($mySQLConnection, $column)
++            )
++        );
++
++        return mysqli_num_rows($result);
++    }
++
+     private function countRowsWhere($table, $whereClause)
+     {
+         global $mySQLConnection;
+diff --git a/src/OpenCATS/Tests/UnitTests/NESPWorkflowTest.php b/src/OpenCATS/Tests/UnitTests/NESPWorkflowTest.php
+index 749c65a..a92b5b4 100644
+--- a/src/OpenCATS/Tests/UnitTests/NESPWorkflowTest.php
++++ b/src/OpenCATS/Tests/UnitTests/NESPWorkflowTest.php
+@@ -8,12 +8,16 @@ class NESPWorkflowTest extends TestCase
+     public function testDefaultFeatureFlagsAreDisabled()
+     {
+         $flags = NESPWorkflow::getDefaultFeatureFlags();
++        $keys = array();
+ 
+         $this->assertCount(6, $flags);
+         foreach ($flags as $flag)
+         {
++            $keys[] = $flag[0];
+             $this->assertSame(0, $flag[3]);
+         }
++
++        $this->assertSame(NESPWorkflow::getRequiredFeatureFlagKeys(), $keys);
+     }
+ 
+     public function testDefaultIntegrationsAreDisabled()
+@@ -30,12 +34,50 @@ class NESPWorkflowTest extends TestCase
+     public function testIntegrationFlagLookupDefaultsToFalse()
+     {
+         $flags = array(
+-            array('flag_key' => 'ai_candidate_review_enabled', 'is_enabled' => 0),
+-            array('flag_key' => 'zoom_scheduling_enabled', 'is_enabled' => 1)
++            array('flag_key' => 'NESP_AI_REVIEW_ENABLED', 'is_enabled' => 0),
++            array('flag_key' => 'NESP_ZOOM_ENABLED', 'is_enabled' => 1)
++        );
++
++        $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'NESP_AI_REVIEW_ENABLED'));
++        $this->assertTrue(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'NESP_ZOOM_ENABLED'));
++        $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'NESP_VAPI_ENABLED'));
++    }
++
++    public function testDashboardNavigationIncludesTaskViews()
++    {
++        $labels = array_map(
++            function ($item) {
++                return $item['label'];
++            },
++            NESPWorkflow::getDashboardNavigation()
++        );
++
++        $this->assertSame(
++            array('Needs Craig', 'Waiting', 'Interviews', 'Completed', 'Staffing Forecast', 'Settings'),
++            $labels
+         );
++    }
++
++    public function testQueueDefinitionsCoverRequestedDashboardSections()
++    {
++        $queues = NESPWorkflow::getQueueDefinitions();
++
++        $this->assertArrayHasKey('needsCraig', $queues);
++        $this->assertArrayHasKey('waitingApplicant', $queues);
++        $this->assertArrayHasKey('waitingInterviewer', $queues);
++        $this->assertArrayHasKey('upcomingInterviews', $queues);
++        $this->assertArrayHasKey('recentlyCompleted', $queues);
++        $this->assertContains('scorecard_complete', $queues['needsCraig']['stageKeys']);
++        $this->assertContains('applicant_clarification_requested', $queues['waitingApplicant']['stageKeys']);
++        $this->assertContains('scorecard_pending', $queues['waitingInterviewer']['stageKeys']);
++    }
++
++    public function testDefaultScorecardQuestionsAreFactual()
++    {
++        $questions = NESPWorkflow::getDefaultScorecardQuestions();
+ 
+-        $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'ai_candidate_review_enabled'));
+-        $this->assertTrue(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'zoom_scheduling_enabled'));
+-        $this->assertFalse(NESPWorkflow::isIntegrationEnabledFromFlags($flags, 'vapi_phone_screening_enabled'));
++        $this->assertCount(4, $questions);
++        $this->assertSame('notes', $questions[3]['key']);
++        $this->assertSame('textarea', $questions[3]['type']);
+     }
+ }
+-- 
+2.50.1 (Apple Git-155)
+
