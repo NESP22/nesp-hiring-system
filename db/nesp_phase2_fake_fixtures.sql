@@ -96,8 +96,11 @@ ON DUPLICATE KEY UPDATE `workflow_stage_id` = VALUES(`workflow_stage_id`), `summ
 INSERT INTO `nesp_interviewer_profile`
     (`interviewer_profile_id`, `user_id`, `display_name`, `email`, `role_key`, `is_active`, `can_view_resume`, `can_add_notes`, `can_submit_scorecard`, `date_created`, `date_modified`)
 VALUES
-    (920001, 1, 'Fixture Photographer Lead', 'fixture.photographer.lead@example.test', 'lead_interviewer', 1, 1, 1, 1, NOW(), NOW()),
-    (920002, 1, 'Fixture Customer Service Reviewer', 'fixture.customer.service@example.test', 'interviewer', 1, 1, 1, 1, NOW(), NOW())
+    -- Fixture profiles intentionally have no linked application user. The
+    -- schema permits multiple NULL values in its unique user_id index, unlike
+    -- the shared administrator ID that would collapse these two profiles.
+    (920001, NULL, 'Fixture Photographer Lead', 'fixture.photographer.lead@example.test', 'lead_interviewer', 1, 1, 1, 1, NOW(), NOW()),
+    (920002, NULL, 'Fixture Customer Service Reviewer', 'fixture.customer.service@example.test', 'interviewer', 1, 1, 1, 1, NOW(), NOW())
 ON DUPLICATE KEY UPDATE
     display_name = VALUES(display_name),
     is_active = 1,
