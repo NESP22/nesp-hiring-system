@@ -326,6 +326,7 @@ class NESPVapiIntegration
     {
         $roleScript = self::getRoleScript(isset($job['joborder_id']) ? $job['joborder_id'] : 0, isset($job['title']) ? $job['title'] : '');
         $artifactPlan = self::getNoRecordingArtifactPlan();
+        $callSafetyOverrides = self::getCallSafetyAssistantOverrides();
         return array(
             'assistantId' => self::getEnvValue('VAPI_HIRING_ASSISTANT_ID'),
             'phoneNumberId' => self::getEnvValue('VAPI_PHONE_NUMBER_ID'),
@@ -333,7 +334,7 @@ class NESPVapiIntegration
                 'number' => self::normalizePhoneForDial($destinationPhone)
             ),
             'artifactPlan' => $artifactPlan,
-            'assistantOverrides' => array(
+            'assistantOverrides' => array_merge($callSafetyOverrides, array(
                 'artifactPlan' => $artifactPlan,
                 'variableValues' => array(
                     'nesp_call_request_key' => $callRequestKey,
@@ -351,7 +352,7 @@ class NESPVapiIntegration
                     'consent_required' => true,
                     'audio_recording' => 'off'
                 )
-            )
+            ))
         );
     }
 
@@ -365,6 +366,39 @@ class NESPVapiIntegration
             'fullMessageHistoryEnabled' => false,
             'transcriptPlan' => array(
                 'enabled' => true
+            )
+        );
+    }
+
+    private static function getCallSafetyAssistantOverrides()
+    {
+        return array(
+            'firstMessageInterruptionsEnabled' => false,
+            'voicemailDetection' => 'off',
+            'maxDurationSeconds' => 600,
+            'backgroundSound' => 'off',
+            'modelOutputInMessagesEnabled' => false,
+            'transportConfigurations' => self::getNoRecordingTransportConfigurations(),
+            'monitorPlan' => array(
+                'listenEnabled' => false,
+                'controlEnabled' => false
+            ),
+            'backgroundSpeechDenoisingPlan' => array(
+                'smartDenoisingPlan' => array(
+                    'enabled' => true
+                )
+            )
+        );
+    }
+
+    private static function getNoRecordingTransportConfigurations()
+    {
+        return array(
+            array(
+                'provider' => 'twilio',
+                'timeout' => 60,
+                'record' => false,
+                'recordingChannels' => 'mono'
             )
         );
     }
